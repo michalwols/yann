@@ -1,1 +1,1 @@
-print('yann')
+from .train import Trainer
