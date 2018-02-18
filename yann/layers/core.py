@@ -1,17 +1,68 @@
 
+from torch.nn import Parameter, Module
+
+from utils import lazy
+
 
 class Params:
+  def __init__(self, layer):
+    self.layer = layer
+    self.values = {}
+
   def __setitem__(self, key, value):
-    pass
+    self.values[key] = Parameter(value)
 
   def __getitem__(self, item):
-    pass
+   if item in self.values:
+     return self.values[item]
+   return getattr(self, item)
 
   def __len__(self):
-    return 1
+    return
+
+  def freeze(self):
+    for p in self:
+      p.requires_grad = False
+
+  @property
+  def initialized(self):
+    return False
+
+  def all(self):
+    for p in self.values.values():
+      yield p
+    for l in self.layer.layers:
+      yield from l.all()
+
+
+class Grads:
+  def __init__(self, layer):
+    self.layer = layer
+
+  def zero(self, deep=True):
+    if deep:
+      for g in self.all():
+        g.data.zero_()
+
+  def all(self):
+    for p in self.layer.params.all():
+      if p.grad:
+        yield p.grad
+
 
 class Layers:
-  pass
+  def __getitem__(self, item):
+    """
+    TODO:
+    - allow indexing by class or class name to get all of that type
+    """
+    pass
+
+  def breadth_first(self):
+    pass
+
+  def depth_first(self):
+    pass
 
 
 class Function:
@@ -30,19 +81,32 @@ class Function:
 
 
 class Partial(Function):
-  pass
+  def __init__(self, func, *args, **kwargs):
+    self.func = func
+    self.args = args
+    self.kwargs = kwargs
 
 
 class Layer(Function):
   def __init__(self, *args, **kwargs):
-    self.was_initialized = False
     self._is_training = True
-    self.params = Params()
     self.init = None
+    self.name = None
 
-  def initialize(self):
-    if self.init:
-      self.init(self.params)
+  @lazy
+  def layers(self):
+    return Layers()
+
+  @lazy
+  def params(self):
+    return Params(self)
+
+  @lazy
+  def grads(self):
+    return Grads(self)
+
+  def initialize(self, *args, **kwargs):
+    pass
 
   def eval(self, *inputs, **kwargs):
     pass
@@ -54,9 +118,6 @@ class Layer(Function):
     return self.eval(*inputs, **kwargs)
 
   def infer_shape(self, *inputs, **kwargs):
-    pass
-
-  def output_shape(self):
     pass
 
   @property
@@ -77,39 +138,8 @@ class Layer(Function):
   def load(self, path):
     pass
 
-
-class Conv(Layer):
-  def __init__(
-      self,
-      d,
-      num_filters,
-      shape,
-      stride=1,
-      pad=0,
-      dilate=0,
-      groups=1
-  ):
-    super(Conv, self).__init__()
-
-
-class Conv1D(Conv):
-  def __init__(self, num_filters, shape):
-    super(Conv1D, self).__init__(d=1, num_filters=num_filters, shape=shape)
-
-class Conv2D(Conv):
-  def __init__(self, num_filters, shape):
-    super(Conv2D, self).__init__(d=2, num_filters=num_filters, shape=shape)
-
-
-class Pool(Layer):
-  pass
-
-class GlobalPool(Pool):
-  # TODO: use mean, max
-  pass
-
-class AdaptivePool(Pool):
-  pass
+  def device(self, name, num=None):
+    pass
 
 class Dense(Layer):
   pass
@@ -120,22 +150,39 @@ class Activation(Layer):
 
 
 class Dropout(Layer):
-  pass
+  def __init__(self, p=.5):
+    super(Dropout, self).__init__()
+    self.p = p
 
 
 class Softmax(Activation):
-  pass
+  def __init__(self, log=False):
+    super(Softmax, self).__init__()
+    self.log = log
 
 
 class Reshape(Layer):
   pass
 
+class Flatten(Reshape):
+  pass
+
+class Merge(Layer):
+  pass
+
+
+class Residual(Layers):
+  def __init__(self, *towers):
+    pass
+
 
 class Stack(Layer):
-  def __init__(self, *layers):
+  def __init__(self, *layers, name=None):
     super(Stack, self).__init__()
     self.layers = []
     self.add(layers)
+
+    self.name = name
 
   def add(self, *layers):
     for l in layers:
