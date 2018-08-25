@@ -30,7 +30,8 @@ class History(Callback):
           metric(targets, outputs)
         )
 
-  def on_validation_end(self, loss, trainer=None):
+  def on_validation_end(self, loss=None, outputs=None, targets=None,
+    trainer=None):
     self.val_times.append(time.time())
     self.val_steps.append(trainer.num_steps)
     self.val_metrics['loss'].append(loss.item())

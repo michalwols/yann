@@ -52,7 +52,8 @@ samples: {trainer.num_samples}\n''')
   def on_validation_start(self, trainer=None):
     self.log('\nStarting Validation')
 
-  def on_validation_end(self, loss, trainer=None):
+  def on_validation_end(self, loss=None, outputs=None, targets=None,
+    trainer=None):
     self.log('\nCompleted Validation, loss:', loss and loss.item())
 
   def on_epoch_end(self, epoch, loss=None, metrics=None, trainer=None):

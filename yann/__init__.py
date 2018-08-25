@@ -1,6 +1,6 @@
 
 import torch
-
+import numpy as np
 
 def seed(val=1):
   import numpy as np
@@ -82,3 +82,11 @@ def trainable(parameters):
 def freeze(parameters):
   for p in parameters:
     p.requires_grad = False
+
+
+def to_numpy(x):
+  if isinstance(x, np.ndarray):
+    return x
+  if torch.is_tensor(x):
+    return x.to('cpu').numpy()
+  return np.array(x)

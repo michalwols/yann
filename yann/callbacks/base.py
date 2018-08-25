@@ -22,7 +22,8 @@ class Callback:
   def on_validation_batch(self, inputs, targets, outputs, trainer):
     pass
 
-  def on_validation_end(self, loss, trainer=None):
+  def on_validation_end(self, targets=None, outputs=None, loss=None,
+                        trainer=None):
     pass
 
   def on_train_end(self, trainer=None):

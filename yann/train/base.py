@@ -1,8 +1,3 @@
-import torch
-
-
-
-
 def callback(method):
   def wrapped_method(self, *args, **kwargs):
     ret = method(self, *args, **kwargs)
@@ -77,7 +72,7 @@ class BaseTrainer:
     pass
 
   @callback
-  def on_validation_end(self, loss):
+  def on_validation_end(self, targets=None, outputs=None, loss=None):
     pass
 
   @callback

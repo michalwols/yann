@@ -4,12 +4,19 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision
 import logging
+import datetime
+import pathlib
+import numpy as np
+
 
 from .base import BaseTrainer
 from yann.data import TransformDataset
 from yann import resolve, evaluate
 from yann import callbacks as yann_callbacks
 
+
+def timestr():
+  return f"{datetime.datetime.utcnow().strftime('%Y-%m-%dT%H%M%S')}"
 
 class Trainer(BaseTrainer):
   model: torch.nn.Module
@@ -98,7 +105,9 @@ class Trainer(BaseTrainer):
     self.num_steps = 0
     self.num_epochs = 0
 
-    self.name = name
+    self.name = name or (
+      f"{timestr()}-{self.model.__class__.__name__}"
+    )
 
     self.history = None
     has_history = False
@@ -176,8 +185,8 @@ class Trainer(BaseTrainer):
       os = torch.cat(os)
 
       loss = self.loss(os, ts)
-      self.on_validation_end(loss=loss)
-      return loss
+    self.on_validation_end(targets=ts, outputs=os, loss=loss)
+    return loss
 
   def run(self, epochs=1):
     self._stop = False
@@ -219,8 +228,6 @@ class Trainer(BaseTrainer):
 
         if self._stop: break
 
-
-
       self.on_train_end()
     except Exception as e:
       self.on_error(e)
@@ -232,36 +239,59 @@ class Trainer(BaseTrainer):
   def stop(self):
     self._stop = True
 
-  def checkpoint(self, root='.'):
-    state = self.state_dict()
-    torch.save(state, '')
+  def get_checkpoint_name(self):
+    return (
+      f"{self.name}-steps_{self.num_steps}.th"
+    )
 
-  @classmethod
-  def from_checkpoint(cls, path):
-    pass
+  def checkpoint(self, root='./'):
+    state = self.state_dict()
+    path = pathlib.Path(root) / self.name / 'checkpoints'
+    path.mkdir(parents=True, exist_ok=True)
+    torch.save(
+      state,
+      str(path / f"{timestr()}-epoch-{self.num_epochs:03d}.th")
+    )
+
+  def load_checkpoint(self, path, metadata=True):
+    data = torch.load(path)
+    self.load_state_dict(data, metadata=metadata)
 
   def state_dict(self):
-    return {
-      'model': {
-        'state': self.model.state_dict(),
-        'class': self.model.__class__
-      },
-      'optimizer': {
-        'state': self.optimizer.state_dict(),
-        'class': self.optimizer.__class__
-      },
-      'progress': {
-        'steps': self.num_steps,
-        'samples': self.num_samples,
-        'epochs': self.num_epochs
-      },
-      'batch_size': self.batch_size
+    data = {
+      'metadata': {
+        'num_steps': self.num_steps,
+        'num_samples': self.num_samples,
+        'num_epochs': self.num_epochs,
+        'batch_size': self.batch_size,
+        'name': self.name
+      }
     }
 
-  def load_state_dict(self, data):
-    pass
+    for k, v in self.__dict__.items():
+      if hasattr(v, 'state_dict'):
+        data[k] = {
+          'state_dict': v.state_dict(),
+          'class': v.__class__.__name__
+        }
 
+    return data
 
+  def load_state_dict(self, data, metadata=True):
+    skipped = set()
+    for k, v in data.items():
+      if 'state_dict' in v and hasattr(self, k):
+        getattr(self, k).load_state_dict(v['state_dict'])
+      else:
+        skipped.add(k)
+
+    if metadata and 'metadata' in data:
+      skipped.discard('metadata')
+      for k, v in data['metadata'].items():
+        setattr(self, k, v)
+
+    if skipped:
+      logging.warning(f'skipped {skipped} when loading checkpoint')
 
   def __str__(self):
     return f"""
