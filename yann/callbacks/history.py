@@ -1,7 +1,7 @@
 import torch
 
 import time
-from .base import Callback
+from yann.callbacks.base import Callback
 from yann.viz import plot_line
 
 

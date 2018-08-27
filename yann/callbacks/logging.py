@@ -63,7 +63,3 @@ samples: {trainer.num_samples}\n''')
     self.log('Completed training run. \n\n')
 
 
-
-
-class MetricLogger(Callback):
-  pass

@@ -16,7 +16,7 @@ from yann import callbacks as yann_callbacks
 
 
 def timestr():
-  return f"{datetime.datetime.utcnow().strftime('%Y-%m-%dT%H%M%S')}"
+  return f"{datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}"
 
 class Trainer(BaseTrainer):
   model: torch.nn.Module
@@ -28,7 +28,7 @@ class Trainer(BaseTrainer):
       model,
       *,
       dataset=None,
-      optimizer='SGD',
+      optimizer=None,
       loss=None,
       loader=None,
       sampler=None,
@@ -216,8 +216,6 @@ class Trainer(BaseTrainer):
                             outputs=outputs, loss=loss)
           if self._stop: break
 
-        self.on_epoch_end(epoch=self.num_epochs)
-        self.num_epochs += 1
 
         if self.val_loader:
           val_loss = self.validate()
@@ -226,6 +224,8 @@ class Trainer(BaseTrainer):
         elif self.lr_scheduler:
           self.lr_scheduler.step()
 
+        self.on_epoch_end(epoch=self.num_epochs)
+        self.num_epochs += 1
         if self._stop: break
 
       self.on_train_end()
@@ -243,6 +243,10 @@ class Trainer(BaseTrainer):
     return (
       f"{self.name}-steps_{self.num_steps}.th"
     )
+
+  @property
+  def checkpoints_root(self):
+    return pathlib.Path('./') / self.name / 'checkpoints'
 
   def checkpoint(self, root='./'):
     state = self.state_dict()
