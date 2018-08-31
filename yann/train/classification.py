@@ -7,6 +7,7 @@ import logging
 import datetime
 import pathlib
 import numpy as np
+import datetime
 
 
 from .base import BaseTrainer
@@ -17,6 +18,7 @@ from yann import callbacks as yann_callbacks
 
 def timestr():
   return f"{datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}"
+
 
 class Trainer(BaseTrainer):
   model: torch.nn.Module
@@ -43,10 +45,14 @@ class Trainer(BaseTrainer):
       val_dataset=None,
       val_loader=None,
       val_transform=None,
+      parallel=False,
       name=None):
     super().__init__()
 
     self.model = model
+    if parallel:
+      self.model = torch.nn.DataParallel(self.model)
+
     self.loss = resolve(
       loss,
       (torch.nn, torch.nn.functional),
@@ -130,7 +136,7 @@ class Trainer(BaseTrainer):
 
     if device:
       self.device = torch.device(device) if isinstance(device, str) else device
-      self.to(device)
+      self.to(self.device)
     else:
       self.device = None
 
@@ -167,23 +173,23 @@ class Trainer(BaseTrainer):
     for inputs, targets in self.loader:
       yield inputs.to(self.device), targets.to(self.device)
 
-  def validate(self):
+  def validate(self, loader=None, device=None):
+    loader = loader or self.val_loader
+    device = device or self.device
+
     self.model.eval()
 
     self.on_validation_start()
 
     ts, os = [], []
     with torch.no_grad():
-      for inputs, targets, outputs in evaluate(self.model, self.val_loader,
-                                       self.device):
-
+      for inputs, targets, outputs in evaluate(self.model, loader, device):
         self.on_validation_batch(inputs=inputs, targets=targets, outputs=outputs)
         ts.append(targets)
         os.append(outputs)
 
       ts = torch.cat(ts)
       os = torch.cat(os)
-
       loss = self.loss(os, ts)
     self.on_validation_end(targets=ts, outputs=os, loss=loss)
     return loss
@@ -207,7 +213,6 @@ class Trainer(BaseTrainer):
             self.stop()
             break
           except Exception as e:
-            print(e)
             self.on_batch_error(batch=batch_idx, error=e)
             if self._stop: break
             raise e
@@ -215,7 +220,7 @@ class Trainer(BaseTrainer):
           self.on_batch_end(batch=batch_idx, inputs=inputs, targets=targets,
                             outputs=outputs, loss=loss)
           if self._stop: break
-
+        if self._stop: break
 
         if self.val_loader:
           val_loss = self.validate()
@@ -226,7 +231,6 @@ class Trainer(BaseTrainer):
 
         self.on_epoch_end(epoch=self.num_epochs)
         self.num_epochs += 1
-        if self._stop: break
 
       self.on_train_end()
     except Exception as e:
@@ -268,7 +272,8 @@ class Trainer(BaseTrainer):
         'num_samples': self.num_samples,
         'num_epochs': self.num_epochs,
         'batch_size': self.batch_size,
-        'name': self.name
+        'name': self.name,
+        'time_created': datetime.datetime.utcnow()
       }
     }
 
@@ -282,6 +287,9 @@ class Trainer(BaseTrainer):
     return data
 
   def load_state_dict(self, data, metadata=True):
+    """
+    TODO: add a way to specify which parts should be loaded (ex: model only)
+    """
     skipped = set()
     for k, v in data.items():
       if 'state_dict' in v and hasattr(self, k):

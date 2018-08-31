@@ -24,3 +24,21 @@ class TransformDataset(Dataset):
       f'\nDataset: {repr(self.dataset)}'
       f'\nTransforms: {repr(self.transforms)}'
       f'\n)')
+
+
+class Noisy(Dataset):
+  def __init__(self, dataset, p=0.1):
+    self.clean_dataset = dataset
+    self.p = p
+
+  def __len__(self):
+    return len(self.clean_dataset)
+
+  def __getitem__(self, idx):
+    x, y = self.clean_dataset[idx]
+
+
+
+class Imbalanced(Dataset):
+  def __init__(self, dataset):
+    self.dataset = dataset

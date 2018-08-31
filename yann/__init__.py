@@ -72,3 +72,15 @@ def to_numpy(x):
   if torch.is_tensor(x):
     return x.to('cpu').numpy()
   return np.array(x)
+
+
+
+def to_fp16(model):
+  # https://discuss.pytorch.org/t/training-with-half-precision/11815
+  # https://github.com/csarofeen/examples/tree/fp16_examples_cuDNN-ATen/imagenet
+  # https://github.com/NVIDIA/apex
+  # https://github.com/NVIDIA/apex/tree/master/apex/amp
+  model.half()
+  for layer in model.modules():
+    if isinstance(layer, torch.nn.BatchNorm2d):
+      layer.float()

@@ -6,6 +6,8 @@ import numpy as np
 from sklearn.metrics import confusion_matrix
 import itertools
 
+import torch
+
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
