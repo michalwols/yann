@@ -30,7 +30,7 @@ class Trainer(BaseTrainer):
       model,
       dataset=None,
       optimizer=None,
-      criterion=None,
+      loss=None,
       loader=None,
       sampler=None,
       collate=None,
@@ -52,8 +52,8 @@ class Trainer(BaseTrainer):
     if parallel:
       self.model = torch.nn.DataParallel(self.model)
 
-    self.criterion = resolve(
-      criterion,
+    self.loss = resolve(
+      loss,
       (torch.nn, torch.nn.functional),
       required=True,
       validate=lambda x: callable(x)
@@ -158,7 +158,7 @@ class Trainer(BaseTrainer):
     self.optimizer.zero_grad()
 
     outputs = self.model(inputs)
-    loss = self.criterion(outputs, target)
+    loss = self.loss(outputs, target)
     loss.backward()
 
     self.optimizer.step()
@@ -189,7 +189,7 @@ class Trainer(BaseTrainer):
 
       ts = torch.cat(ts)
       os = torch.cat(os)
-      loss = self.criterion(os, ts)
+      loss = self.loss(os, ts)
     self.on_validation_end(targets=ts, outputs=os, loss=loss)
     return loss
 
