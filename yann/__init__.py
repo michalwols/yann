@@ -7,8 +7,13 @@ import numpy as np
 def seed(val=1):
   import numpy as np
   import torch
-  torch.manual_seed(val)
+  import random
+  random.seed(val)
   np.random.seed(val)
+  torch.manual_seed(val)
+  try:
+    torch.cuda.manual_seed(val)
+  except: pass
   return val
 
 
