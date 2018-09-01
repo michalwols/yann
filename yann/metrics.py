@@ -1,6 +1,7 @@
 import torch
 from yann import to_numpy
 
+
 def get_preds(scores):
   score, preds = torch.max(scores, dim=1)
   return preds
@@ -11,10 +12,9 @@ def top_k(scores, k=5, largest=True):
 
 
 def accuracy(targets, preds):
+  if targets.shape != preds.shape:
+    preds = get_preds(preds)
   return (targets == preds).sum() / len(preds)
-
-
-
 
 
 def evaluate_multiclass(

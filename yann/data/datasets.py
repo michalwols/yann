@@ -1,5 +1,6 @@
 from itertools import zip_longest
 from torch.utils.data import Dataset
+from .classes import Classes
 
 
 class TransformDataset(Dataset):
@@ -42,3 +43,21 @@ class Noisy(Dataset):
 class Imbalanced(Dataset):
   def __init__(self, dataset):
     self.dataset = dataset
+
+
+
+class InputsTargetsDataset(Dataset):
+  def __init__(self, inputs, targets, transform=None):
+    self.inputs = inputs
+    self.targets = targets
+    self.transform = transform
+    self.classes = Classes(sorted(set(x for t in self.targets for x in t)))
+
+  def __len__(self):
+    return len(self.inputs)
+
+  def __getitem__(self, idx):
+    x, y = self.inputs[idx], self.targets[idx]
+    if self.transform:
+      x = self.transform(x)
+    return x, y

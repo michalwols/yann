@@ -44,17 +44,25 @@ class Classes:
     return getattr(self, (encoding or self.default_encoding) + '_decode')(encoded)
 
   def index_encode(self, seq):
+    if isinstance(seq, str):
+      return self.indices[seq]
     return [self.indices[c] for c in seq]
 
   def index_decode(self, indices):
+    if isinstance(indices, int):
+      return self[indices]
     return [self[idx] for idx in indices]
 
   def one_hot_encode(self, seq):
+    if isinstance(seq, str):
+      seq = [seq]
     y = np.zeros(len(self))
     y[[self.indices[c] for c in seq]] = 1
     return y
 
   def normalized_one_hot_encode(self, seq):
+    if isinstance(seq, str):
+      seq = [seq]
     y = np.zeros(len(self))
     y[[self.indices[c] for c in seq]] = 1
     y = np.true_divide(y, y.sum())
