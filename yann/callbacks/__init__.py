@@ -1,4 +1,4 @@
-from .history import History, HistoryPlotter
+from .history import History, HistoryPlotter, HistoryWriter
 from .logging import Logger
 from .timing import Timing
 from .vis import VisPlotter

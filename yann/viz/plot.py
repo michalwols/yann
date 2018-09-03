@@ -1,6 +1,6 @@
 from matplotlib import pylab as plt
 import numpy as np
-
+import datetime
 
 def plot_line(
     y,
@@ -15,6 +15,7 @@ def plot_line(
     xlabel=None,
     ylabel=None,
     show=True,
+    save=False,
     legend=True,
     name=None,
     grid=True
@@ -52,9 +53,14 @@ def plot_line(
   if legend:
     plt.legend(loc='best')
 
-
+  if save and show:
+    raise ValueError("Can't show and save at the same time")
   if show:
     plt.show()
+  if save:
+    plt.savefig(save if isinstance(save, str) else
+                f"{title or ylabel or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg")
+    plt.gcf().clear()
 
 
 

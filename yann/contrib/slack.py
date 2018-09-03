@@ -57,7 +57,7 @@ class Slack(Callback):
     self.send(
       text='Starting train run',
       attachments=[
-        atch(experiment=trainer.name),
+        atch(experiment=trainer.name, text=trainer.description),
         atch('Configuration', f"```{trainer}```", color='good'),
       ]
     )
@@ -68,7 +68,6 @@ class Slack(Callback):
       text=f'Completed epoch {trainer.num_epochs} with loss: {loss.item}'
     )
 
-
   def on_error(self, error, trainer=None):
     self.send(
       text='Training run failed due to an exception',
@@ -78,3 +77,6 @@ class Slack(Callback):
         atch('Exception', f"```{str(error)}```", color='danger'),
       ]
     )
+
+  def on_train_end(self, trainer=None):
+    self.send(text='Train run completed')

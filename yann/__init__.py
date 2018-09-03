@@ -22,6 +22,11 @@ def benchmark():
   cudnn.benchmark = True
 
 
+def detect_anomalies(val=True):
+  import torch.autograd
+  torch.autograd.set_detect_anomaly(val)
+
+
 def resolve(x, modules=None, required=False, types=None,
             validate=None, **kwargs):
   if isinstance(x, str):
@@ -57,6 +62,24 @@ def evaluate(model, batches, device=None):
     yield x, y, pred
 
 
+def predict_multicrop(model, inputs, reduce='mean'):
+  batch_size, num_crops, *sample_shape = inputs.shape
+  flat_preds = model(inputs.view(-1, *sample_shape))
+  outputs = flat_preds.view(batch_size, num_crops, -1)
+  if reduce:
+    outputs = getattr(torch, reduce)(outputs, 1)
+  return outputs
+
+
+class Multicrop(torch.nn.Module):
+  def __init__(self, model):
+    super().__init__()
+    self.model = model
+
+  def forward(self, inputs, *rest):
+    return predict_multicrop(self.model, inputs)
+
+
 def set_param(x, param, val):
   for group in x.param_groups:
     group[param] = val
@@ -66,9 +89,14 @@ def trainable(parameters):
   return (p for p in parameters if p.requires_grad)
 
 
+# TODO: handle batchnorm
 def freeze(parameters):
   for p in parameters:
     p.requires_grad = False
+
+def unfreeze(parameters):
+  for p in parameters:
+    p.requires_grad = True
 
 
 def to_numpy(x):
@@ -89,3 +117,17 @@ def to_fp16(model):
   for layer in model.modules():
     if isinstance(layer, torch.nn.BatchNorm2d):
       layer.float()
+
+
+class lazy:
+  __slots__ = 'method', 'name'
+
+  def __init__(self, method):
+    self.method = method
+    self.name = method.__name__
+
+  def __get__(self, obj, cls):
+    if obj:
+      val = self.method(obj)
+      setattr(obj, self.name, val)
+      return val

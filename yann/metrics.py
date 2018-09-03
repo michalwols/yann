@@ -14,7 +14,7 @@ def top_k(scores, k=5, largest=True):
 def accuracy(targets, preds):
   if targets.shape != preds.shape:
     preds = get_preds(preds)
-  return (targets == preds).sum() / len(preds)
+  return (targets == preds).sum().float() / len(preds)
 
 
 def evaluate_multiclass(
@@ -46,3 +46,29 @@ def evaluate_multilabel(
     to_numpy(outputs),
     to_numpy(preds)
   )
+
+
+
+
+class Meter:
+  def __init__(self):
+    self.reset()
+
+  def reset(self):
+    self.max = None
+    self.min = None
+    self.sum = 0
+    self.count = 0
+
+  def update(self, val):
+    if self.max is None or val > self.max:
+      self.max = val
+    if self.min is None or val < self.min:
+      self.min = val
+
+    self.sum += val
+    self.count += 1
+
+  @property
+  def average(self):
+    return self.sum / self.count

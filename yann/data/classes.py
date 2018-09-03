@@ -18,6 +18,8 @@ class Classes:
     self.indices = {c: i for i, c in enumerate(self.classes)}
     self.meta = meta
 
+    self.dtype = 'float32'
+
     assert default_encoding in self.valid_encodings, \
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
@@ -56,14 +58,14 @@ class Classes:
   def one_hot_encode(self, seq):
     if isinstance(seq, str):
       seq = [seq]
-    y = np.zeros(len(self))
+    y = np.zeros(len(self), dtype=self.dtype)
     y[[self.indices[c] for c in seq]] = 1
     return y
 
   def normalized_one_hot_encode(self, seq):
     if isinstance(seq, str):
       seq = [seq]
-    y = np.zeros(len(self))
+    y = np.zeros(len(self), dtype=self.dtype)
     y[[self.indices[c] for c in seq]] = 1
     y = np.true_divide(y, y.sum())
     return y

@@ -45,7 +45,9 @@ class Trainer(BaseTrainer):
       val_loader=None,
       val_transform=None,
       parallel=False,
-      name=None):
+      name=None,
+      description=None,
+  ):
     super().__init__()
 
     self.model = model
@@ -113,6 +115,7 @@ class Trainer(BaseTrainer):
     self.name = name or (
       f"{timestr()}-{self.model.__class__.__name__}"
     )
+    self.description = description
 
     self.history = None
     has_history = False
@@ -130,6 +133,11 @@ class Trainer(BaseTrainer):
 
     if not has_history:
       self.callbacks.append(self.history)
+
+    # make sure history callback is called first
+    self.callbacks = sorted(
+      self.callbacks,
+      key=lambda x: 0 if x is self.history else 1)
 
     self.function_callback = None
 
@@ -160,7 +168,6 @@ class Trainer(BaseTrainer):
     outputs = self.model(inputs)
     loss = self.loss(outputs, target)
     loss.backward()
-
     self.optimizer.step()
 
     self.num_steps += 1

@@ -11,7 +11,8 @@ class Logger(Callback):
     self.dest = dest
 
     self.batch_freq = batch_freq
-    self.batch_string = 'batch: {batch:>8}\tloss: {loss:.6f}'
+    self.batch_string = 'batch: {batch:>8}\tloss: {loss:.6f}\taccuracy: {' \
+                        'accuracy:.3f}'
     self.logged_batch_shapes = False
 
   def log(self, *args):
@@ -31,7 +32,9 @@ class Logger(Callback):
           pass
         self.logged_batch_shapes = True
 
-      self.log(self.batch_string.format(batch=batch, loss=loss and loss.item()))
+      self.log(self.batch_string.format(
+        batch=batch, **({m: v[-1] for m, v in
+                         trainer.history.metrics.items()})))
 
   def on_epoch_start(self, epoch, trainer=None):
     self.log('\nStarting epoch', epoch)

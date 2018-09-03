@@ -14,4 +14,3 @@ class Checkpoint(Callback):
     if epoch % self.freq == 0 :
       trainer.checkpoint()
 
-[]

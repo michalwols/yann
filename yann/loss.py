@@ -6,7 +6,7 @@ from torch.nn.modules.loss import _Loss
 def soft_target_cross_entropy(input, target, reduce=True,
                               reduction='elementwise_mean'):
   """"like cross_entropy but using soft tarets"""
-  vals = torch.sum(-target * F.log_softmax(input, dim=1), dim=1)
+  vals = torch.sum(-target * F.log_softmax(input, dim=1))
   if not reduce:
     return vals
 
