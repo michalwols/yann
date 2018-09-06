@@ -8,7 +8,8 @@ class Checkpoint(Callback):
     self.load_latest = load_latest
   def on_train_start(self, trainer=None):
     if self.load_latest:
-      trainer.load_checkpoint()
+      # trainer.load_checkpoint()
+      pass
 
   def on_epoch_end(self, epoch, loss=None, metrics=None, trainer=None):
     if epoch % self.freq == 0 :

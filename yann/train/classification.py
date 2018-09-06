@@ -47,6 +47,7 @@ class Trainer(BaseTrainer):
       parallel=False,
       name=None,
       description=None,
+      root='./'
   ):
     super().__init__()
 
@@ -116,6 +117,9 @@ class Trainer(BaseTrainer):
       f"{timestr()}-{self.model.__class__.__name__}"
     )
     self.description = description
+
+    self.root = pathlib.Path(root) / self.name
+    self.root.mkdir(parents=True, exist_ok=True)
 
     self.history = None
     has_history = False
@@ -256,15 +260,15 @@ class Trainer(BaseTrainer):
 
   @property
   def checkpoints_root(self):
-    return pathlib.Path('./') / self.name / 'checkpoints'
+    root = self.root / 'checkpoints'
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
   def checkpoint(self, root='./'):
     state = self.state_dict()
-    path = pathlib.Path(root) / self.name / 'checkpoints'
-    path.mkdir(parents=True, exist_ok=True)
     torch.save(
       state,
-      str(path / f"{timestr()}-epoch-{self.num_epochs:03d}.th")
+      str(self.checkpoints_root / f"{timestr()}-epoch-{self.num_epochs:03d}.th")
     )
 
   def load_checkpoint(self, path, metadata=True):

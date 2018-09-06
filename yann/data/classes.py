@@ -1,5 +1,6 @@
 import numpy as np
-
+import collections
+import torch
 
 class Classes:
   valid_encodings = {
@@ -45,28 +46,28 @@ class Classes:
   def decode(self, encoded, encoding=None):
     return getattr(self, (encoding or self.default_encoding) + '_decode')(encoded)
 
-  def index_encode(self, seq):
-    if isinstance(seq, str):
-      return self.indices[seq]
-    return [self.indices[c] for c in seq]
+  def index_encode(self, classes):
+    if isinstance(classes, (str, int)):
+      return self.indices[classes]
+    return [self.indices[c] for c in classes]
 
   def index_decode(self, indices):
     if isinstance(indices, int):
       return self[indices]
     return [self[idx] for idx in indices]
 
-  def one_hot_encode(self, seq):
-    if isinstance(seq, str):
-      seq = [seq]
+  def one_hot_encode(self, classes):
+    if isinstance(classes, (str, int)):
+      classes = [classes]
     y = np.zeros(len(self), dtype=self.dtype)
-    y[[self.indices[c] for c in seq]] = 1
+    y[[self.indices[c] for c in classes]] = 1
     return y
 
-  def normalized_one_hot_encode(self, seq):
-    if isinstance(seq, str):
-      seq = [seq]
+  def normalized_one_hot_encode(self, classes):
+    if isinstance(classes, (str, int)):
+      classes = [classes]
     y = np.zeros(len(self), dtype=self.dtype)
-    y[[self.indices[c] for c in seq]] = 1
+    y[[self.indices[c] for c in classes]] = 1
     y = np.true_divide(y, y.sum())
     return y
 

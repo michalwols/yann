@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
   name='yann',
-  version='0.0.10',
+  version='0.0.11',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",

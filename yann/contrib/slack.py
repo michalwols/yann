@@ -39,10 +39,12 @@ def atch(title=None, text=None, fields=None, color=None, **kwargs):
 
 class Slack(Callback):
   # TODO: subclass Logging callback instead
-  def __init__(self, channel=None, username=None, url=None):
+  def __init__(self, channel=None, username=None, url=None, validation=False):
     self.channel = channel
     self.username = username
     self.url = url
+
+    self.validation = validation
 
   def send(self, *args, **kwargs):
     send(
@@ -64,9 +66,10 @@ class Slack(Callback):
 
   def on_validation_end(self, targets=None, outputs=None, loss=None,
                         trainer=None):
-    self.send(
-      text=f'Completed epoch {trainer.num_epochs} with loss: {loss.item}'
-    )
+    if self.validation:
+      self.send(
+        text=f'Completed epoch {trainer.num_epochs} with loss: {loss.item()}'
+      )
 
   def on_error(self, error, trainer=None):
     self.send(

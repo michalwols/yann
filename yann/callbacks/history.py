@@ -57,6 +57,7 @@ class HistoryPlotter(Callback):
     self.save = save
 
     self.clear = clear
+    self.root = None
 
   def plot(self, metric=None, time=False, validation=False, **kwargs):
     if self.clear:
@@ -92,10 +93,14 @@ class HistoryPlotter(Callback):
           ylabel=f'validation {m}' if validation else m,
           name=f'validation {m}' if validation else m,
           window=1 if validation else self.window,
-          save=self.save and (f'validation {m}' if validation else m),
+          save=self.save and
+               self.root / (f'validation {m}' if validation else m),
           show=not self.save,
           **kwargs
       )
+
+  def on_train_start(self, trainer=None):
+    self.root = trainer.root
 
   def on_batch_end(self, *args, trainer=None, **kwargs):
     if trainer.num_steps % self.freq == 0:
@@ -112,7 +117,8 @@ class HistoryPlotter(Callback):
 
 
 class HistoryWriter(Callback):
-  def __init__(self, root='./', train=True, val=True, mode='w', write_freq=1, flush_freq=500):
+  def __init__(self, root=None, train=True, val=True, mode='a+',
+               write_freq=1, flush_freq=500):
     self.root = root
     self.mode = mode
     self.train = train
@@ -124,22 +130,30 @@ class HistoryWriter(Callback):
     self.header = None
     self.val_header = None
 
+    self.train_file = None
+    self.val_file = None
+
   @property
   def root(self):
     return self._root
 
   @root.setter
   def root(self, val):
-    self._root = Path(val)
-    self._root.mkdir(parents=True, exist_ok=True)
+    if val:
+      self._root = Path(val)
+      self._root.mkdir(parents=True, exist_ok=True)
+    else:
+      self._root = None
 
-  @lazy
-  def train_file(self):
-    return open(self.root / 'history-train.tsv', self.mode)
 
-  @lazy
-  def val_file(self):
-    return open(self.root / 'history-val.tsv', self.mode)
+  def on_train_start(self, trainer=None):
+    self.root = self.root or trainer.root
+
+    if not self.train_file:
+      self.train_file = open(self.root / 'history-train.tsv', self.mode)
+    if not self.val_file:
+      self.val_file = open(self.root / 'history-val.tsv', self.mode)
+
 
   def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
     if batch % self.write_freq:
@@ -183,7 +197,12 @@ class HistoryWriter(Callback):
     self.train_file.close()
     self.val_file.close()
 
+    self.train_file = None
+    self.val_file = None
+
   def on_error(self, error, trainer=None):
     self.train_file.close()
     self.val_file.close()
 
+    self.train_file = None
+    self.val_file = None
