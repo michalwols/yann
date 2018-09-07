@@ -229,12 +229,14 @@ def plot_confusion_matrix(
   if normalize:
     cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 
-
   if thresh or top:
     cm, rows, cols = truncate_confusion_matrix(
       cm, thresh=thresh, top=top, symmetric=symmetric)
   else:
     rows, cols = list(range(len(classes))), list(range(len(classes)))
+
+  if not len(cm):
+    return cm
 
   fig = plt.figure(figsize=figsize)
   plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)

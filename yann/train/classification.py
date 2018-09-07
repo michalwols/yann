@@ -33,7 +33,6 @@ class Trainer(BaseTrainer):
       loss=None,
       loader=None,
       sampler=None,
-      collate=None,
       num_workers=8,
       transform=None,
       lr_scheduler=None,
@@ -163,7 +162,6 @@ class Trainer(BaseTrainer):
       self.callbacks.append(self.function_callback)
 
     self.function_callback.on(event, callback)
-
 
   def step(self, inputs, target):
     self.model.train()

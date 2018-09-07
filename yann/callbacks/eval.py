@@ -1,9 +1,8 @@
-import torch
 import sys
 from sklearn.metrics import classification_report, accuracy_score
 from .base import Callback
 
-from yann.metrics import get_preds, accuracy
+from yann.metrics import get_preds
 
 
 class MulticlassEval(Callback):
