@@ -11,13 +11,13 @@ import datetime
 
 
 from .base import BaseTrainer
-from yann.data import TransformDataset
+from yann.data import TransformDataset, get_dataset_name
 from yann import resolve, evaluate
 from yann import callbacks as yann_callbacks
 
 
-def timestr():
-  return f"{datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}"
+def timestr(d=None):
+  return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
 
 
 class Trainer(BaseTrainer):
@@ -36,6 +36,7 @@ class Trainer(BaseTrainer):
       num_workers=8,
       transform=None,
       lr_scheduler=None,
+      lr_batch_step=False,
       callbacks=None,
       device=None,
       trainable_parameters=None,
@@ -46,7 +47,8 @@ class Trainer(BaseTrainer):
       parallel=False,
       name=None,
       description=None,
-      root='./'
+      root='./',
+      
   ):
     super().__init__()
 
@@ -107,17 +109,20 @@ class Trainer(BaseTrainer):
       (torch.optim.lr_scheduler,),
       optimizer=self.optimizer
     )
+    self.lr_batch_step = lr_batch_step
 
     self.num_samples = 0
     self.num_steps = 0
     self.num_epochs = 0
 
+    self.time_created = datetime.datetime.utcnow()
+
     self.name = name or (
-      f"{timestr()}-{self.model.__class__.__name__}"
+      f"{get_dataset_name(self.loader)}-{self.model.__class__.__name__}"
     )
     self.description = description
 
-    self.root = pathlib.Path(root) / self.name
+    self.root = pathlib.Path(root) / self.name / timestr(self.time_created)
     self.root.mkdir(parents=True, exist_ok=True)
 
     self.history = None
@@ -227,14 +232,18 @@ class Trainer(BaseTrainer):
 
           self.on_batch_end(batch=batch_idx, inputs=inputs, targets=targets,
                             outputs=outputs, loss=loss)
+          
+          if self.lr_scheduler and self.lr_batch_step:
+            self.lr_scheduler.step()
+          
           if self._stop: break
         if self._stop: break
 
         if self.val_loader:
           val_loss = self.validate()
-          if self.lr_scheduler:
+          if self.lr_scheduler and not self.lr_batch_step:
             self.lr_scheduler.step(val_loss)
-        elif self.lr_scheduler:
+        elif self.lr_scheduler and not self.lr_batch_step:
           self.lr_scheduler.step()
 
         self.on_epoch_end(epoch=self.num_epochs)
@@ -262,12 +271,14 @@ class Trainer(BaseTrainer):
     root.mkdir(parents=True, exist_ok=True)
     return root
 
-  def checkpoint(self, root='./'):
+  def checkpoint(self, root='./', name=None):
     state = self.state_dict()
-    torch.save(
-      state,
-      str(self.checkpoints_root / f"{timestr()}-epoch-{self.num_epochs:03d}.th")
-    )
+    path = str(self.checkpoints_root /
+          (f"{name}.th" if name else
+          f"{timestr()}-epoch-{self.num_epochs:03d}-"
+          f"steps-{self.num_steps:05d}.th"))
+    torch.save(state, path)
+    return path
 
   def load_checkpoint(self, path, metadata=True):
     data = torch.load(path)

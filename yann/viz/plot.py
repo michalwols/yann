@@ -5,6 +5,7 @@ import pathlib
 from sklearn.metrics import roc_curve, auc, confusion_matrix
 from yann import to_numpy
 import itertools
+from yann.metrics import moving_average
 
 def plot_line(
     y,
@@ -18,6 +19,8 @@ def plot_line(
     title=None,
     xlabel=None,
     ylabel=None,
+    xscale=None,
+    yscale=None,
     show=True,
     save=False,
     legend=True,
@@ -25,8 +28,8 @@ def plot_line(
     grid=True
 ):
 
-  if figsize:
-    fig = plt.figure(figsize=figsize)
+
+  fig = figsize and plt.figure(figsize=figsize)
 
   if xlim:
     plt.xlim(xlim)
@@ -40,15 +43,19 @@ def plot_line(
   if title:
     plt.title(title)
 
+  if yscale:
+    plt.yscale(yscale)
+
+  if xscale:
+    plt.xscale(xscale)
+
   if window != 1:
-    y = [np.mean(y[i:i + window])
-         for i in range(0, len(y), window)]
+    y = moving_average(y, window=window)
 
   if x is None:
     x = [n * window for n in range(len(y))]
   elif len(x) != len(y):
-    x = [np.mean(x[i:i + window])
-         for i in range(0, len(x), window)]
+    x = moving_average(x, window=window)
 
   plt.plot(x, y, stroke, lw=line_width, label=name and str(name))
   if grid:
@@ -65,6 +72,8 @@ def plot_line(
     plt.savefig(save if isinstance(save, (str, pathlib.Path)) else
                 f"{title or ylabel or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg")
     plt.gcf().clear()
+    if fig:
+      plt.close(fig)
 
 
 def plot_pred_scores(

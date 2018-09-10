@@ -19,3 +19,6 @@ def kaiming(model: nn.Module):
         init.constant(module.bias, 0)
 
 msr = kaiming
+
+
+from torch.optim import Adam

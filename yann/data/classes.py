@@ -73,7 +73,7 @@ class Classes:
 
   def ranked_decode(self, scores):
     indices = np.argsort(scores)
-    return [(self.classes[i], scores[i]) for i in indices[::-1]]
+    return [(self.classes[i], scores[i]) for i in indices][::-1]
 
 
 def smooth(y, eps=.1):

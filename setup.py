@@ -3,11 +3,10 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
   long_description = fh.read()
 
-import yann
 
 setup(
   name='yann',
-  version=yann.__version__,
+  version='0.0.14',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",

@@ -1,6 +1,6 @@
-import numpy as np
+import re
 
 
-def moving_average(data, window=10):
-  cumsum = np.cumsum(np.insert(data, 0, 0))
-  return (cumsum[window:] - cumsum[:-window]) / float(window)
+def camel_to_snake(text):
+  s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', text)
+  return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()

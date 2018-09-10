@@ -56,6 +56,8 @@ class HistoryPlotter(Callback):
     self.metrics = metrics
     self.save = save
 
+    self.figsize = (16, 16)
+
     self.clear = clear
     self.root = None
 
@@ -96,6 +98,7 @@ class HistoryPlotter(Callback):
           save=self.save and
                self.root / (f'validation {m}' if validation else m),
           show=not self.save,
+          figsize=self.figsize,
           **kwargs
       )
 
