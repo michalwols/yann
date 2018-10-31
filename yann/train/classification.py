@@ -1,23 +1,31 @@
+import datetime
+import logging
+import pathlib
 from typing import Optional
 
 import torch
-from torch.utils.data import DataLoader
 import torchvision
-import logging
-import datetime
-import pathlib
-import numpy as np
-import datetime
+from torch.utils.data import DataLoader
 
-
-from .base import BaseTrainer
-from yann.data import TransformDataset, get_dataset_name
-from yann import resolve, evaluate
 from yann import callbacks as yann_callbacks
+from yann import resolve, evaluate
+from yann.data import TransformDataset, get_dataset_name, Classes
+from yann.export import export
+from .base import BaseTrainer
 
 
 def timestr(d=None):
   return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
+
+
+def get_model_name(model):
+  if isinstance(model, torch.nn.DataParallel):
+    model = model.module
+
+  if hasattr(model, 'name'):
+    return model.name
+
+  return model.__class__.__name__
 
 
 class Trainer(BaseTrainer):
@@ -44,11 +52,12 @@ class Trainer(BaseTrainer):
       val_dataset=None,
       val_loader=None,
       val_transform=None,
+      classes=None,
       parallel=False,
       name=None,
       description=None,
       root='./',
-      
+
   ):
     super().__init__()
 
@@ -69,6 +78,13 @@ class Trainer(BaseTrainer):
       validate=lambda x: hasattr(x, 'step'),
       params=trainable_parameters or self.model.parameters()
     )
+
+    if classes:
+      self.classes = classes if isinstance(classes, Classes) else Classes(
+        classes)
+    else:
+      self.classes = None
+
     self.dataset = resolve(
       dataset,
       (torchvision.datasets,),
@@ -77,6 +93,7 @@ class Trainer(BaseTrainer):
 
     if transform:
       self.dataset = TransformDataset(self.dataset, transform)
+    self.transform = transform
 
     self.batch_size = batch_size
 
@@ -92,7 +109,7 @@ class Trainer(BaseTrainer):
 
     self.val_dataset = val_dataset
 
-    val_transform = val_transform or transform
+    self.val_transform = val_transform or transform
     if val_transform:
       self.val_dataset = TransformDataset(self.val_dataset, val_transform)
 
@@ -118,7 +135,7 @@ class Trainer(BaseTrainer):
     self.time_created = datetime.datetime.utcnow()
 
     self.name = name or (
-      f"{get_dataset_name(self.loader)}-{self.model.__class__.__name__}"
+      f"{get_dataset_name(self.loader)}-{get_model_name(self.model)}"
     )
     self.description = description
 
@@ -197,7 +214,8 @@ class Trainer(BaseTrainer):
     ts, os = [], []
     with torch.no_grad():
       for inputs, targets, outputs in evaluate(self.model, loader, device):
-        self.on_validation_batch(inputs=inputs, targets=targets, outputs=outputs)
+        self.on_validation_batch(inputs=inputs, targets=targets,
+                                 outputs=outputs)
         ts.append(targets)
         os.append(outputs)
 
@@ -232,10 +250,10 @@ class Trainer(BaseTrainer):
 
           self.on_batch_end(batch=batch_idx, inputs=inputs, targets=targets,
                             outputs=outputs, loss=loss)
-          
+
           if self.lr_scheduler and self.lr_batch_step:
             self.lr_scheduler.step()
-          
+
           if self._stop: break
         if self._stop: break
 
@@ -274,15 +292,32 @@ class Trainer(BaseTrainer):
   def checkpoint(self, root='./', name=None):
     state = self.state_dict()
     path = str(self.checkpoints_root /
-          (f"{name}.th" if name else
-          f"{timestr()}-epoch-{self.num_epochs:03d}-"
-          f"steps-{self.num_steps:05d}.th"))
+               (f"{name}.th" if name else
+                f"{timestr()}-epoch-{self.num_epochs:03d}-"
+                f"steps-{self.num_steps:05d}.th"))
     torch.save(state, path)
     return path
 
   def load_checkpoint(self, path, metadata=True):
     data = torch.load(path)
     self.load_state_dict(data, metadata=metadata)
+
+  def export(self, path, trace=False, meta=None, postprocess=None):
+    export(
+      model=self.model,
+      preprocess=self.val_transform,
+      postprocess=postprocess,
+      classes=self.classes,
+      trace=trace and next(iter(self.loader)),
+      path=path,
+      meta=dict(
+        name=self.name,
+        root=str(self.root),
+        dataset=get_dataset_name(self.dataset),
+        num_steps=self.num_steps,
+        **(meta or {})
+      )
+    )
 
   def state_dict(self):
     data = {

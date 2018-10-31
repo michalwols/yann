@@ -1,6 +1,7 @@
 import torch
 from yann import to_numpy
 import numpy as np
+from sklearn import metrics
 from functools import partial
 from collections import deque
 
@@ -11,7 +12,7 @@ def get_preds(scores):
 
 
 def top_k(scores, k=5, largest=True):
-  return torch.topk(scores, k=k, dim=1, largest=largest)
+  return torch.topk(scores, k=k, dim=1, largest=largest, sorted=True)
 
 
 def accuracy(targets, preds):
@@ -24,7 +25,7 @@ def top_k_accuracy(targets, preds, k=1):
   if len(targets.shape) != 1:
     raise ValueError('Multi label targets not supported')
   scores, preds = preds.topk(k, 1, True, True)
-  preds.t_()
+  preds = preds.t()
   correct = (preds == targets.view(1, -1).expand_as(preds))
 
   return correct.sum().float() / len(targets)
@@ -32,6 +33,52 @@ def top_k_accuracy(targets, preds, k=1):
 top_3_accuracy = partial(top_k_accuracy, k=3)
 top_5_accuracy = partial(top_k_accuracy, k=5)
 top_10_accuracy = partial(top_k_accuracy, k=10)
+
+
+def precision_at_k(targets, outputs, k=5):
+  scores, top_preds = top_k(outputs, k=k)
+  raise NotImplementedError()
+
+
+def recall_at_k(targets, outputs, k=5):
+  scores, top_preds = top_k(outputs, k=k)
+  raise NotImplementedError()
+
+
+def hits_at_k():
+  pass
+
+def mean_reciprocal_rank():
+  pass
+
+
+def average_precision(targets, preds, target_threshold=0):
+  targets, preds = to_numpy(targets), to_numpy(preds)
+  if target_threshold is not None:
+    targets = targets > target_threshold
+  return metrics.average_precision_score(targets, preds)
+
+
+def label_ranking_average_precision(targets, preds, target_threshold=0):
+  targets, preds = to_numpy(targets), to_numpy(preds)
+  if target_threshold is not None:
+    targets = targets > target_threshold
+  return metrics.label_ranking_average_precision_score(targets, preds)
+
+
+def coverage_error(targets, preds, target_threshold=0):
+  targets, preds = to_numpy(targets), to_numpy(preds)
+  if target_threshold is not None:
+    targets = targets > target_threshold
+  return metrics.coverage_error(targets, preds)
+
+
+def average_precision_at_k(targets, preds, k=5):
+  raise NotImplementedError()
+
+
+def mean_average_precision_at_k(targets, preds, k=5):
+  raise NotImplementedError()
 
 
 def evaluate_multiclass(
@@ -46,8 +93,7 @@ def evaluate_multiclass(
     to_numpy(outputs),
     to_numpy(preds)
   )
-
-
+  raise NotImplementedError()
 
 
 
@@ -63,6 +109,7 @@ def evaluate_multilabel(
     to_numpy(outputs),
     to_numpy(preds)
   )
+  raise NotImplementedError()
 
 
 

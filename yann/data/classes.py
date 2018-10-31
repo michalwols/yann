@@ -1,6 +1,5 @@
 import numpy as np
-import collections
-import torch
+
 
 class Classes:
   valid_encodings = {
@@ -24,6 +23,20 @@ class Classes:
     assert default_encoding in self.valid_encodings, \
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
+
+
+  def state_dict(self):
+    return {
+      'classes': self.classes,
+      'meta': self.meta,
+      'default_encoding': self.default_encoding
+    }
+
+  def load_state_dict(self, data):
+    self.classes = data['classes']
+    self.indices = {c: i for i, c in enumerate(self.classes)}
+    self.meta = data['meta']
+    self.default_encoding = data['default_encoding']
 
   def __getitem__(self, idx):
     return self.classes[idx]

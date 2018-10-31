@@ -3,11 +3,13 @@ from matplotlib import pylab as plt
 
 from .base import Callback
 
+
 class Timing(Callback):
   def __init__(self):
     super().__init__()
     self.starts = []
     self.ends = []
+    self.start_time = None
 
   def on_train_start(self, *args, **kwargs):
     self.start_time = time.time()

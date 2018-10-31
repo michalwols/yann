@@ -3,10 +3,9 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
   long_description = fh.read()
 
-
 setup(
   name='yann',
-  version='0.0.14',
+  version='0.0.18',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",
@@ -15,9 +14,9 @@ setup(
   author_email='michal@bite.ai',
   license='MIT',
   packages=find_packages(),
-  entry_points = {
-        'console_scripts': ['yann=yann.cli:main'],
-    },
+  entry_points={
+    'console_scripts': ['yann=yann.cli:main'],
+  },
   install_requires=[
     'numpy',
     'scipy',
@@ -28,4 +27,3 @@ setup(
   ],
   python_requires='>=3.6',
   zip_safe=False)
-

@@ -1,7 +1,8 @@
-__version__ = '0.0.14'
+__version__ = '0.0.18'
 
-import torch
 import numpy as np
+import torch
+
 
 def seed(val=1):
   import numpy as np
@@ -12,7 +13,8 @@ def seed(val=1):
   torch.manual_seed(val)
   try:
     torch.cuda.manual_seed(val)
-  except: pass
+  except:
+    pass
   return val
 
 
@@ -41,7 +43,8 @@ def resolve(x, modules=None, required=False, types=None,
     assert x, f'Got invalid argument, was required but got {str(x)}'
 
   if types:
-    assert isinstance(x, types), f'Expected {types} for got {x} of type {type(x)}'
+    assert isinstance(x, types), \
+      f'Expected {types} for got {x} of type {type(x)}'
 
   if validate:
     assert validate(x), f'Failed validation, got {x}'
@@ -93,6 +96,7 @@ def freeze(parameters):
   for p in parameters:
     p.requires_grad = False
 
+
 def unfreeze(parameters):
   for p in parameters:
     p.requires_grad = True
@@ -104,7 +108,6 @@ def to_numpy(x):
   if torch.is_tensor(x):
     return x.to('cpu').numpy()
   return np.array(x)
-
 
 
 def to_fp16(model):
@@ -156,9 +159,9 @@ class HyperParams:
 
   def __str__(self):
     return (
-      'HyperParams (\n' +
+        'HyperParams (\n' +
         ''.join('  {}: {}\n'.format(k, v) for k, v in self.__dict__.items()) +
-      ')'
+        ')'
     )
 
   def __len__(self):

@@ -1,6 +1,7 @@
-from .loaders import TransformLoader
-from .datasets import TransformDataset
 from .classes import Classes
+from .datasets import TransformDataset
+from .loaders import TransformLoader
+from .transform import Transformer
 
 
 def get_dataset_name(x):

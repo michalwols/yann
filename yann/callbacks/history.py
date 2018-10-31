@@ -1,10 +1,10 @@
+import time
+from pathlib import Path
+
 import torch
 
-import time
 from yann.callbacks.base import Callback
 from yann.viz import plot_line
-from yann import lazy
-from pathlib import Path
 
 
 class History(Callback):
@@ -15,7 +15,6 @@ class History(Callback):
     self.metrics['loss'] = []
     self.times = []
     self.steps = []
-
 
     self.val_metrics = {m: [] for m in metrics}
     self.val_metrics['loss'] = []
@@ -34,7 +33,7 @@ class History(Callback):
         )
 
   def on_validation_end(self, loss=None, outputs=None, targets=None,
-    trainer=None):
+                        trainer=None):
     self.val_times.append(time.time())
     self.val_steps.append(trainer.num_steps)
     self.val_metrics['loss'].append(loss.item())
@@ -88,18 +87,18 @@ class HistoryPlotter(Callback):
       metrics = self.metrics or ms.keys()
 
     for m in metrics:
-        plot_line(
-          ms[m],
-          x=times if time else steps,
-          xlabel='time' if time else 'step',
-          ylabel=f'validation {m}' if validation else m,
-          name=f'validation {m}' if validation else m,
-          window=1 if validation else self.window,
-          save=self.save and
-               self.root / (f'validation {m}' if validation else m),
-          show=not self.save,
-          figsize=self.figsize,
-          **kwargs
+      plot_line(
+        ms[m],
+        x=times if time else steps,
+        xlabel='time' if time else 'step',
+        ylabel=f'validation {m}' if validation else m,
+        name=f'validation {m}' if validation else m,
+        window=1 if validation else self.window,
+        save=self.save and
+             self.root / (f'validation {m}' if validation else m),
+        show=not self.save,
+        figsize=self.figsize,
+        **kwargs
       )
 
   def on_train_start(self, trainer=None):
@@ -116,7 +115,6 @@ class HistoryPlotter(Callback):
       validation=True,
       title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}'
     )
-
 
 
 class HistoryWriter(Callback):
@@ -148,15 +146,19 @@ class HistoryWriter(Callback):
     else:
       self._root = None
 
+  def prep_files(self, root=None):
+    self.root = self.root or root
+
+    if self.train_file:
+      self.train_file.close()
+    if self.val_file:
+      self.val_file.close()
+
+    self.train_file = open(self.root / 'history-train.tsv', self.mode)
+    self.val_file = open(self.root / 'history-val.tsv', self.mode)
 
   def on_train_start(self, trainer=None):
-    self.root = self.root or trainer.root
-
-    if not self.train_file:
-      self.train_file = open(self.root / 'history-train.tsv', self.mode)
-    if not self.val_file:
-      self.val_file = open(self.root / 'history-val.tsv', self.mode)
-
+    self.prep_files(trainer.root if trainer else None)
 
   def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
     if batch % self.write_freq:
