@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 __version__ = '0.0.18'
 
 import numpy as np
@@ -205,3 +207,26 @@ class HyperParams:
 
   def __eq__(self, other):
     return hash(self) == hash(other)
+
+
+@contextmanager
+def evalmode(*modules, grad=False):
+  if grad:
+    training = (m.training for m in modules)
+    try:
+      for m in modules: m.eval()
+      yield
+    finally:
+      for m, train in zip(modules, training):
+        if train:
+          m.train()
+  else:
+    with torch.no_grad():
+      training = (m.training for m in modules)
+      try:
+        for m in modules: m.eval()
+        yield
+      finally:
+        for m, train in zip(modules, training):
+          if train:
+            m.train()
