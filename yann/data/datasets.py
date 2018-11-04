@@ -1,6 +1,7 @@
 from itertools import zip_longest
 
-from torch.utils.data import Dataset
+import torch
+from torch.utils.data import Dataset, TensorDataset
 
 from .classes import Classes
 
@@ -65,3 +66,17 @@ class InputsTargetsDataset(Dataset):
 
 class OutputCache:
   pass
+
+
+class TinyDigits(TensorDataset):
+  """
+  Dataset of 8x8 digits, best used for testing
+  """
+
+  def __init__(self, num_classes=10):
+    from sklearn.datasets import load_digits
+    digits = load_digits(num_classes)
+    super().__init__(
+      torch.from_numpy(digits.images).unsqueeze(1).float(),
+      torch.Tensor(digits.target).long()
+    )

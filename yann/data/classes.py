@@ -1,7 +1,21 @@
 import numpy as np
 
 
-class Classes:
+class TargetTransformer:
+  def encode(self, x, many=True):
+    pass
+
+  def decode(self, x, many=True):
+    pass
+
+  def state_dict(self):
+    pass
+
+  def load_state_dict(self):
+    pass
+
+
+class Classes(TargetTransformer):
   valid_encodings = {
     'index',
     'one_hot',
@@ -23,7 +37,6 @@ class Classes:
     assert default_encoding in self.valid_encodings, \
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
-
 
   def state_dict(self):
     return {
@@ -57,7 +70,8 @@ class Classes:
     return getattr(self, (encoding or self.default_encoding) + '_encode')(seq)
 
   def decode(self, encoded, encoding=None):
-    return getattr(self, (encoding or self.default_encoding) + '_decode')(encoded)
+    return getattr(self, (encoding or self.default_encoding) + '_decode')(
+      encoded)
 
   def index_encode(self, classes):
     if isinstance(classes, (str, int)):
