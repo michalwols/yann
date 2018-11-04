@@ -46,10 +46,10 @@ class History(Callback):
 
 
 class HistoryPlotter(Callback):
-  def __init__(self, history: History, freq=500, window=50, metrics=None,
-               clear=False, save=False):
+  def __init__(self, freq=500, window=50, metrics=None,
+               clear=False, save=False, history: History = None):
     super().__init__()
-    self.history = history
+    self.history: History = history
     self.freq = freq
     self.window = window
     self.metrics = metrics
@@ -102,7 +102,9 @@ class HistoryPlotter(Callback):
       )
 
   def on_train_start(self, trainer=None):
-    self.root = trainer.root
+    if trainer:
+      self.root = trainer.root
+      self.history = self.history or trainer.history
 
   def on_batch_end(self, *args, trainer=None, **kwargs):
     if trainer.num_steps % self.freq == 0:
