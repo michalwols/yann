@@ -8,10 +8,11 @@ import torchvision
 from torch.utils.data import DataLoader
 
 from yann import callbacks as yann_callbacks
-from yann import resolve, evaluate
+from yann import lazy, resolve, evaluate
 from yann.data import TransformDataset, get_dataset_name, Classes
 from yann.export import export
-from .base import BaseTrainer
+from yann.predict import Classifier
+from yann.train.base import BaseTrainer
 
 
 def timestr(d=None):
@@ -56,7 +57,7 @@ class Trainer(BaseTrainer):
       parallel=False,
       name=None,
       description=None,
-      root='./',
+      root='./train-runs/',
 
   ):
     super().__init__()
@@ -80,8 +81,10 @@ class Trainer(BaseTrainer):
     )
 
     if classes:
-      self.classes = classes if isinstance(classes, Classes) else Classes(
-        classes)
+      self.classes = (
+        classes if isinstance(classes, Classes)
+        else Classes(classes)
+      )
     else:
       self.classes = None
 
@@ -110,8 +113,8 @@ class Trainer(BaseTrainer):
     self.val_dataset = val_dataset
 
     self.val_transform = val_transform or transform
-    if val_transform:
-      self.val_dataset = TransformDataset(self.val_dataset, val_transform)
+    if self.val_transform:
+      self.val_dataset = TransformDataset(self.val_dataset, self.val_transform)
 
     self.val_loader = val_loader or (val_dataset and DataLoader(
       self.val_dataset,
@@ -278,6 +281,15 @@ class Trainer(BaseTrainer):
   def stop(self):
     self._stop = True
 
+  @lazy
+  def predict(self):
+    return Classifier(
+      model=self.model,
+      classes=self.classes,
+      preprocess=self.transform,
+      postprocess=None
+    )
+
   def get_checkpoint_name(self):
     return (
       f"{self.name}-steps_{self.num_steps}.th"
@@ -302,7 +314,8 @@ class Trainer(BaseTrainer):
     data = torch.load(path)
     self.load_state_dict(data, metadata=metadata)
 
-  def export(self, path, trace=False, meta=None, postprocess=None):
+  def export(self, path=None, trace=False, meta=None, postprocess=None):
+    path = path or self.root / 'exports' / timestr()
     export(
       model=self.model,
       preprocess=self.val_transform,
@@ -318,6 +331,8 @@ class Trainer(BaseTrainer):
         **(meta or {})
       )
     )
+
+    return path
 
   def state_dict(self):
     data = {
@@ -362,6 +377,7 @@ class Trainer(BaseTrainer):
   def __str__(self):
     return f"""
 name: {self.name}
+root: {self.root}
 batch_size: {self.batch_size}
 device: {self.device}
 
