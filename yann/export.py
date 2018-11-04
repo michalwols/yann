@@ -8,8 +8,7 @@ import torch
 
 from yann.data import Classes
 from yann.utils import (
-  load_pickle, load_json, save_json, save_pickle, Obj,
-  tar_dir,
+  load_pickle, load_json, save_json, save_pickle, tar_dir,
   untar
 )
 
@@ -86,12 +85,14 @@ def export(
     shutil.rmtree(str(path))
 
 
-class LoadedModule:
+class Predictor:
   def __init__(self):
     self.model = None
     self.classes = None
     self.meta = {}
     self.kwargs = {}
+
+    self.model_state_dict = None
 
     self.postprocess = None
     self.predict = None
@@ -103,42 +104,42 @@ class LoadedModule:
 
 def load(path, eval=True):
   path = Path(path)
-  r = Obj()
+  p = Predictor()
 
   # TODO: read from tarfile directly instead
   if str(path).endswith('.tar.gz'):
     untar(path)
     path = Path(str(path).rstrip('.tar.gz'))
 
-  r.model = None
+  p.model = None
   if (path / 'model.th').exists():
-    r.model = torch.load(str(path / 'model.th'))
+    p.model = torch.load(str(path / 'model.th'))
   elif (path / 'model.traced.th').exists():
     from torch import jit
-    r.model = jit.load(str(path / 'model.traced.th'))
+    p.model = jit.load(str(path / 'model.traced.th'))
 
-  if r.model and eval:
-    r.model.eval()
-
-  with suppress(FileNotFoundError):
-    r.model_state_dict = torch.load(str(path / 'model.state_dict.th'))
+  if p.model and eval:
+    p.model.eval()
 
   with suppress(FileNotFoundError):
-    r.classes = load_json(path / 'classes.json')
+    p.model_state_dict = torch.load(str(path / 'model.state_dict.th'))
 
   with suppress(FileNotFoundError):
-    r.preprocess = load_pickle(path / 'preprocess.pkl')
+    p.classes = load_json(path / 'classes.json')
 
   with suppress(FileNotFoundError):
-    r.postprocess = load_pickle(path / 'postprocess.pkl')
+    p.preprocess = load_pickle(path / 'preprocess.pkl')
 
   with suppress(FileNotFoundError):
-    r.predict = load_pickle(path / 'predict.pkl')
+    p.postprocess = load_pickle(path / 'postprocess.pkl')
 
   with suppress(FileNotFoundError):
-    r.meta = load_json(path / 'meta.json')
+    p.predict = load_pickle(path / 'predict.pkl')
 
   with suppress(FileNotFoundError):
-    r.kwargs = load_pickle(path / 'kwargs.pkl')
+    p.meta = load_json(path / 'meta.json')
 
-  return r
+  with suppress(FileNotFoundError):
+    p.kwargs = load_pickle(path / 'kwargs.pkl')
+
+  return p

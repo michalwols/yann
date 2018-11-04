@@ -1,56 +1,58 @@
-import torch
-from sklearn.datasets import load_digits
+import pytest
+import torch.cuda
 from torch import nn
 from torch.optim import SGD
-from torch.utils.data import TensorDataset
-from torchvision.transforms import ToTensor
 
 from yann.callbacks import (
   History, HistoryPlotter, HistoryWriter, Logger,
   Checkpoint
 )
+from yann.data.datasets import TinyDigits
 from yann.layers import Flatten
 from yann.train import Trainer
 
+devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 
-def test_train(tmpdir):
+
+@pytest.mark.slow
+@pytest.mark.parametrize('device', devices)
+def test_train(tmpdir, device):
   """Sanity check train run"""
-  h = History()
-
-  digits = load_digits()
-
-  t = ToTensor()
-
-  dataset = TensorDataset(
-    torch.from_numpy(digits.images).unsqueeze(1).float(),
-    torch.Tensor(digits.target).long()
-  )
 
   model = nn.Sequential(
-    nn.Conv2d(1, 10, 3),
+    nn.Conv2d(1, 20, 3),
     nn.ReLU(inplace=True),
-    nn.Conv2d(10, 3, 3),
+    nn.Conv2d(20, 20, 3),
     nn.ReLU(inplace=True),
     Flatten(),
-    nn.Linear(48, 10)
+    nn.Linear(320, 10)
   )
 
   train = Trainer(
     root=tmpdir,
     model=model,
-    dataset=dataset,
+    dataset=TinyDigits(),
+    device=device,
     optimizer=SGD(
       model.parameters(),
-      lr=.01, momentum=0.9, weight_decay=.001),
+      lr=.01, momentum=0.9, weight_decay=.001
+    ),
     loss=nn.CrossEntropyLoss(),
     callbacks=[
-      h,
-      HistoryPlotter(h, save=True),
+      History(),
+      HistoryPlotter(save=True),
       HistoryWriter(),
-      Logger(),
+      Logger(batch_freq=20),
       Checkpoint()
     ]
   )
 
   train(10)
-  train.export(tmpdir / 'export')
+
+  assert train.checkpoints_root.is_dir()
+  assert train.history.metrics
+
+  export_path = train.export()
+
+  assert export_path
+  assert export_path.is_dir()
