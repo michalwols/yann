@@ -1,18 +1,17 @@
-import datetime
 import logging
+
+import datetime
 import pathlib
-from typing import Optional
-
 import torch
-import torchvision
 from torch.utils.data import DataLoader
-
+from typing import Optional
 from yann import callbacks as yann_callbacks
-from yann import lazy, resolve, evaluate
+from yann import resolve, evaluate
 from yann.data import TransformDataset, get_dataset_name, Classes
 from yann.export import export
-from yann.predict import Classifier
+from yann.inference.predict import Classifier
 from yann.train.base import BaseTrainer
+from yann.utils.decorators import lazy
 
 
 def timestr(d=None):
@@ -62,22 +61,24 @@ class Trainer(BaseTrainer):
   ):
     super().__init__()
 
-    self.model = model
+    self.model = resolve.model(
+      model,
+      required=True,
+      validate=callable
+    )
     if parallel:
       self.model = torch.nn.DataParallel(self.model)
 
-    self.loss = resolve(
+    self.loss = resolve.loss(
       loss,
-      (torch.nn, torch.nn.functional),
       required=True,
-      validate=lambda x: callable(x)
+      validate=callable
     )
-    self.optimizer = resolve(
+    self.optimizer = resolve.optimizer(
       optimizer,
-      (torch.optim,),
+      args=(trainable_parameters or self.model.parameters(),),
       required=True,
-      validate=lambda x: hasattr(x, 'step'),
-      params=trainable_parameters or self.model.parameters()
+      validate=lambda x: hasattr(x, 'step')
     )
 
     if classes:
@@ -88,10 +89,9 @@ class Trainer(BaseTrainer):
     else:
       self.classes = None
 
-    self.dataset = resolve(
+    self.dataset = resolve.dataset(
       dataset,
-      (torchvision.datasets,),
-      required=True,
+      required=not loader,
     )
 
     if transform:
@@ -124,10 +124,9 @@ class Trainer(BaseTrainer):
       num_workers=num_workers
     ))
 
-    self.lr_scheduler = resolve(
+    self.lr_scheduler = resolve.lr_scheduler(
       lr_scheduler,
-      (torch.optim.lr_scheduler,),
-      optimizer=self.optimizer
+      kwargs=dict(optimizer=self.optimizer)
     )
     self.lr_batch_step = lr_batch_step
 

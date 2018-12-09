@@ -1,5 +1,7 @@
 import torch
 
+from yann import evalmode
+
 
 class Predictor:
   def __call__(self, *args, **kwargs):
@@ -35,6 +37,8 @@ class Classifier(Predictor):
     self.classes = classes
 
   def __call__(self, *args, **kwargs):
-    self.model.eval()
-    with torch.no_grad():
-      pass
+    x = self.preprocess(*args, **kwargs)
+    with evalmode(self.model):
+      x = self.model(x)
+
+    return self.classes.decode(x)

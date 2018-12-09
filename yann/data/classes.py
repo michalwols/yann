@@ -11,7 +11,7 @@ class TargetTransformer:
   def state_dict(self):
     pass
 
-  def load_state_dict(self):
+  def load_state_dict(self, data):
     pass
 
 

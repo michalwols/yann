@@ -1,9 +1,9 @@
 import base64
-import io
 import os
-import pathlib
 
+import io
 import numpy as np
+import pathlib
 import torch
 from PIL import Image
 from torchvision import transforms as tvt
@@ -129,10 +129,12 @@ def get_image(x, space=None) -> Image.Image:
       except:
         pass
 
+  if hasattr(x, 'read'):
+    img = Image.open(io.BytesIO(x.read()))
+    return img.convert(space) if space else img
+  
   if isinstance(x, bytes):
     img = Image.open(io.BytesIO(x))
     return img.convert(space) if space else img
 
-  if hasattr(x, 'read'):
-    img = Image.open(io.BytesIO(x.read()))
-    return img.convert(space) if space else img
+

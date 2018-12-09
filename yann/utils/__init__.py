@@ -1,10 +1,10 @@
 import json
 import os
 import pickle as pkl
-import re
 import tarfile
 
 import numpy as np
+import re
 import torch
 from PIL import Image
 
@@ -43,14 +43,16 @@ def load_json(path, mode='r'):
     return json.load(f)
 
 
-def tar_dir(path, dest=None):
+def tar_dir(path, dest=None, zip=True):
   path = str(path)
   dest = str(dest or path)
 
-  if not dest.endswith('.tar.gz'):
-    dest = os.path.splitext(dest)[0] + '.tar.gz'
+  ext, mode = ('.tar.gz', 'w:gz') if zip else ('.tar', 'w')
 
-  with tarfile.open(dest, 'w:gz') as tar:
+  if not dest.endswith(ext):
+    dest = os.path.splitext(dest)[0] + ext
+
+  with tarfile.open(dest, mode) as tar:
     tar.add(path)
 
 

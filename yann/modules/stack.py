@@ -3,11 +3,10 @@ from inspect import isclass
 
 from torch import nn
 
-from yann.models.model import Model
 from yann.utils import camel_to_snake
 
 
-class Stack(Model):
+class Stack(nn.Module):
   """
 
   NOTE: this depends on dict ordering, which is only guaranteed for python >=3.6

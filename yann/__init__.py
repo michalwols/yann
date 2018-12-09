@@ -1,9 +1,14 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.18'
+__version__ = '0.0.19'
 
 import numpy as np
 import torch
+
+from .config import registry
+
+register = registry
+resolve = registry.resolve
 
 
 def seed(val=1):
@@ -28,30 +33,6 @@ def benchmark():
 def detect_anomalies(val=True):
   import torch.autograd
   torch.autograd.set_detect_anomaly(val)
-
-
-def resolve(x, modules=None, required=False, types=None,
-            validate=None, **kwargs):
-  if isinstance(x, str):
-    for m in (modules or []):
-      if hasattr(m, x):
-        x = getattr(m, x)
-        break
-
-  if isinstance(x, type):
-    x = x(**kwargs)
-
-  if required:
-    assert x, f'Got invalid argument, was required but got {str(x)}'
-
-  if types:
-    assert isinstance(x, types), \
-      f'Expected {types} for got {x} of type {type(x)}'
-
-  if validate:
-    assert validate(x), f'Failed validation, got {x}'
-
-  return x
 
 
 def evaluate(model, batches, device=None):
@@ -123,20 +104,6 @@ def to_fp16(model):
       layer.float()
 
 
-class lazy:
-  __slots__ = 'method', 'name'
-
-  def __init__(self, method):
-    self.method = method
-    self.name = method.__name__
-
-  def __get__(self, obj, cls):
-    if obj:
-      val = self.method(obj)
-      setattr(obj, self.name, val)
-      return val
-
-
 class HyperParams:
   def __init__(self, **args):
     self.__dict__.update(args)
@@ -162,7 +129,7 @@ class HyperParams:
   def __str__(self):
     return (
         'HyperParams (\n' +
-        ''.join('  {}: {}\n'.format(k, v) for k, v in self.__dict__.items()) +
+        ''.join('  {}={}\n'.format(k, v) for k, v in self.__dict__.items()) +
         ')'
     )
 

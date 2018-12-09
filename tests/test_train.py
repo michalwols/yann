@@ -8,7 +8,7 @@ from yann.callbacks import (
   Checkpoint
 )
 from yann.data.datasets import TinyDigits
-from yann.layers import Flatten
+from yann.modules import Flatten
 from yann.train import Trainer
 
 devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
@@ -56,3 +56,20 @@ def test_train(tmpdir, device):
 
   assert export_path
   assert export_path.is_dir()
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize('device', devices)
+def test_train_resolved(tmpdir, device):
+  from yann.data.transform import ImageTransformer
+
+  train = Trainer(
+    root=tmpdir,
+    model='densenet121',
+    dataset='CIFAR10',
+    loss='CrossEntropy',
+    optimizer='SGD',
+    transform=ImageTransformer(resize=224)
+  )
+
+  train(1)

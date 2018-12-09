@@ -1,9 +1,20 @@
-from itertools import zip_longest
-
 import torch
-from torch.utils.data import Dataset, TensorDataset
+from itertools import zip_longest
+from torch.utils import data
 
 from .classes import Classes
+
+
+class Dataset(data.Dataset):
+  def state_dict(self):
+    return {
+      'name': self.__class__.__name__
+    }
+
+
+class ClassificationDataset(Dataset):
+  def __init__(self):
+    pass
 
 
 class TransformDataset(Dataset):
@@ -68,7 +79,7 @@ class OutputCache:
   pass
 
 
-class TinyDigits(TensorDataset):
+class TinyDigits(data.TensorDataset):
   """
   Dataset of 8x8 digits, best used for testing
   """
