@@ -2,7 +2,7 @@ import urllib
 import urllib.request
 import json
 
-from yann.callbacks.base import Callback
+from ..callbacks.base import Callback
 
 def post(url, data):
   data = json.dumps(data).encode('utf8')

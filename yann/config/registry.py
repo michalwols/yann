@@ -8,10 +8,16 @@ def dedupe(items):
   return OrderedDict.fromkeys(items).keys()
 
 
+def noop(x, *args, **kwargs):
+  return x
+
+
+def pass_args(x, *args, **kwargs):
+  return x(*args, **kwargs)
+
+
 class default:
-  @staticmethod
-  def init(x, *args, **kwargs):
-    return x(*args, **kwargs)
+  init = pass_args
 
   @staticmethod
   def get_names(x):
@@ -50,21 +56,27 @@ class Resolver:
       x,
       required=False,
       validate=None,
-      instance=None,
+      instance=True,
       types=None,
+      init=None,
       args=None,
-      kwargs=None,
-      init=None
+      kwargs=None
   ):
     initial = x
     if isinstance(x, str):
       record = self.registry[x]
       x = record.x
-      init = init or record.init or default.init
+      if record.init:
+        x = record.init(x, *(args or ()), **(kwargs or {}))
 
-    if isinstance(x, type) and instance or init:
+    if instance and isinstance(x, type):
       init = init or default.init
       x = init(x, *(args or ()), **(kwargs or {}))
+
+    if not required and x is None:
+      return x
+    elif required and x is None:
+      raise ResolutionError("Could not resolve to a value and was required")
 
     if types and not isinstance(x, types):
       raise ResolutionError(
@@ -76,13 +88,10 @@ class Resolver:
     if validate and not validate(x):
       raise ResolutionError(f"Couldn't validate {x}")
 
-    if required and x is None:
-      raise ResolutionError("Could not resolve to a value and was required")
-
     return x
 
   def __call__(self, x, required=False, validate=None,
-               instance=None, types=None, args=None, kwargs=None, init=None):
+               instance=True, types=None, args=None, kwargs=None, init=None):
     return self.resolve(
       x,
       required=required,
@@ -229,6 +238,11 @@ class Registry:
       names = get_names(item) if get_names else default.get_names(item)
 
       self.register(item, name=names, init=init)
+
+  def register_subclasses(self, cls: type, init=None):
+    self.register(cls, init=init)
+    for scls in cls.__subclasses__():
+      self.register(scls, init=init)
 
   def update(self, items, init=None):
     for x in items:

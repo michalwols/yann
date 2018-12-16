@@ -18,7 +18,5 @@ def kaiming(model: nn.Module):
       if module.bias is not None:
         init.constant(module.bias, 0)
 
+
 msr = kaiming
-
-
-from torch.optim import Adam

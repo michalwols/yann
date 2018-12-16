@@ -2,10 +2,10 @@ import os
 from math import cos, pi
 import numpy as np
 
-from yann.callbacks.base import Callback
-from yann import set_param
-from yann.metrics import exp_moving_avg
-from yann.viz import plot_line
+from ..callbacks.base import Callback
+from .. import set_param
+from ..metrics import exp_moving_avg
+from ..viz import plot_line
 
 
 def cosine_anneal(min_lr, max_lr, cur_step, num_steps):
@@ -99,7 +99,6 @@ class LRRangeTest(Callback):
     if not step and not steps:
       raise ValueError('step or steps must be provided')
 
-
     delta = end_lr - start_lr
     self.steps = steps or (delta / step)
     self.step = step or (delta / steps)
@@ -114,6 +113,7 @@ class LRRangeTest(Callback):
     self.log_freq = log_freq
 
     self.divergence_multiplier = divergence_multiplier
+
   def __repr__(self):
     return (
       f"LRRangeTest (\n"

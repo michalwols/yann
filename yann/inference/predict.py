@@ -1,6 +1,6 @@
 import torch
 
-from yann import evalmode
+from .. import evalmode
 
 
 class Predictor:

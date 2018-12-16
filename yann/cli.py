@@ -14,6 +14,7 @@ def cli():
 @click.option('-e', '--epochs', default=10, show_default=True)
 @click.option('-l', '--loss')
 @click.option('-cp', '--checkpoint')
+@click.option('-c', '--continue')
 def train(
     name,
     model,
@@ -27,8 +28,8 @@ def train(
     epochs=10
 ):
   """Train model"""
-  from yann.train import Trainer
-  from yann.callbacks import get_callbacks
+  from .train import Trainer
+  from .callbacks import get_callbacks
 
   t = Trainer(
     name=name,
@@ -60,6 +61,35 @@ def evaluate(self):
 @cli.command()
 def validate():
   pass
+
+
+@cli.command()
+@click.argument('names', nargs=-1)
+def resolve(names):
+  import yann
+
+  if len(names) == 1:
+    print(yann.resolve(names[0]))
+  else:
+    x = getattr(yann.resolve, names[0])
+    for n in names[1:-1]:
+      x = getattr(x, n)
+    print(x(names[-1]))
+
+
+@cli.command()
+@click.argument('names', nargs=-1)
+def registry(names):
+  """List contents of registry"""
+  import yann
+
+  if not names:
+    print(yann.registry)
+  else:
+    x = yann.registry
+    for n in names:
+      x = getattr(x, n)
+    print(x)
 
 
 def main():

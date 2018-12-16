@@ -1,6 +1,6 @@
 import subprocess
 
-from yann.callbacks.base import Callback
+from ..callbacks.base import Callback
 
 
 def run(command):

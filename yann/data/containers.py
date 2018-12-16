@@ -1,7 +1,8 @@
 from collections import OrderedDict
+from collections import abc
 
 
-class Container:
+class Container(abc.MutableMapping):
   def __init__(self, *args, **kwargs):
     items = OrderedDict(
       ('_arg' + str(n), v) for n, v in enumerate(args)
@@ -32,6 +33,9 @@ class Container:
   def __setitem__(self, key, value):
     if isinstance(key, int):
       setattr(self, self._keys[key], value)
+
+  def __delitem__(self, key):
+    pass
 
 
 class Inputs(Container):

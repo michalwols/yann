@@ -1,6 +1,8 @@
+import logging
+
 import torch
 
-from .utils.registry import Registry
+from .registry import Registry, pass_args
 
 ## Configure Registry
 
@@ -14,7 +16,9 @@ from torch.utils.data import Dataset
 registry.dataset.index(
   datasets,
   types=(Dataset,),
-  init=lambda D: D(root=f'~/.torch/datasets/{D.__name__}', download=False)
+  init=lambda D, root=None, download=True, **kwargs: \
+    D(root=root or f'~/.torch/datasets/{D.__name__}',
+      download=download)
 )
 
 # Losses
@@ -35,10 +39,14 @@ registry.loss.index(
   x.__name__.endswith('_loss') else (x.__name__,)
 )
 
+from ..modules import loss
+
 registry.loss.update((
   F.cross_entropy,
   F.binary_cross_entropy,
-  F.binary_cross_entropy_with_logits
+  F.binary_cross_entropy_with_logits,
+  loss.soft_target_cross_entropy,
+  loss.SoftTargetCrossEntopyLoss
 ))
 
 # Optimizers
@@ -64,9 +72,29 @@ registry.lr_scheduler.index(
 # Models
 from torchvision import models
 
-registry.model.index(
+
+def is_public_callable(x):
+  return (
+      hasattr(x, '__name__')
+      and not x.__name__.startswith('_')
+      and callable(x)
+  )
+
+
+registry.model.torchvision.index(
   models,
-  include=lambda x: hasattr(x, '__name__')
-                    and (isinstance(x, torch.nn.Module)
-                         or callable(x))
+  init=pass_args,
+  include=is_public_callable
 )
+
+try:
+  import pretrainedmodels.models
+except ImportError:
+  logging.debug("Couldn't register pretrainedmodels models because it's not "
+                "installed")
+else:
+  registry.model.pretrainedmodels.index(
+    pretrainedmodels.models,
+    init=pass_args,
+    include=is_public_callable
+  )

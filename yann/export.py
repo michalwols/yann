@@ -6,8 +6,8 @@ from pathlib import Path
 
 import torch
 
-from yann.data import Classes
-from yann.utils import (
+from .data import Classes
+from .data.io import (
   load_pickle, load_json, save_json, save_pickle, tar_dir,
   untar
 )

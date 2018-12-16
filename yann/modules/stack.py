@@ -3,7 +3,7 @@ from inspect import isclass
 
 from torch import nn
 
-from yann.utils import camel_to_snake
+from ..utils import camel_to_snake
 
 
 class Stack(nn.Module):

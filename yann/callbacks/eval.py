@@ -2,7 +2,7 @@ import sys
 from sklearn.metrics import classification_report, accuracy_score
 from .base import Callback
 
-from yann.metrics import get_preds
+from ..metrics import get_preds
 
 
 class MulticlassEval(Callback):
@@ -24,11 +24,9 @@ class MulticlassEval(Callback):
 
     print('Accuracy: ', accuracy_score(targets, preds))
 
-
   def on_validation_end(self, targets=None, outputs=None, loss=None,
                         trainer=None, **kwargs):
     self(targets=targets, outputs=outputs, trainer=trainer)
-
 
 
 class MultilabelEval(Callback):

@@ -1,6 +1,6 @@
 from torch.nn import AdaptiveAvgPool2d
-from yann.data.containers import Outputs, Inputs
-from yann.models import Model
+from ..data.containers import Outputs, Inputs
+from ..models import Model
 
 
 class PretrainedModel(Model):
@@ -56,3 +56,11 @@ class PretrainedModelWrapper(Model):
       logits=logits,
       activations=activations
     )
+
+
+def spec_from_settings():
+  pass
+
+
+def spec_from_model(model):
+  pass

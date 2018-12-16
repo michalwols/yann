@@ -9,7 +9,7 @@ from PIL import Image
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
 
-from yann.utils import truthy
+from ..utils import truthy
 
 
 def mixup(x1, x2, y1, y2, alpha=.5):
@@ -132,9 +132,7 @@ def get_image(x, space=None) -> Image.Image:
   if hasattr(x, 'read'):
     img = Image.open(io.BytesIO(x.read()))
     return img.convert(space) if space else img
-  
+
   if isinstance(x, bytes):
     img = Image.open(io.BytesIO(x))
     return img.convert(space) if space else img
-
-

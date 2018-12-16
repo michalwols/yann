@@ -1,7 +1,7 @@
 import os
 
-from yann import set_param
-from yann.train import train, Trainer
+from . import set_param
+from .train import train, Trainer
 
 
 

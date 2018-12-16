@@ -3,9 +3,11 @@ import numpy as np
 import datetime
 import pathlib
 from sklearn.metrics import roc_curve, auc, confusion_matrix
-from yann import to_numpy
+
 import itertools
-from yann.metrics import moving_average
+
+from .. import to_numpy
+from ..metrics import moving_average
 
 def plot_line(
     y,

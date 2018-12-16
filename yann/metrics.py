@@ -1,9 +1,10 @@
 import torch
-from yann import to_numpy
 import numpy as np
 from sklearn import metrics
 from functools import partial
 from collections import deque
+
+from . import to_numpy
 
 
 def get_preds(scores):
@@ -30,6 +31,7 @@ def top_k_accuracy(targets, preds, k=1):
 
   return correct.sum().float() / len(targets)
 
+
 top_3_accuracy = partial(top_k_accuracy, k=3)
 top_5_accuracy = partial(top_k_accuracy, k=5)
 top_10_accuracy = partial(top_k_accuracy, k=10)
@@ -47,6 +49,7 @@ def recall_at_k(targets, outputs, k=5):
 
 def hits_at_k():
   pass
+
 
 def mean_reciprocal_rank():
   pass
@@ -96,8 +99,6 @@ def evaluate_multiclass(
   raise NotImplementedError()
 
 
-
-
 def evaluate_multilabel(
     targets,
     outputs,
@@ -110,8 +111,6 @@ def evaluate_multilabel(
     to_numpy(preds)
   )
   raise NotImplementedError()
-
-
 
 
 class Meter:

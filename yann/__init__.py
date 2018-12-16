@@ -1,11 +1,11 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.19'
+__version__ = '0.0.20'
 
 import numpy as np
 import torch
 
-from .config import registry
+from .config.setup import registry
 
 register = registry
 resolve = registry.resolve

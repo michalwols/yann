@@ -1,6 +1,6 @@
 from torch import nn
 
-from yann.data.containers import Outputs
+from ..data.containers import Outputs
 
 
 class ModelMixin:

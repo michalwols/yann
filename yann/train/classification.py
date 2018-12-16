@@ -5,13 +5,14 @@ import pathlib
 import torch
 from torch.utils.data import DataLoader
 from typing import Optional
-from yann import callbacks as yann_callbacks
-from yann import resolve, evaluate
-from yann.data import TransformDataset, get_dataset_name, Classes
-from yann.export import export
-from yann.inference.predict import Classifier
-from yann.train.base import BaseTrainer
-from yann.utils.decorators import lazy
+
+from .. import callbacks as yann_callbacks
+from .. import resolve, evaluate
+from ..data import TransformDataset, get_dataset_name, Classes
+from ..export import export
+from ..inference.predict import Classifier
+from ..train.base import BaseTrainer
+from ..utils.decorators import lazy
 
 
 def timestr(d=None):
@@ -72,7 +73,7 @@ class Trainer(BaseTrainer):
     self.loss = resolve.loss(
       loss,
       required=True,
-      validate=callable
+      validate=callable,
     )
     self.optimizer = resolve.optimizer(
       optimizer,
@@ -180,12 +181,20 @@ class Trainer(BaseTrainer):
     if self.model:
       self.model.to(self.device)
 
-  def on(self, event, callback):
+  def on(self, event, callback=None):
     if not self.function_callback:
       self.function_callback = yann_callbacks.FunctionCallback()
       self.callbacks.append(self.function_callback)
 
-    self.function_callback.on(event, callback)
+    if callback:
+      self.function_callback.on(event, callback)
+      return self
+    else:
+      def decorated(func):
+        self.function_callback.on(event, callback)
+        return func
+
+      return decorated
 
   def step(self, inputs, target):
     self.model.train()

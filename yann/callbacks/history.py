@@ -3,8 +3,8 @@ from pathlib import Path
 
 import torch
 
-from yann.callbacks.base import Callback
-from yann.viz import plot_line
+from ..callbacks.base import Callback
+from ..viz import plot_line
 
 
 class History(Callback):
