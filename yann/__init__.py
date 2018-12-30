@@ -1,10 +1,10 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.20'
+__version__ = '0.0.21'
 
 import numpy as np
 import torch
-
+from torch import nn
 from .config.setup import registry
 
 register = registry
@@ -83,6 +83,16 @@ def freeze(parameters):
 def unfreeze(parameters):
   for p in parameters:
     p.requires_grad = True
+
+
+def replace_linear(model, num_outputs, layer_name='last_linear'):
+  setattr(
+    model,
+    layer_name,
+    nn.Linear(
+      getattr(model, layer_name).in_features,
+      num_outputs)
+  )
 
 
 def to_numpy(x):
