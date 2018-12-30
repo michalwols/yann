@@ -5,15 +5,12 @@ import io
 import numpy as np
 import pathlib
 import torch
+import random
 from PIL import Image
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
 
 from ..utils import truthy
-
-
-def mixup(x1, x2, y1, y2, alpha=.5):
-  pass
 
 
 class Transformer:
@@ -136,3 +133,40 @@ def get_image(x, space=None) -> Image.Image:
   if isinstance(x, bytes):
     img = Image.open(io.BytesIO(x))
     return img.convert(space) if space else img
+
+
+
+
+def mixup(inputs, targets, alpha=1):
+  """
+  Args:
+    inputs: batch of inputs
+    targets: hot encoded targets
+  Returns:
+    mixed up (inputs, targets)
+
+  """
+  shuffled_indices = torch.randperm(inputs.shape[0], device=inputs.device)
+  fraction = np.random.beta(alpha, alpha)
+  return (
+    fraction * inputs + (1 - fraction) * inputs[shuffled_indices],
+    fraction * targets + (1 - fraction) * targets[shuffled_indices]
+  )
+
+
+
+def cutout(img, percent=.3, value=0):
+  pil_img = False
+  if isinstance(img, Image.Image):
+    img = np.array(img)
+    pil_img = True
+  height, width = img.shape[:2]
+
+  mask_height = round(height * percent)
+  mask_width = round(width * percent)
+
+  start_h = random.randint(0, (height - mask_height))
+  start_w = random.randint(0, (width - mask_width))
+
+  img[start_h:start_h + mask_height, start_w:start_w + mask_width] = value
+  return Image.fromarray(img) if pil_img else img
