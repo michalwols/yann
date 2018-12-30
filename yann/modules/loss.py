@@ -11,7 +11,7 @@ def soft_target_cross_entropy(
     smooth=None,
     reduce=True,
     reduction='elementwise_mean'):
-  """"like cross_entropy but using soft tarets"""
+  """"like cross_entropy but using soft targets"""
   if smooth:
     targets = label_smoothing(targets, smooth)
 
@@ -39,3 +39,10 @@ class SoftTargetCrossEntopyLoss(_Loss):
                                      reduction=self.reduction)
 
 
+
+def contrastive_loss():
+  pass
+
+
+def triplet_loss():
+  pass
