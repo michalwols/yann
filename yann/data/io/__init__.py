@@ -55,16 +55,22 @@ def untar(path):
     tar.extractall()
 
 
-def iter_csv(path, header=True):
+def iter_csv(path, header=True, tuples=True, sep=',', quote='"', **kwargs):
   with open(path) as f:
-    reader = csv.reader(f)
+    reader = csv.reader(f, delimiter=sep, quotechar=quote, **kwargs)
     if header:
-      reader = iter(reader)
-      h = next(reader)
-      Row = namedtuple('Row', h)
+      if tuples:
+        reader = iter(reader)
+        h = next(reader)
+        Row = namedtuple('Row', h)
 
-      for r in reader:
-        yield Row(*r)
+        for r in reader:
+          yield Row(*r)
+      else:
+        reader = iter(reader)
+        h = next(reader)
+        for r in reader:
+          yield dict(zip(h, r))
     else:
       yield from reader
 
