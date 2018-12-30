@@ -103,5 +103,10 @@ class Classes(TargetTransformer):
     return [(self.classes[i], scores[i]) for i in indices][::-1]
 
 
-def smooth(y, eps=.1):
-  return y * (1 - eps) + eps * (1.0 / len(y))
+def smooth(y, eps=.1, num_classes=None):
+  if not num_classes:
+    if len(y.shape) == 1:
+      num_classes = len(y)
+    else:
+      num_classes = y.shape[1]
+  return y * (1 - eps) + eps * (1.0 / num_classes)
