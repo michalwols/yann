@@ -3,7 +3,8 @@ from torch.optim import SGD
 from torch.utils.data import Dataset
 from torchvision import datasets
 from torchvision.datasets import MNIST, FashionMNIST
-from yann.utils.registry import Registry, RegistryError
+
+from yann.config.registry import Registry, RegistryError
 
 
 def test_registry():
@@ -45,7 +46,7 @@ def test():
 
   yann.register(MNIST, 'mnist')
 
-  assert yann.registry.resolve('mnist') is MNIST
+  assert yann.registry.resolve('mnist', instance=False) is MNIST
 
   yann.register.dataset(MNIST)
 
@@ -65,7 +66,7 @@ def test_indexing():
   yann.resolve = registry.resolve
 
   yann.registry.dataset.index(datasets, types=(Dataset,))
-  assert yann.resolve.dataset('MNIST') is datasets.MNIST
+  assert yann.resolve.dataset('MNIST', instance=False) is datasets.MNIST
 
   assert yann.registry.has(datasets.MNIST)
   assert 'MNIST' in yann.registry
@@ -85,7 +86,7 @@ def test_indexing():
   class Foobar(Dataset):
     pass
 
-  assert yann.resolve.dataset('Foobar') is Foobar
+  assert yann.resolve.dataset('Foobar', instance=False) is Foobar
 
   @yann.register('ReLU')
   def relu(x):
@@ -104,3 +105,5 @@ def test_yann_registry():
   assert len(yann.registry.dataset)
   assert len(yann.registry.loss)
   assert len(yann.registry.optimizer)
+
+  yann.resolve('MNIST', required=True)

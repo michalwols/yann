@@ -62,7 +62,7 @@ def test_train(tmpdir, device):
 @pytest.mark.parametrize('device', devices)
 def test_train_resolved(tmpdir, device):
   from yann.data.transform import ImageTransformer
-
+  
   train = Trainer(
     root=tmpdir,
     model='densenet121',
