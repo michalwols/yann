@@ -4,11 +4,11 @@ from torch.nn import functional as F
 
 def mac(batch):
   """MAC Pooling"""
-  return F.adaptive_max_pool2d(batch, (1,1))
+  return F.adaptive_max_pool2d(batch, (1, 1))
 
 def spoc(batch):
   """SPoC Pooling"""
-  return F.adaptive_avg_pool2d(batch, (1,1))
+  return F.adaptive_avg_pool2d(batch, (1, 1))
 
 
 def generalized_mean(batch, p=3, eps=1e-8):

@@ -41,6 +41,10 @@ class Flatten(Reshape):
     return input.view(input.size(0), -1)
 
 
+def flatten(input):
+  return input.view(input.size(0), -1)
+
+
 class FlattenSequences(Module):
   def forward(self, input, *rest):
     return flatten_sequence(input)
@@ -49,3 +53,27 @@ class FlattenSequences(Module):
 def flatten_sequence(seq_batch):
   seq_len, batch_size, *rest = seq_batch.size()
   return seq_batch.view(seq_len * batch_size, -1)
+
+
+class Infer(Module):
+  def __init__(self, cls, *args, **kwargs):
+    super(Infer, self).__init__()
+    self.cls = cls
+
+    self.args = args
+    self.kwargs = kwargs
+
+    self.module = None
+
+  @property
+  def was_inferred(self):
+    return self.module is not None
+
+  def forward(self, x):
+    if self.module is None:
+      self.module = self.cls(x.shape[1], *self.args, **self.kwargs)
+    return self.module(x)
+
+  @classmethod
+  def shed(cls, module):
+    pass

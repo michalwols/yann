@@ -30,7 +30,7 @@ def soft_target_cross_entropy(
   raise ValueError('Unsupported reduction mode: ' + str(reduction))
 
 
-class SoftTargetCrossEntopyLoss(_Loss):
+class SoftTargetCrossEntropyLoss(_Loss):
   def __init__(self, smooth=None, reduce=True, dim=1, reduction='elementwise_mean'):
     super().__init__(reduce=reduce, reduction=reduction)
     self.reduce = reduce
