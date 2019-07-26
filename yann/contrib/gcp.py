@@ -63,6 +63,9 @@ def kill_instance():
   pass
 
 
+def shutdown():
+  return run('sudo shutdown -h now')
+
 def gcp_sync(src, dst, exclude=None):
   if exclude:
     return subprocess.call([
