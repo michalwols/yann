@@ -46,7 +46,7 @@ registry.loss.update((
   F.binary_cross_entropy,
   F.binary_cross_entropy_with_logits,
   loss.soft_target_cross_entropy,
-  loss.SoftTargetCrossEntopyLoss
+  loss.SoftTargetCrossEntropyLoss
 ))
 
 # Optimizers
