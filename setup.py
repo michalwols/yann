@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
   name='yann',
-  version='0.0.19',
+  version='0.0.22',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",
@@ -16,6 +16,10 @@ setup(
   packages=find_packages(),
   entry_points={
     'console_scripts': ['yann=yann.cli:main'],
+  },
+  extras_require={
+    'cli': ['click>=6.7'],
+    'pretrainedmodels': ['pretrainedmodels']
   },
   install_requires=[
     'numpy',
