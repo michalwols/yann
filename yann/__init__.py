@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.21'
+__version__ = '0.0.22'
 
 import numpy as np
 import torch
@@ -11,7 +11,11 @@ register = registry
 resolve = registry.resolve
 
 
-def seed(val=1):
+default_device = torch.device('cuda') \
+  if torch.cuda.is_available() else torch.device('cpu')
+
+
+def seed(val=1, deterministic=False):
   import numpy as np
   import torch
   import random
@@ -20,6 +24,9 @@ def seed(val=1):
   torch.manual_seed(val)
   try:
     torch.cuda.manual_seed(val)
+
+    if deterministic:
+      torch.cuda.deterministic = True
   except:
     pass
   return val
@@ -68,6 +75,11 @@ class Multicrop(torch.nn.Module):
 def set_param(x, param, val):
   for group in x.param_groups:
     group[param] = val
+
+
+def scale_param(x, param, mult):
+  for group in x.param_groups:
+    group[param] *= mult
 
 
 def trainable(parameters):
