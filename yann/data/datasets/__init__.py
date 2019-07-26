@@ -14,9 +14,38 @@ class Dataset(data.Dataset):
     }
 
 
-class ClassificationDataset(Dataset):
+class SupervisedDataset(Dataset):
   def __init__(self):
+    self.inputs = None
+    self.targets = None
+
+
+class ClassificationDataset(Dataset):
+  def __init__(self, classes: Classes):
+    self.classes = classes
     pass
+
+
+from glob import iglob
+import os
+
+
+class GlobDataset(Dataset):
+  def __init__(self, pattern='**/*.*', limit=None):
+    paths = []
+    for n, p in enumerate(iglob(pattern, recursive=True)):
+      if os.path.getsize(p) < 4000:
+        continue
+      paths.append(p)
+      if limit and n >= limit:
+        break
+    self.paths = paths
+
+  def __len__(self):
+    return len(self.paths)
+
+  def __getitem__(self, idx):
+    return (self.paths[idx], 0)
 
 
 class InputsTargetsDataset(Dataset):

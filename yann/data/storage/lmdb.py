@@ -1,12 +1,6 @@
 import lmdb
 
-
-def to_bytes(string: str) -> bytes:
-  return string.encode(encoding='utf-8', errors='strict')
-
-
-def to_unicode(b: bytes) -> str:
-  return b.decode(encoding='utf-8', errors='strict')
+from ..serialize import serialize, deserialize
 
 
 class LMDB:

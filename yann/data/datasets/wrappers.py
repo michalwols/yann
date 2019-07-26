@@ -23,6 +23,10 @@ class IncludeIndex(DatasetWrapper):
     return (z, idx)
 
 
+class Subset(DatasetWrapper):
+  pass
+
+
 class LookupCache(DatasetWrapper):
   """
   Cache lookups
@@ -90,13 +94,17 @@ class Imbalanced(DatasetWrapper):
   pass
 
 
+class SemiSupervised(DatasetWrapper):
+  """TODO: hide subset of labels"""
+  pass
+
 
 class SwallowErrors(DatasetWrapper):
   def __getitem__(self, item):
     try:
       return self.dataset[item]
     except KeyboardInterrupt as e:
-      raise from e
+      raise e
     except Exception as e:
       logging.warning(e)
       return None

@@ -82,3 +82,4 @@ def write_csv(data, path, header=None):
       writer.writerow(header)
     for row in data:
       writer.writerow(row)
+
