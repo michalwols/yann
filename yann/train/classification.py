@@ -3,6 +3,7 @@ import logging
 import datetime
 import pathlib
 import torch
+import torch.nn
 from torch.utils.data import DataLoader
 from typing import Optional
 
@@ -58,7 +59,7 @@ class Trainer(BaseTrainer):
       name=None,
       description=None,
       root='./train-runs/',
-
+      metrics=None,
   ):
     super().__init__()
 
@@ -153,7 +154,7 @@ class Trainer(BaseTrainer):
           self.history = c
           has_history = True
           break
-    self.history = self.history or yann_callbacks.History()
+    self.history = self.history or yann_callbacks.History(*(metrics or ()))
 
     self.callbacks = callbacks or [
       yann_callbacks.Logger()
@@ -191,7 +192,7 @@ class Trainer(BaseTrainer):
       return self
     else:
       def decorated(func):
-        self.function_callback.on(event, callback)
+        self.function_callback.on(event, func)
         return func
 
       return decorated
