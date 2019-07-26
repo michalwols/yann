@@ -4,22 +4,23 @@ class Callback:
   def on_train_start(self, trainer=None):
     pass
 
-  def on_epoch_start(self, epoch, trainer=None):
+  def on_epoch_start(self, epoch=None, trainer=None):
     pass
 
-  def on_batch_start(self, batch, inputs, targets, trainer=None):
+  def on_batch_start(self, batch=None, inputs=None, targets=None, trainer=None):
     pass
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
+  def on_batch_end(self, batch=None, inputs=None, targets=None, outputs=None, loss=None,
+                   trainer=None):
     pass
 
-  def on_epoch_end(self, epoch, loss=None, metrics=None, trainer=None):
+  def on_epoch_end(self, epoch=None, loss=None, metrics=None, trainer=None):
     pass
 
-  def on_validation_start(self, trainer):
+  def on_validation_start(self, trainer=None):
     pass
 
-  def on_validation_batch(self, inputs, targets, outputs, trainer):
+  def on_validation_batch(self, inputs=None, targets=None, outputs=None, trainer=None):
     pass
 
   def on_validation_end(self, targets=None, outputs=None, loss=None,
@@ -29,10 +30,10 @@ class Callback:
   def on_train_end(self, trainer=None):
     pass
 
-  def on_batch_error(self, batch, error, trainer=None):
+  def on_batch_error(self, batch=None, error=None, trainer=None):
     pass
 
-  def on_error(self, error, trainer=None):
+  def on_error(self, error=None, trainer=None):
     pass
 
 
@@ -70,7 +71,7 @@ class FunctionCallback(Callback):
     for f in self.callbacks['epoch_start']:
       f(*args, **kwargs)
 
-  def on_batch_start(self,*args, **kwargs):
+  def on_batch_start(self, *args, **kwargs):
     for f in self.callbacks['batch_start']:
       f(*args, **kwargs)
 
@@ -101,3 +102,21 @@ class FunctionCallback(Callback):
   def on_error(self, *args, **kwargs):
     for f in self.callbacks['error']:
       f(*args, **kwargs)
+
+
+class TempCallback(Callback):
+  def __init__(self, callback, steps=None, epochs=None):
+    self.callback = callback
+    self.steps = steps
+    self.epochs = epochs
+
+  def unregister(self):
+    raise NotImplementedError()
+
+  def on_batch_end(self, batches, *args, **kwargs):
+    if self.steps and self.steps < batches:
+      self.unregister()
+
+  def on_epoch_end(self, epoch=None, loss=None, metrics=None, trainer=None):
+    if self.epochs and self.epochs < epoch:
+      self.unregister()

@@ -8,15 +8,15 @@ from ..viz import plot_line
 
 
 class History(Callback):
-  def __init__(self, **metrics):
+  def __init__(self, *metrics, **named_metrics):
     super(History, self).__init__()
-    self.metric_funcs = metrics
-    self.metrics = {m: [] for m in metrics}
+    self.metric_funcs = {**named_metrics, **{m.__name__: m for m in metrics}}
+    self.metrics = {m: [] for m in self.metric_funcs}
     self.metrics['loss'] = []
     self.times = []
     self.steps = []
 
-    self.val_metrics = {m: [] for m in metrics}
+    self.val_metrics = {m: [] for m in self.metric_funcs}
     self.val_metrics['loss'] = []
     self.val_steps = []
     self.val_times = []

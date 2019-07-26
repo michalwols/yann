@@ -1,4 +1,4 @@
-from .base import FunctionCallback
+from .base import FunctionCallback, Callback
 from .checkpoint import Checkpoint
 from .eval import MulticlassEval
 from .history import History, HistoryPlotter, HistoryWriter
