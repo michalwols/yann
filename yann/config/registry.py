@@ -186,7 +186,9 @@ class Registry:
       except KeyError:
         pass
 
-    raise KeyError(f"Couldn't find key: {item}")
+    raise KeyError(
+      f"Couldn't find key: '{item}', "
+      f"valid options include: {', '.join(self._records.keys())}")
 
   def values(self):
     return dedupe((

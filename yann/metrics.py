@@ -4,7 +4,7 @@ from sklearn import metrics
 from functools import partial
 from collections import deque
 
-from . import to_numpy
+from .utils import to_numpy
 
 
 def get_preds(scores):

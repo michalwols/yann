@@ -38,6 +38,18 @@ class Classes(TargetTransformer):
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
 
+  def __repr__(self):
+    c = min(len(self.classes) // 2, 3)
+
+    return (
+      f"Classes(\n" 
+      f"  count={len(self)},\n" 
+      f"  default_encoding={self.default_encoding}\n"
+      f"  classes=[{', '.join(self.classes[:c])}, ..., {', '.join(self.classes[-c:])}]\n"
+      # f"  encoded={self.encode(self.classes[:c])}, ..., {self.encode(self.classes[-c:])}\n"
+      f")"
+    )
+
   def state_dict(self):
     return {
       'classes': self.classes,

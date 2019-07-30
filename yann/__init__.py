@@ -1,8 +1,7 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.22'
+__version__ = '0.0.24'
 
-import numpy as np
 import torch
 from torch import nn
 from .config.setup import registry
@@ -10,6 +9,7 @@ from .config.setup import registry
 register = registry
 resolve = registry.resolve
 
+from .utils import to_numpy
 
 default_device = torch.device('cuda') \
   if torch.cuda.is_available() else torch.device('cpu')
@@ -105,14 +105,6 @@ def replace_linear(model, num_outputs, layer_name='last_linear'):
       getattr(model, layer_name).in_features,
       num_outputs)
   )
-
-
-def to_numpy(x):
-  if isinstance(x, np.ndarray):
-    return x
-  if torch.is_tensor(x):
-    return x.to('cpu').numpy()
-  return np.array(x)
 
 
 def to_fp16(model):

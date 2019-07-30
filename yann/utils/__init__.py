@@ -28,8 +28,8 @@ def equal(t1, t2):
   return torch.all(t1 == t2)
 
 
-def randimg(*shape):
-  return Image.fromarray((np.random.rand(*shape) * 255).astype('uint8'))
+def randimg(*shape, dtype='uint8'):
+  return Image.fromarray((np.random.rand(*shape) * 255).astype(dtype))
 
 
 
@@ -55,3 +55,11 @@ def progress(it, num=None):
 def repeat(val):
   while True:
     yield val
+
+
+def to_numpy(x):
+  if isinstance(x, np.ndarray):
+    return x
+  if torch.is_tensor(x):
+    return x.to('cpu').numpy()
+  return np.array(x)

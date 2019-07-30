@@ -9,6 +9,7 @@ import random
 from PIL import Image
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
+from torchvision import transforms
 
 from ..utils import truthy
 
@@ -170,3 +171,40 @@ def cutout(img, percent=.3, value=0):
 
   img[start_h:start_h + mask_height, start_w:start_w + mask_width] = value
   return Image.fromarray(img) if pil_img else img
+
+
+
+def get_imagenet_transformers(size=224, resize=256, fixres=False):
+  train_transform = Transformer(
+    load=GetImage('RGB'),
+    transform=transforms.Compose([
+#       transforms.Resize(resize, interpolation=Image.ANTIALIAS),
+      transforms.RandomResizedCrop(
+          size,
+#           scale=(.4, 1),
+#           interpolation=Image.ANTIALIAS
+      ),
+      transforms.ColorJitter(
+          .3, .3, .3
+#           brightness=.4, contrast=.2, saturation=.1, hue=.05
+      ),
+      transforms.RandomHorizontalFlip(),
+    ]),
+    to_tensor=transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize(
+          mean=[0.485, 0.456, 0.406],
+          std=[0.229, 0.224, 0.225])
+    ])
+  )
+
+  test_transform = Transformer(
+    load=train_transform.load,
+    transform=transforms.Compose([
+      transforms.Resize(size, interpolation=Image.ANTIALIAS),
+      transforms.CenterCrop(size)
+    ]),
+    to_tensor=train_transform.to_tensor
+  )
+
+  return train_transform, test_transform

@@ -14,12 +14,10 @@ def extract(src, dst=None):
       tar.extractall(path=dst)
 
 
-
 class Imagenette(ClassificationDataset):
   """
   https://github.com/fastai/imagenette
   """
-
   urls = {
     160: 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette-160.tgz',
     320: 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette-320.tgz',
@@ -40,7 +38,7 @@ class Imagenette(ClassificationDataset):
         f"Unsupported size '{size}', "
         f"must be one of '{', '.join(self.urls.keys())}'")
     self.size = size
-    self.root = Path(root)
+    self.root = Path(root).expanduser()
     self.size_root = self.root / self.get_dirname(self.urls[self.size])
 
     self.split = split
@@ -75,9 +73,51 @@ class Imagenette(ClassificationDataset):
     extract(root / filename)
 
 
+class Imagenette160(Imagenette):
+  size = 160
+  def __init__(self, **kwargs):
+    if 'size' in kwargs and kwargs['size'] != self.__class__.size:
+      raise ValueError('size is not a valid argument')
+    super(Imagenette160, self).__init__(
+      size=self.__class__.size,
+      **kwargs
+    )
+
+class Imagenette320(Imagenette):
+  size = 320
+  def __init__(self, **kwargs):
+    if 'size' in kwargs and kwargs['size'] != self.__class__.size:
+      raise ValueError('size is not a valid argument')
+    super(Imagenette320, self).__init__(
+      size=self.__class__.size,
+      **kwargs
+    )
+
 class Imagewoof(Imagenette):
   urls = {
     160: 'https://s3.amazonaws.com/fast-ai-imageclas/imagewoof-160.tgz',
     320: 'https://s3.amazonaws.com/fast-ai-imageclas/imagewoof-320.tgz',
     None: 'https://s3.amazonaws.com/fast-ai-imageclas/imagewoof.tgz'
   }
+
+
+class Imagewoof160(Imagenette):
+  size = 160
+  def __init__(self, **kwargs):
+    if 'size' in kwargs and kwargs['size'] != self.__class__.size:
+      raise ValueError('size is not a valid argument')
+    super(Imagewoof160, self).__init__(
+      size=self.__class__.size,
+      **kwargs
+    )
+
+
+class Imagewoof320(Imagenette):
+  size = 320
+  def __init__(self, **kwargs):
+    if 'size' in kwargs and kwargs['size'] != self.__class__.size:
+      raise ValueError('size is not a valid argument')
+    super(Imagewoof320, self).__init__(
+      size=self.__class__.size,
+      **kwargs
+    )

@@ -9,17 +9,27 @@ from .registry import Registry, pass_args
 registry = Registry()
 
 # Datasets
-from torchvision import datasets
+import torchvision.datasets
 
 from torch.utils.data import Dataset
 
 registry.dataset.index(
-  datasets,
+  torchvision.datasets,
   types=(Dataset,),
   init=lambda D, root=None, download=True, **kwargs: \
     D(root=root or f'~/.torch/datasets/{D.__name__}',
       download=download)
 )
+
+from ..data.datasets import imagenette
+registry.dataset.index(
+  imagenette,
+  types=(Dataset,),
+  init=lambda D, root=None, download=True, **kwargs: \
+    D(root=root or f'~/.torch/datasets/',
+      download=download)
+)
+
 
 # Losses
 registry.loss.index(
@@ -98,3 +108,26 @@ else:
     init=pass_args,
     include=is_public_callable
   )
+
+from .. import metrics
+registry.metric.update((
+  metrics.accuracy,
+  metrics.average_precision,
+  metrics.average_precision_at_k,
+  metrics.coverage_error,
+))
+
+registry.metric.register(
+  metrics.top_3_accuracy,
+  name='top_3_accuracy'
+)
+
+registry.metric.register(
+  metrics.top_5_accuracy,
+  name='top_5_accuracy'
+)
+
+registry.metric.register(
+  metrics.top_10_accuracy,
+  name='top_10_accuracy'
+)

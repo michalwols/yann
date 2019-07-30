@@ -17,7 +17,7 @@ def get_callbacks(
 ):
   return [
     x for x in (
-      History(),
+      # History(),
       plot and HistoryPlotter(save=not interactive),
       write and HistoryWriter(),
       checkpoint and Checkpoint(),

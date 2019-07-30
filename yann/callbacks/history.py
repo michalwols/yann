@@ -3,14 +3,26 @@ from pathlib import Path
 
 import torch
 
+from ..utils.decorators import lazy
 from ..callbacks.base import Callback
 from ..viz import plot_line
+from .. import resolve
 
 
 class History(Callback):
   def __init__(self, *metrics, **named_metrics):
     super(History, self).__init__()
-    self.metric_funcs = {**named_metrics, **{m.__name__: m for m in metrics}}
+    self.metric_funcs = {
+      **named_metrics,
+    }
+    for m in metrics:
+      if isinstance(m, str):
+        self.metric_funcs[m] = resolve.metric(m)
+      elif hasattr(m, '__name__'):
+        self.metric_funcs[m.__name__] = m
+      else:
+        raise ValueError(f'Unknown metric {m}')
+
     self.metrics = {m: [] for m in self.metric_funcs}
     self.metrics['loss'] = []
     self.times = []
@@ -44,6 +56,10 @@ class History(Callback):
           metric(targets, outputs)
         )
 
+  @lazy
+  def plot(self):
+    return HistoryPlotter(history=self)
+
 
 class HistoryPlotter(Callback):
   def __init__(self, freq=500, window=50, metrics=None,
@@ -59,6 +75,9 @@ class HistoryPlotter(Callback):
 
     self.clear = clear
     self.root = None
+
+  def __call__(self, *args, **kwargs):
+    return self.plot(*args, **kwargs)
 
   def plot(self, metric=None, time=False, validation=False, **kwargs):
     if self.clear:
