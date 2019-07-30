@@ -60,6 +60,7 @@ class Trainer(BaseTrainer):
       description=None,
       root='./train-runs/',
       metrics=None,
+      collate=None
   ):
     super().__init__()
 
@@ -83,18 +84,20 @@ class Trainer(BaseTrainer):
       validate=lambda x: hasattr(x, 'step')
     )
 
+    self.dataset = resolve.dataset(
+      dataset,
+      required=not loader,
+    )
+
     if classes:
       self.classes = (
         classes if isinstance(classes, Classes)
         else Classes(classes)
       )
+    elif hasattr(self.dataset, 'classes') and isinstance(self.dataset.classes, Classes):
+      self.classes = self.dataset.classes
     else:
       self.classes = None
-
-    self.dataset = resolve.dataset(
-      dataset,
-      required=not loader,
-    )
 
     if transform:
       self.dataset = TransformDataset(self.dataset, transform)
@@ -108,8 +111,8 @@ class Trainer(BaseTrainer):
       pin_memory=True,
       shuffle=False if sampler else True,
       sampler=sampler,
-      #       collate_fn=collate,
-      num_workers=num_workers
+      num_workers=num_workers,
+      **({'collate_fn': collate} if collate else {})
     )
 
     self.val_dataset = val_dataset
@@ -176,6 +179,33 @@ class Trainer(BaseTrainer):
     else:
       self.device = None
 
+  def __setattr__(self, key, value):
+    if key == 'optimizer':
+      if hasattr(self, 'lr_scheduler') and hasattr(self.lr_scheduler, 'optimizer'):
+        self.lr_scheduler.optimizer = value
+    if key == 'loader':
+      if hasattr(self, 'dataset') and hasattr(value, 'dataset'):
+        super(Trainer, self).__setattr__('dataset', value.dataset)
+      if hasattr(value, 'batch_size'):
+        super(Trainer, self).__setattr__('batch_size', value.batch_size)
+    if key == 'batch_size' and hasattr(self, 'batch_size') and self.batch_size != key:
+      if hasattr(self, 'loader') and self.loader:
+        raise ValueError(
+          'Cannot modify batch_size because a loader is defined '
+          'and modifying batch size of a loader is not supported, '
+          'try creating and setting a new loader instead'
+        )
+      if key == 'dataset' and hasattr(self, 'dataset') and self.dataset and hasattr(self, 'loader') and self.loader:
+        raise ValueError(
+          'Cannot modify dataset because a loader is defined '
+          'and modifying dataset of a loader is not supported, '
+          'try creating and setting a new loader instead'
+        )
+
+    logging.debug(f"setting '{key}' to {value}")
+    super(Trainer, self).__setattr__(key, value)
+
+
   def to(self, device=None):
     self.device = device
 
@@ -213,7 +243,10 @@ class Trainer(BaseTrainer):
 
   def batches(self):
     for inputs, targets in self.loader:
-      yield inputs.to(self.device), targets.to(self.device)
+      if self.device:
+        yield inputs.to(self.device), targets.to(self.device)
+      else:
+        yield inputs, targets
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
