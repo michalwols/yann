@@ -1,3 +1,7 @@
+from typing import Union, Iterable, Any
+from glob import iglob
+import os
+
 from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex
 
 
@@ -16,18 +20,22 @@ class Dataset(data.Dataset):
 
 class SupervisedDataset(Dataset):
   def __init__(self):
-    self.inputs = None
-    self.targets = None
+    if not hasattr(self, 'inputs'):
+      self.inputs = None
+    if not hasattr(self, 'targets'):
+      self.targets = None
+
+  def __getitem__(self, idx):
+    return self.inputs[idx], self.targets[idx]
+
+  def __len__(self):
+    return len(self.inputs)
 
 
-class ClassificationDataset(Dataset):
-  def __init__(self, classes: Classes):
-    self.classes = classes
-    pass
-
-
-from glob import iglob
-import os
+class ClassificationDataset(SupervisedDataset):
+  def __init__(self, classes: Union[Classes, Iterable[Any]]):
+    super(ClassificationDataset, self).__init__()
+    self.classes = classes if isinstance(classes, Classes) else Classes(classes)
 
 
 class GlobDataset(Dataset):
