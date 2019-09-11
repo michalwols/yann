@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
 function tests() {
-  pytest
+  pytest "$1" --mocha
+}
+
+function test-coverage() {
+  pytest --cov=yann tests/
+}
+
+function watch-tests() {
+  pytest-watch "$1" -- --testmon --mocha
 }
 
 
