@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
   name='yann',
-  version='0.0.25',
+  version='0.0.27',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",
@@ -25,7 +25,7 @@ setup(
     'numpy',
     'scipy',
     'scikit-learn',
-    'torch>=0.4.0',
+    'torch>=1.0.0',
     'matplotlib',
     'torchvision'
   ],
