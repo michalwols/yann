@@ -32,7 +32,6 @@ def randimg(*shape, dtype='uint8'):
   return Image.fromarray((np.random.rand(*shape) * 255).astype(dtype))
 
 
-
 def progress(it, num=None):
   if not num:
     try:
@@ -55,6 +54,13 @@ def progress(it, num=None):
 def repeat(val):
   while True:
     yield val
+
+
+def counter(start=0, end=None, step=1):
+  current = start
+  while end is None or (end and (current < end)):
+    yield current
+    current += step
 
 
 def to_numpy(x):
