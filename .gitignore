@@ -1,6 +1,11 @@
 # Editors
 .idea/
 
+
+datasets/
+
+.testmondata/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
