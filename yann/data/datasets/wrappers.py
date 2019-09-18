@@ -23,6 +23,22 @@ class IncludeIndex(DatasetWrapper):
     return (z, idx)
 
 
+class Slice(DatasetWrapper):
+  def __init__(self, dataset, start=0, end=None):
+    super(Slice, self).__init__(dataset)
+
+    self.start = start
+    self.end = end if end is not None else len(dataset)
+
+  def __getitem__(self, idx):
+    if idx < len(self):
+      raise IndexError('')
+    return self.dataset[self.start + idx]
+
+  def __len__(self):
+    return self.end - self.start
+
+
 class Subset(DatasetWrapper):
   pass
 
