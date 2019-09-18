@@ -4,12 +4,13 @@ from torch import nn
 from torch.optim import SGD
 
 from yann.callbacks import (
-  History, HistoryPlotter, HistoryWriter, Logger,
-  Checkpoint
+  History, HistoryPlotter, HistoryWriter, Logger, Checkpoint
 )
 from yann.data.datasets import TinyDigits
 from yann.modules import Flatten
 from yann.train import Trainer
+
+from torchvision.models.resnet import resnet18
 
 devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 
@@ -33,10 +34,7 @@ def test_train(tmpdir, device):
     model=model,
     dataset=TinyDigits(),
     device=device,
-    optimizer=SGD(
-      model.parameters(),
-      lr=.01, momentum=0.9, weight_decay=.001
-    ),
+    optimizer=SGD(model.parameters(), lr=.01, momentum=0.9, weight_decay=.001),
     loss=nn.CrossEntropyLoss(),
     callbacks=[
       History(),
@@ -62,7 +60,7 @@ def test_train(tmpdir, device):
 @pytest.mark.parametrize('device', devices)
 def test_train_resolved(tmpdir, device):
   from yann.data.transform import ImageTransformer
-  
+
   train = Trainer(
     root=tmpdir,
     model='densenet121',
