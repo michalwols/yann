@@ -14,6 +14,7 @@ from ..export import export
 from ..inference.predict import Classifier
 from ..train.base import BaseTrainer
 from ..utils.decorators import lazy
+from ..utils import counter
 
 
 def timestr(d=None):
@@ -115,7 +116,10 @@ class Trainer(BaseTrainer):
       **({'collate_fn': collate} if collate else {})
     )
 
-    self.val_dataset = val_dataset
+    self.val_dataset = resolve.dataset(
+      val_dataset,
+      required=not val_loader,
+    )
 
     self.val_transform = val_transform or transform
     if self.val_transform:
@@ -195,7 +199,8 @@ class Trainer(BaseTrainer):
           'and modifying batch size of a loader is not supported, '
           'try creating and setting a new loader instead'
         )
-      if key == 'dataset' and hasattr(self, 'dataset') and self.dataset and hasattr(self, 'loader') and self.loader:
+      if key == 'dataset' and hasattr(self, 'dataset') and self.dataset \
+          and hasattr(self, 'loader') and self.loader:
         raise ValueError(
           'Cannot modify dataset because a loader is defined '
           'and modifying dataset of a loader is not supported, '
@@ -270,12 +275,12 @@ class Trainer(BaseTrainer):
     self.on_validation_end(targets=ts, outputs=os, loss=loss)
     return loss
 
-  def run(self, epochs=1):
+  def run(self, epochs=None):
     self._stop = False
     try:
       self.on_train_start()
 
-      for _ in range(epochs):
+      for _ in counter(end=epochs):
         self.on_epoch_start(epoch=self.num_epochs)
         for batch_idx, (inputs, targets) in enumerate(self.batches()):
           self.on_batch_start(
@@ -293,11 +298,16 @@ class Trainer(BaseTrainer):
             if self._stop: break
             raise e
 
-          self.on_batch_end(batch=batch_idx, inputs=inputs, targets=targets,
-                            outputs=outputs, loss=loss)
+          self.on_batch_end(
+            batch=batch_idx,
+            inputs=inputs,
+            targets=targets,
+            outputs=outputs,
+            loss=loss
+          )
 
           if self.lr_scheduler and self.lr_batch_step:
-            self.lr_scheduler.step()
+            self.lr_scheduler.step(epoch=self.num_steps)
 
           if self._stop: break
         if self._stop: break
@@ -305,9 +315,12 @@ class Trainer(BaseTrainer):
         if self.val_loader:
           val_loss = self.validate()
           if self.lr_scheduler and not self.lr_batch_step:
-            self.lr_scheduler.step(val_loss)
+            if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
+             self.lr_scheduler.step(metrics=val_loss, epoch=self.num_epochs)
+            else:
+              self.lr_scheduler.step(epoch=self.num_epochs)
         elif self.lr_scheduler and not self.lr_batch_step:
-          self.lr_scheduler.step()
+          self.lr_scheduler.step(epoch=self.num_epochs)
 
         self.on_epoch_end(epoch=self.num_epochs)
         self.num_epochs += 1
@@ -451,9 +464,15 @@ OPTIMIZER
 
 {self.optimizer}
 
+SCHEDULER
+=========
+
+{self.lr_scheduler}
+
 
 PROGRESS
 ========
 epochs: {self.num_epochs}
 steps: {self.num_steps}
-samples: {self.num_samples}"""
+samples: {self.num_samples}
+"""
