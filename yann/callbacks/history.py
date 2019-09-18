@@ -40,9 +40,10 @@ class History(Callback):
 
     with torch.no_grad():
       for name, metric in self.metric_funcs.items():
-        self.metrics[name].append(
-          metric(targets, outputs)
-        )
+        val = metric(targets, outputs).item()
+        if torch.is_tensor(val):
+          val = val.item()
+        self.metrics[name].append(val)
 
   def on_validation_end(self, loss=None, outputs=None, targets=None,
                         trainer=None):
@@ -52,13 +53,32 @@ class History(Callback):
 
     with torch.no_grad():
       for name, metric in self.metric_funcs.items():
-        self.val_metrics[name].append(
-          metric(targets, outputs)
-        )
+        val = metric(targets, outputs).item()
+        if torch.is_tensor(val):
+          val = val.item()
+        self.val_metrics[name].append(val)
 
   @lazy
   def plot(self):
     return HistoryPlotter(history=self)
+
+  def summary(self):
+    return {
+      'train': {
+        m: {
+          'max': max(vals, default=None),
+          'min': min(vals, default=None)
+        }
+        for m, vals in self.metrics.items()
+      },
+      'validation': {
+        m: {
+          'max': max(vals, default=None),
+          'min': min(vals, default=None)
+        }
+        for m, vals in self.val_metrics.items()
+      }
+    }
 
 
 class HistoryPlotter(Callback):
