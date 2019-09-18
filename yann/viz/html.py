@@ -45,6 +45,8 @@ class Node:
     </{self.name}>
     """
 
+  __repr__ = __str__
+
   def render(self, target='notebook'):
     if target == 'notebook':
       from IPython.core.display import display, HTML
