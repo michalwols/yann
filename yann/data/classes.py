@@ -24,56 +24,62 @@ class Classes(TargetTransformer):
 
   def __init__(
       self,
-      classes,
+      names,
       meta=None,
       default_encoding='index'
   ):
-    self.classes = list(classes)
-    self.indices = {c: i for i, c in enumerate(self.classes)}
+    self.names = list(names)
+    self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = meta
+    
+    self.counts = None
 
     self.dtype = 'float32'
 
     assert default_encoding in self.valid_encodings, \
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
+    
+  @classmethod
+  def ordered(cls, num, meta=None, default_encoding='index'):
+    return Classes(range(num), meta=meta, default_encoding=default_encoding)
 
   def __repr__(self):
-    c = min(len(self.classes) // 2, 3)
+    c = min(len(self.names) // 2, 3)
 
     return (
       f"Classes(\n" 
       f"  count={len(self)},\n" 
       f"  default_encoding={self.default_encoding}\n"
-      f"  classes=[{', '.join(self.classes[:c])}, ..., {', '.join(self.classes[-c:])}]\n"
-      # f"  encoded={self.encode(self.classes[:c])}, ..., {self.encode(self.classes[-c:])}\n"
+      f"  names=[{', '.join(self.names[:c])}, ..., {', '.join(self.names[-c:])}]\n"
+      # f"  encoded={self.encode(self.names[:c])}, ..., {self.encode(self.names[-c:])}\n"
       f")"
     )
 
   def state_dict(self):
     return {
-      'classes': self.classes,
+      'names': self.names,
       'meta': self.meta,
       'default_encoding': self.default_encoding
     }
 
   def load_state_dict(self, data):
-    self.classes = data['classes']
-    self.indices = {c: i for i, c in enumerate(self.classes)}
+    self.names = data['names']
+    self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = data['meta']
     self.default_encoding = data['default_encoding']
 
   def __getitem__(self, idx):
-    return self.classes[idx]
+    return self.names[idx]
 
   def __iter__(self):
-    return iter(self.classes)
+    return iter(self.names)
 
   def __contains__(self, cls):
     return cls in self.indices
 
   def __len__(self):
-    return len(self.classes)
+    return len(self.names)
 
   def __eq__(self, other):
     return self.indices == other.indices
@@ -112,7 +118,7 @@ class Classes(TargetTransformer):
 
   def ranked_decode(self, scores):
     indices = np.argsort(scores)
-    return [(self.classes[i], scores[i]) for i in indices][::-1]
+    return [(self.names[i], scores[i]) for i in indices][::-1]
 
 
 def smooth(y, eps=.1, num_classes=None):
