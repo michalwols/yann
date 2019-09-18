@@ -12,6 +12,13 @@ function watch-tests() {
   pytest-watch "$1" -- --testmon --mocha
 }
 
+function release() {
+  rm -rf ./dist
+  rm -rf ./build
+  python setup.py sdist bdist_wheel
+  twine upload dist/*
+}
+
 
 if declare -f "$1" > /dev/null
 then
