@@ -3,6 +3,9 @@ import numpy as np
 import datetime
 import pathlib
 from sklearn.metrics import roc_curve, auc, confusion_matrix
+import matplotlib.dates as mdates
+from matplotlib.collections import PolyCollection
+from collections import OrderedDict
 
 import itertools
 
@@ -269,3 +272,35 @@ def plot_confusion_matrix(
   plt.show()
 
   return cm
+
+
+def plot_timeline(tasks, figsize=None):
+  inds = OrderedDict((c, n) for n, c in enumerate(set(t.name for t in tasks)))
+  color_map = {c: f"C{n}" for c, n in inds.items()}
+
+  verts = []
+  colors = []
+  for task in tasks:
+    v = [(mdates.date2num(task.start_time), inds[task.name] - .4),
+         (mdates.date2num(task.start_time), inds[task.name] + .4),
+         (mdates.date2num(task.end_time), inds[task.name] + .4),
+         (mdates.date2num(task.end_time), inds[task.name] - .4),
+         (mdates.date2num(task.start_time), inds[task.name] - .4)]
+    verts.append(v)
+    colors.append(color_map[task.name])
+
+  bars = PolyCollection(
+    verts,
+    facecolors=colors,
+  )
+
+  fig, ax = plt.subplots(figsize=figsize)
+  ax.add_collection(bars)
+  ax.autoscale()
+  loc = mdates.SecondLocator(list(range(0, 60, 10)))
+  ax.xaxis.set_major_locator(loc)
+  ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(loc))
+
+  ax.set_yticks(list(inds.values()))
+  ax.set_yticklabels(list(inds.keys()))
+  plt.show()
