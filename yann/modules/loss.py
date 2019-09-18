@@ -51,7 +51,7 @@ class SoftTargetCrossEntropyLoss(_Loss):
 
 
 
-def binary_focal_loss(logits, targets, gamma=2, alpha=None, reduce=True, reduction='mean'):
+def binary_focal_loss(logits, targets, gamma=2, alpha=None, pos_weight=None, reduce=True, reduction='mean'):
   """
   Binary focal loss (with sigmoids)
 
@@ -86,8 +86,10 @@ def binary_focal_loss(logits, targets, gamma=2, alpha=None, reduce=True, reducti
   Returns:
 
   """
+  # TODO try this numerically stable version https://github.com/richardaecn/class-balanced-loss/issues/1
+
   probs = torch.sigmoid(logits)
-  bce = F.binary_cross_entropy_with_logits(logits, targets, reduction='none')
+  bce = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=pos_weight, reduction='none')
 
   pt = targets * probs + (1 - targets) * (1 - probs)
   modulate = 1 if gamma is None else (1 - pt) ** gamma
@@ -99,10 +101,28 @@ def binary_focal_loss(logits, targets, gamma=2, alpha=None, reduce=True, reducti
     alpha_weights = targets * alpha + (1 - targets) * (1 - alpha)
     focal_loss *= alpha_weights
 
-
-
   return _reduce(focal_loss, reduce=reduce, reduction=reduction)
 
+
+class BinaryFocalLoss(_Loss):
+  def __init__(self, gamma=2, alpha=None, pos_weight=None, reduce=True, reduction='mean'):
+    super(BinaryFocalLoss, self).__init__()
+
+    self.gamma = gamma
+    self.alpha = alpha
+    self.pos_weight = pos_weight
+    self.reduce = reduce
+    self.reduction = reduction
+
+  def forward(self, logits, targets):
+    return binary_focal_loss(
+      logits,
+      targets,
+      gamma=self.gamma,
+      alpha=self.alpha,
+      pos_weight=self.pos_weight,
+      reduction=self.reduction
+    )
 
 class ClassWeighted(_Loss):
   def __init__(self, loss, weights=None, reduce=True, reduction='mean'):
