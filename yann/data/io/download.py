@@ -1,14 +1,132 @@
 import urllib.request
 from concurrent import futures
 import pathlib
+from pathlib import Path
 from urllib.parse import urlparse
 import os
 
 from ...utils import progress
 
 
+class CachedExecutor:
+  def __init__(self, workers=8):
+    self._executor = futures.ThreadPoolExecutor(max_workers=workers)
+
+    self.pending = {}  # key => future
+    self.results = {} # key => local path
+    self.errors = {}  # key => error
+
+    self.error_callbacks = []
+    self.success_callbacks = []
+    self.cancel_callbacks = []
+
+  def on_error(self, callback):
+    self.error_callbacks.append(callback)
+
+  def on_success(self, callback):
+    self.success_callbacks.append(callback)
+
+  def on_cancel(self, callback):
+    self.cancel_callbacks.append(callback)
+
+  def __del__(self):
+    self.cancel()
+    if self._executor:
+      self._executor.shutdown()
+
+  def cancel(self):
+    for key, future in self.pending.items():
+      future.cancel()
+
+  def complete(self):
+    self._executor.shutdown()
+
+  def as_completed(self):
+    yield from futures.as_completed(self.pending.values())
+
+  def wait(self):
+    return futures.wait(self.pending.values())
+
+  def handle_done_future(self, future: futures.Future):
+    self.pending.pop(future.key)
+
+    if future.cancelled():
+      for c in self.cancel_callbacks:
+        c(future.key, future)
+      return
+
+    try:
+      r = future.result()
+      self.results[future.key] = r
+    except Exception as e:
+      self.errors[future.key] = e
+      for c in self.error_callbacks:
+        c(future.key, e, future)
+      return
+
+    for c in self.success_callbacks:
+      c(future.key, r, future)
+
+  def get_all(self, keys):
+    fs = self._executor.map(self.get, keys)
+    return futures.wait(fs)
+
+  def stream(self, keys):
+    fs = self._executor.map(self.get, keys)
+    return futures.as_completed(fs)
+
+  def execute(self, key, *args, **kwargs):
+    raise NotImplementedError()
+
+  def submit(self, key, *args, **kwargs):
+    future = self._executor.submit(self.execute, key, *args, **kwargs)
+    self.pending[key] = future
+    future.key = key
+    future.add_done_callback(self.handle_done_future)
+    return future
+
+  def enqueue(self, key, *args, **kwargs):
+    if key in self.results or key in self.pending:
+      return
+    return self.submit(key,  *args, **kwargs)
+
+  def get(self, key):
+    if key in self.results:
+      return self.results[key]
+    if key in self.pending:
+      return self.pending[key].result()
+
+    return self.submit(key).result()
+
+
+  def __getitem__(self, key):
+    return self.get(key)
+
+
+class Downloader(CachedExecutor):
+  def __init__(self, local_root='./', workers=8):
+    super(Downloader, self).__init__(workers=workers)
+    self.local_root = local_root
+
+  def execute(self, key, *args, **kwargs):
+    uri = self.get_uri(key)
+    dest = self.get_path(uri)
+    return self.download(uri, dest)[0]
+
+  def get_path(self, url):
+    return None
+
+  def get_uri(self, key):
+    return key
+
+  def download(self, uri, path):
+    return download(uri, path, root=self.local_root)
+
 
 def download(url, dest=None, skip_existing=True, nest=True, root='./'):
+  """
+  Returns: (local_path, headers), headers will be None if file exists
+  """
   if not dest:
     root = os.path.abspath(root)
     dest = (urlparse(url).path if nest else os.path.basename(urlparse(url).path))
