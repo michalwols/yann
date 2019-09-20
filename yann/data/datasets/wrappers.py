@@ -13,6 +13,7 @@ class DatasetWrapper:
     return len(self.dataset)
 
 
+
 class IncludeIndex(DatasetWrapper):
   def __getitem__(self, idx):
     z = super().__getitem__(idx)
@@ -31,8 +32,8 @@ class Slice(DatasetWrapper):
     self.end = end if end is not None else len(dataset)
 
   def __getitem__(self, idx):
-    if idx < len(self):
-      raise IndexError('')
+    if idx >= len(self):
+      raise IndexError(f'Index out of bounds {idx}')
     return self.dataset[self.start + idx]
 
   def __len__(self):
@@ -116,12 +117,27 @@ class SemiSupervised(DatasetWrapper):
 
 
 class SwallowErrors(DatasetWrapper):
+  def __init__(self, dataset, errors=None):
+    super(SwallowErrors, self).__init__(dataset)
+    self.errors = errors or Exception
+
   def __getitem__(self, item):
     try:
       return self.dataset[item]
     except KeyboardInterrupt as e:
       raise e
-    except Exception as e:
+    except self.errors as e:
       logging.warning(e)
       return None
 
+
+class VariableLength(DatasetWrapper):
+  def __init__(self, dataset, max_size=1e20):
+    super(VariableLength, self).__init__(dataset)
+    self.max_size = max_size
+
+  def __len__(self):
+    return self.max_size
+
+  def __getitem__(self, idx):
+    return self.dataset[idx % len(self.dataset)]
