@@ -64,7 +64,11 @@ class Classes(TargetTransformer):
     }
 
   def load_state_dict(self, data):
-    self.names = data['names']
+    if 'classes' in data:
+      # fr backwards compatibility since classes was renamed to names
+      self.names = data['classes']
+    else:
+      self.names = data['names']
     self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = data['meta']
     self.default_encoding = data['default_encoding']
