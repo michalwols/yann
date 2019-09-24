@@ -1,5 +1,5 @@
-
 import torch
+
 
 def normalize(batch, p=2, eps=1e-8):
   return (
