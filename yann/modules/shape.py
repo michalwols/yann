@@ -56,9 +56,10 @@ def flatten_sequence(seq_batch):
 
 
 class Infer(Module):
-  def __init__(self, cls, *args, **kwargs):
+  def __init__(self, cls, shape_dim=1, *args, **kwargs):
     super(Infer, self).__init__()
     self.cls = cls
+    self.shape_dim = shape_dim
 
     self.args = args
     self.kwargs = kwargs
@@ -71,9 +72,10 @@ class Infer(Module):
 
   def forward(self, x):
     if self.module is None:
-      self.module = self.cls(x.shape[1], *self.args, **self.kwargs)
+      self.module = self.cls(x.shape[self.shape_dim], *self.args, **self.kwargs)
     return self.module(x)
 
   @classmethod
   def shed(cls, module):
-    pass
+    # TODO: modify the model to drop the Infer nodes and replace them with the initialized module
+    raise NotImplementedError()
