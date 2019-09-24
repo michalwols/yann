@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.29'
+__version__ = '0.0.31'
 
 import torch
 from torch import nn
@@ -10,6 +10,7 @@ register = registry
 resolve = registry.resolve
 
 from .utils import to_numpy
+
 
 default_device = torch.device('cuda') \
   if torch.cuda.is_available() else torch.device('cpu')
@@ -73,13 +74,19 @@ class Multicrop(torch.nn.Module):
 
 
 def set_param(x, param, val):
-  for group in x.param_groups:
-    group[param] = val
+  if hasattr(x, 'param_groups'):
+    for group in x.param_groups:
+      group[param] = val
+  else:
+    setattr(x, param, val)
 
 
 def scale_param(x, param, mult):
-  for group in x.param_groups:
-    group[param] *= mult
+  if hasattr(x, 'param_groups'):
+    for group in x.param_groups:
+      group[param] *= mult
+  else:
+    setattr(x, param, getattr(x, param) * mult)
 
 
 def trainable(parameters):
@@ -88,11 +95,15 @@ def trainable(parameters):
 
 # TODO: handle batchnorm
 def freeze(parameters):
+  if isinstance(parameters, nn.Module):
+    parameters = parameters.parameters()
   for p in parameters:
     p.requires_grad = False
 
 
 def unfreeze(parameters):
+  if isinstance(parameters, nn.Module):
+    parameters = parameters.parameters()
   for p in parameters:
     p.requires_grad = True
 
@@ -118,76 +129,7 @@ def to_fp16(model):
       layer.float()
 
 
-class HyperParams:
-  def __init__(self, **args):
-    self.__dict__.update(args)
 
-  def __setattr__(self, key, value):
-    raise AttributeError('Updating properties is not permitted')
-
-  def __getitem__(self, item):
-    if isinstance(item, (tuple, list)):
-      return tuple(self.__dict__[k] for k in item)
-    return self.__dict__[item]
-
-  def fork(self, **args):
-    return HyperParams(**{**self.__dict__, **args})
-
-  def __repr__(self):
-    return (
-      'HyperParams('
-      f"{', '.join(f'{k}={v}' for k, v in self.__dict__.items())}"
-      ')'
-    )
-
-  def __str__(self):
-    return (
-        'HyperParams (\n' +
-        ''.join('  {}={}\n'.format(k, v) for k, v in self.__dict__.items()) +
-        ')'
-    )
-
-  def __len__(self):
-    return len(self.__dict__)
-
-  def __hash__(self):
-    return hash(tuple(sorted(self.items())))
-
-  def keys(self):
-    return self.__dict__.keys()
-
-  def values(self):
-    return self.__dict__.values()
-
-  def items(self):
-    return self.__dict__.items()
-
-  def grid(self, **args):
-    raise NotImplementedError()
-
-  def inject(self, scope=None, uppercase=True):
-    scope = globals() if scope is None else scope
-    for k, v in self.items():
-      scope[k.upper() if uppercase else k] = v
-
-  @classmethod
-  def collect(cls, scope=None, types=(int, str, float, bool),
-              upper_only=True, lowercase=True):
-    scope = globals() if scope is None else scope
-
-    d = {}
-    for k, v in scope.items():
-      if types and not isinstance(v, types):
-        continue
-      if upper_only and not k.isupper():
-        continue
-
-      d[k.lower() if lowercase else k] = v
-
-    return cls(**d)
-
-  def __eq__(self, other):
-    return hash(self) == hash(other)
 
 
 @contextmanager
