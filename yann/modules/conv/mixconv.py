@@ -6,7 +6,10 @@ from .utils import get_same_padding
 class MixConv(nn.Module):
   convs: nn.ModuleList
   """
-  https://arxiv.org/abs/1907.09595
+  
+  From:
+    MixConv: Mixed Depthwise Convolutional Kernels
+    https://arxiv.org/abs/1907.09595
   
   
   NOTE: with MKLDNN and padding == 3 and depthwise=False there's a runtime error that crashes the interpreter
