@@ -22,6 +22,9 @@ def git_commit(files='.', message='automated commit', branch=None):
     run(['git', 'add', *files])
   run(f'git commit -m {message}')
 
+def git_diff():
+  return run('git diff')
+
 
 def shutdown_computer():
   return run('sudo shutdown -h now')
