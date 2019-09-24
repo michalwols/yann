@@ -44,8 +44,8 @@ class CachedExecutor:
   def as_completed(self):
     yield from futures.as_completed(self.pending.values())
 
-  def wait(self):
-    return futures.wait(self.pending.values())
+  def wait(self, *args, **kwargs):
+    return futures.wait(self.pending.values(), *args, **kwargs)
 
   def handle_done_future(self, future: futures.Future):
     self.pending.pop(future.key)
@@ -67,14 +67,6 @@ class CachedExecutor:
     for c in self.success_callbacks:
       c(future.key, r, future)
 
-  def get_all(self, keys):
-    fs = self._executor.map(self.get, keys)
-    return futures.wait(fs)
-
-  def stream(self, keys):
-    fs = self._executor.map(self.get, keys)
-    return futures.as_completed(fs)
-
   def execute(self, key, *args, **kwargs):
     raise NotImplementedError()
 
@@ -84,6 +76,14 @@ class CachedExecutor:
     future.key = key
     future.add_done_callback(self.handle_done_future)
     return future
+
+  def prefetch(self, keys):
+    futures = []
+    for k in keys:
+      f = self.enqueue(k)
+      if f:
+        futures.append(f)
+    return futures
 
   def enqueue(self, key, *args, **kwargs):
     if key in self.results or key in self.pending:
@@ -98,10 +98,22 @@ class CachedExecutor:
 
     return self.submit(key).result()
 
-
   def __getitem__(self, key):
     return self.get(key)
 
+  def __contains__(self,key):
+    return (
+      key in self.results
+      or key in self.errors
+      or key in self.pending
+    )
+
+  def __delitem__(self, key):
+    self.results.pop(key)
+    self.errors.pop(key)
+    p = self.pending.pop(key)
+    if p:
+      p.cancel()
 
 class Downloader(CachedExecutor):
   def __init__(self, local_root='./', workers=8):
