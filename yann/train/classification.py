@@ -118,7 +118,7 @@ class Trainer(BaseTrainer):
 
     self.val_dataset = resolve.dataset(
       val_dataset,
-      required=not val_loader,
+      required=False,
     )
 
     self.val_transform = val_transform or transform
