@@ -1,5 +1,5 @@
 from torch.nn import Module
-
+from ..exceptions import ShapeInferenceError
 
 class Reshape(Module):
   method = None
@@ -56,11 +56,10 @@ def flatten_sequence(seq_batch):
 
 
 class Infer(Module):
-  def __init__(self, cls, shape_dim=1, *args, **kwargs):
+  def __init__(self, cls, *args, **kwargs):
     super(Infer, self).__init__()
+    self.shape_dim = kwargs.pop('shape_dim', 1)
     self.cls = cls
-    self.shape_dim = shape_dim
-
     self.args = args
     self.kwargs = kwargs
 
@@ -72,7 +71,10 @@ class Infer(Module):
 
   def forward(self, x):
     if self.module is None:
-      self.module = self.cls(x.shape[self.shape_dim], *self.args, **self.kwargs)
+      try:
+        self.module = self.cls(x.shape[self.shape_dim], *self.args, **self.kwargs)
+      except IndexError as e:
+        raise ShapeInferenceError(f"Improper shape dim ({self.shape_dim}) selected for {self.cls} with input of shape {x.shape}")
     return self.module(x)
 
   @classmethod
