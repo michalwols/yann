@@ -89,6 +89,41 @@ def scale_param(x, param, mult):
     setattr(x, param, getattr(x, param) * mult)
 
 
+def group_params(model, get_key):
+  splits = {}
+  for name, param in model.named_parameters():
+    splits[get_key(name, param)] = param
+  return splits
+
+from torch.nn.modules.batchnorm import _BatchNorm
+
+
+def split_regularization_params(
+    module: nn.Module,
+    excluded_modules=(_BatchNorm,),
+    excluded_names=('bias',)
+):
+  """
+  filter out parameters which should not be regularized
+  """
+  reg, no_reg = [], []
+  m: nn.Module
+  for m in module.modules():
+    if isinstance(m, excluded_modules):
+      no_reg.extend((x for x in m.parameters(recurse=False) if x is not None))
+    else:
+      for name, param in m.named_parameters(recurse=False):
+        if param is not None:
+          if name.endswith(excluded_names):
+            no_reg.append(param)
+          else:
+            reg.append(param)
+  return reg, no_reg
+
+
+
+
+
 def trainable(parameters):
   return (p for p in parameters if p.requires_grad)
 
