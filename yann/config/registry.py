@@ -90,16 +90,16 @@ class Resolver:
 
     return x
 
-  def __call__(self, x, required=False, validate=None,
-               instance=True, types=None, args=None, kwargs=None, init=None):
+  def __call__(self, x, *_args, required=False, validate=None,
+               instance=True, types=None, args=None, kwargs=None, init=None, **_kwargs):
     return self.resolve(
       x,
       required=required,
       validate=validate,
       instance=instance,
       types=types,
-      args=args,
-      kwargs=kwargs,
+      args=args or _args,
+      kwargs=kwargs or _kwargs,
       init=init
     )
 
