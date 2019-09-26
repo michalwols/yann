@@ -4,7 +4,7 @@ from copy import deepcopy
 from .utils import get_arg_parser
 
 class Field:
-  def __init__(self, help=None, type=None, required=True, default=None):
+  def __init__(self, help=None, type=None, required=False, default=None):
     self.help = help
     self.type = type
     self.required = required
@@ -60,10 +60,15 @@ class HyperParamsBase:
         raise Exception(f"{k} failed validation. {e}")
 
   @classmethod
-  def from_command(cls, cmd=None, **kwargs):
+  def from_command(cls, cmd=None, validate=False, **kwargs):
     parser = get_arg_parser(cls.__fields__, **kwargs)
     parsed = parser.parse_args(cmd.split() if isinstance(cmd, str) else cmd)
-    return cls(**vars(parsed))
+    params = cls(**vars(parsed))
+
+    if validate:
+      params.validate()
+
+    return params
 
   @classmethod
   def load(cls, path):
