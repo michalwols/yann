@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.31'
+__version__ = '0.0.32'
 
 import torch
 from torch import nn
