@@ -61,9 +61,12 @@ class Trainer(BaseTrainer):
       description=None,
       root='./train-runs/',
       metrics=None,
-      collate=None
+      collate=None,
+      params=None
   ):
     super().__init__()
+
+    self.params = params
 
     self.model = resolve.model(
       model,
