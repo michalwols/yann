@@ -68,7 +68,7 @@ registry.optimizer.index(
 )
 
 registry.optimizer['SGD'].init = \
-  lambda SGD, params, lr=.01, momentum=.9, weight_decay=1e-4: \
+  lambda SGD, params, lr=.01, momentum=0, weight_decay=0: \
     SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
 
 # LR Schedulers
