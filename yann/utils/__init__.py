@@ -36,7 +36,7 @@ def get_arg_parser(x, description=None, epilog=None, **kwargs):
             default=v.default,
             type=v.type,
             help=f"{v.help or k} (default: {v.default})",
-            required=v.required and v.default is None,
+            required=v.required,
             choices=getattr(v, 'choices', None),
           )
         else:
