@@ -235,6 +235,22 @@ class Trainer(BaseTrainer):
 
       return decorated
 
+  def epochs(self, num=None):
+    for e in counter(start=self.num_epochs, end=self.num_epochs + num):
+      yield e
+      self.num_epochs += 1
+
+  def batches(self, device=None):
+    device = device or self.device
+    for inputs, targets in self.loader:
+      if device:
+        yield inputs.to(device), targets.to(device)
+      else:
+        yield inputs, targets
+
+      self.num_steps += 1
+      self.num_samples += len(inputs)
+
   def step(self, inputs, target):
     self.model.train()
     self.optimizer.zero_grad()
@@ -244,17 +260,7 @@ class Trainer(BaseTrainer):
     loss.backward()
     self.optimizer.step()
 
-    self.num_steps += 1
-    self.num_samples += len(inputs)
-
     return outputs, loss
-
-  def batches(self):
-    for inputs, targets in self.loader:
-      if self.device:
-        yield inputs.to(self.device), targets.to(self.device)
-      else:
-        yield inputs, targets
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
@@ -283,7 +289,7 @@ class Trainer(BaseTrainer):
     try:
       self.on_train_start()
 
-      for _ in counter(end=epochs):
+      for _ in self.epochs(num=epochs):
         self.on_epoch_start(epoch=self.num_epochs)
         for batch_idx, (inputs, targets) in enumerate(self.batches()):
           self.on_batch_start(
@@ -479,3 +485,13 @@ epochs: {self.num_epochs}
 steps: {self.num_steps}
 samples: {self.num_samples}
 """
+
+  def __repr__(self):
+    return (
+      f"Trainer("
+      f"\n  name={self.name},"
+      f"\n  root={self.root},"
+      f"\n  batch_size={self.batch_size},"
+      f"\n  device={self.device}"
+      "\n)"
+    )
