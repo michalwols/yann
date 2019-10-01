@@ -15,11 +15,17 @@ class DatasetWrapper:
 
 
 class IncludeIndex(DatasetWrapper):
+  def __init__(self, dataset, last=False):
+    super(IncludeIndex, self).__init__(dataset)
+    self.last = last
+
   def __getitem__(self, idx):
     z = super().__getitem__(idx)
 
     if isinstance(z, (tuple, list)):
-      return (*z, idx)
+      return (*z, idx) if self.last else (idx, *z)
+
+    return (z, idx) if self.last else (idx, z)
 
     return (z, idx)
 
