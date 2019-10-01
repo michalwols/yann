@@ -27,7 +27,19 @@ class IncludeIndex(DatasetWrapper):
 
     return (z, idx) if self.last else (idx, z)
 
-    return (z, idx)
+
+class Sliceable(DatasetWrapper):
+  def __init__(self, dataset, columnar=True):
+    super().__init__(dataset)
+    self.columnar = columnar
+
+  def __getitem__(self, x):
+    if isinstance(x, slice):
+      d = [self.dataset[n] for n in range(*x.indices(len(self.dataset)))]
+      if self.columnar:
+        return list(zip(*d))
+      return d
+    return self.dataset[x]
 
 
 class Slice(DatasetWrapper):
