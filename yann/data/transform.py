@@ -96,6 +96,26 @@ class ImageTransformer(Transformer):
     )
 
 
+class DictTransformer:
+  def __init__(self, **transforms):
+    self.transforms = transforms
+
+  def __call__(self, data: dict):
+    return {
+      k: (self.transforms[k](v) if k in self.transforms else v)
+      for k, v in data.items()
+    }
+
+
+class BatchTransformer:
+  def __init__(self, transform):
+    self.transform = transform
+
+  def __call__(self, items):
+    return [self.transform(x) for x in items]
+
+
+
 class GetImage:
   def __init__(self, space=None):
     self.color_space = space
