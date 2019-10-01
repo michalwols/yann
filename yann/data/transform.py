@@ -25,6 +25,14 @@ class Transformer:
     x = self.transform(x)
     return self.to_tensor(x)
 
+  def trace(self, x):
+    loaded = self.load(x)
+    yield loaded
+    transformed = self.transform(loaded)
+    yield transformed
+    tensor = self.to_tensor(transformed)
+    yield tensor
+
   def prep(self, x):
     return self.transform(self.load(x))
 
