@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch.nn.modules.loss import _Loss
+from torch.nn.modules.loss import _Loss, _WeightedLoss
 from torch import nn
 
 from ..data.classes import smooth as label_smoothing
@@ -169,3 +169,30 @@ def bi_tempered_logistic_loss():
 
 def bi_tempered_binary_logistic_loss():
   pass
+
+
+
+class WeightedLoss(_WeightedLoss):
+  def __init__(self, loss, weight=1, **kwargs):
+    super(WeightedLoss, self).__init__(weight=weight, **kwargs)
+    self.loss = loss
+
+  def forward(self, *input, **kwargs):
+    loss = self.weight * self.loss(*input, **kwargs)
+    return _reduce(loss, reduction=self.reduction, reduce=self.reduce)
+
+class CombinedLoss(_Loss):
+  def __init__(self, losses, weights, *args, **kwargs):
+    super(CombinedLoss, self).__init__(*args, **kwargs)
+    self.losses = nn.ModuleList(
+      WeightedLoss(loss, weight, reduction='none')
+      for loss, weight in zip(losses, weights)
+    )
+
+  def forward(self, *input, **kwargs):
+    loss = sum((loss(*input, **kwargs) for loss in self.losses))
+    return _reduce(loss, reduction=self.reduction, reduce=self.reduce)
+
+
+# class MultiTaskLoss(_Loss):
+#   pass
