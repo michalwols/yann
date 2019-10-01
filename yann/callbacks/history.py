@@ -1,12 +1,13 @@
-import time
+from time import time as get_time
 from pathlib import Path
-
 import torch
 
 from ..utils.decorators import lazy
 from ..callbacks.base import Callback
 from ..viz import plot_line
-from .. import resolve
+from .. import resolve, get_item
+from ..data.metrics import MetricStore, EventStore, Event
+from ..evaluation import evaluate_metrics
 
 
 class History(Callback):
@@ -23,62 +24,36 @@ class History(Callback):
       else:
         raise ValueError(f'Unknown metric {m}')
 
-    self.metrics = {m: [] for m in self.metric_funcs}
-    self.metrics['loss'] = []
-    self.times = []
-    self.steps = []
+    self.metrics = MetricStore(
+      self.metric_funcs.keys(),
+      cast_value=get_item
+    )
+    self.val_metrics = MetricStore(
+      self.metric_funcs.keys(),
+      cast_value=get_item
+    )
+    self.events = EventStore()
 
-    self.val_metrics = {m: [] for m in self.metric_funcs}
-    self.val_metrics['loss'] = []
-    self.val_steps = []
-    self.val_times = []
+    self.trainer = None
 
   def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
-    self.times.append(time.time())
-    self.steps.append(trainer.num_steps)
-    self.metrics['loss'].append(loss.item())
+    self.metrics.update(
+      step=trainer.num_steps,
+      loss=loss,
+      **evaluate_metrics(targets=targets, outputs=outputs, metrics=self.metric_funcs)
+    )
 
-    with torch.no_grad():
-      for name, metric in self.metric_funcs.items():
-        val = metric(targets, outputs).item()
-        if torch.is_tensor(val):
-          val = val.item()
-        self.metrics[name].append(val)
-
-  def on_validation_end(self, loss=None, outputs=None, targets=None,
-                        trainer=None):
-    self.val_times.append(time.time())
-    self.val_steps.append(trainer.num_steps)
-    self.val_metrics['loss'].append(loss.item())
-
-    with torch.no_grad():
-      for name, metric in self.metric_funcs.items():
-        val = metric(targets, outputs).item()
-        if torch.is_tensor(val):
-          val = val.item()
-        self.val_metrics[name].append(val)
+  def on_validation_end(self, loss=None, outputs=None, targets=None, trainer=None):
+    self.val_metrics.update(
+      step=trainer.num_steps,
+      loss=loss,
+      **evaluate_metrics(targets=targets, outputs=outputs, metrics=self.metric_funcs)
+    )
 
   @lazy
   def plot(self):
     return HistoryPlotter(history=self)
 
-  def summary(self):
-    return {
-      'train': {
-        m: {
-          'max': max(vals, default=None),
-          'min': min(vals, default=None)
-        }
-        for m, vals in self.metrics.items()
-      },
-      'validation': {
-        m: {
-          'max': max(vals, default=None),
-          'min': min(vals, default=None)
-        }
-        for m, vals in self.val_metrics.items()
-      }
-    }
 
 
 class HistoryPlotter(Callback):
@@ -107,34 +82,27 @@ class HistoryPlotter(Callback):
       except:
         pass
 
+
     if validation:
-      ms, steps, times = (
-        self.history.val_metrics,
-        self.history.val_steps,
-        self.history.val_times
-      )
+      metrics = self.history.val_metrics
     else:
-      ms, steps, times = (
-        self.history.metrics,
-        self.history.steps,
-        self.history.times
-      )
+      metrics = self.history.metrics
 
     if metric:
-      metrics = [metric]
+      names = [metric]
     else:
-      metrics = self.metrics or ms.keys()
+      names = self.metrics or metrics.keys()
 
-    for m in metrics:
+    for name in names:
       plot_line(
-        ms[m],
-        x=times if time else steps,
+        metrics[name],
+        x=metrics.times if time else range(len(metrics)),
         xlabel='time' if time else 'step',
-        ylabel=f'validation {m}' if validation else m,
-        name=f'validation {m}' if validation else m,
+        ylabel=f'validation {name}' if validation else name,
+        name=f'validation {name}' if validation else name,
         window=1 if validation else self.window,
         save=self.save and
-             self.root / (f'validation {m}' if validation else m),
+             self.root / (f'validation {name}' if validation else name),
         show=not self.save,
         figsize=self.figsize,
         **kwargs
@@ -206,13 +174,13 @@ class HistoryWriter(Callback):
       return
 
     if self.header is None:
-      self.header = ['timestamp', 'epoch', 'step', *trainer.history.metrics]
+      self.header = ['timestamp', 'epoch', 'step', *trainer.history.metrics.keys()]
       self.train_file.write('\t'.join(self.header) + '\n')
 
     self.train_file.write(
-      f"{trainer.history.times[-1]}\t"
+      f"{trainer.history.metrics.times[-1]}\t"
       f"{trainer.num_epochs}\t"
-      f"{trainer.history.steps[-1]}\t"
+      f"{len(trainer.history.metrics.times)}\t"
       + '\t'.join((f"{trainer.history.metrics[m][-1]:.4f}"
                    for m in self.header[3:]))
       + '\n'
@@ -225,13 +193,13 @@ class HistoryWriter(Callback):
                         trainer=None):
     if self.val_header is None:
       self.val_header = ['timestamp', 'epoch', 'step',
-                         *trainer.history.val_metrics]
+                         *trainer.history.val_metrics.keys()]
       self.val_file.write('\t'.join(self.header) + '\n')
 
     self.val_file.write(
-      f"{trainer.history.val_times[-1]}\t"
+      f"{trainer.history.val_metrics.times[-1]}\t"
       f"{trainer.num_epochs}\t"
-      f"{trainer.history.val_steps[-1]}\t"
+      f"{len(trainer.history.val_metrics.times)}\t"
       + '\t'.join((f"{trainer.history.val_metrics[m][-1]:.4f}"
                    for m in self.val_header[3:]))
       + '\n'

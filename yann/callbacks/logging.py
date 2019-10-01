@@ -70,7 +70,7 @@ samples: {trainer.num_samples}\n''')
     self.log('\nCompleted Validation')
     self.log(
       epoch=trainer.num_epochs,
-      steps=trainer.history.val_steps[-1],
+      steps=len(trainer.history.val_metrics),
       **{m: f'{vals[-1]:.4f}' for m, vals in trainer.history.val_metrics.items()}
     )
 
