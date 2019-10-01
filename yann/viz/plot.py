@@ -7,10 +7,15 @@ import matplotlib.dates as mdates
 from matplotlib.collections import PolyCollection
 from collections import OrderedDict
 
+import io
+import base64
+from urllib.parse import quote
+
 import itertools
 
 from .. import to_numpy
 from ..metrics import moving_average
+
 
 def plot_line(
     y,
@@ -32,8 +37,6 @@ def plot_line(
     name=None,
     grid=True
 ):
-
-
   fig = figsize and plt.figure(figsize=figsize)
 
   if xlim:
@@ -64,7 +67,7 @@ def plot_line(
 
   plt.plot(x, y, stroke, lw=line_width, label=name and str(name))
   if grid:
-    plt.grid()
+    plt.grid(True)
 
   if legend:
     plt.legend(loc='best')
@@ -74,12 +77,15 @@ def plot_line(
   if show:
     plt.show()
   if save:
-    plt.savefig(save if isinstance(save, (str, pathlib.Path)) else
-                f"{title or ylabel or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg")
+    plt.gcf().savefig(
+      save if isinstance(save, (str, pathlib.Path)) else
+      f"{title or ylabel or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg"
+    )
     plt.gcf().clear()
     if fig:
       plt.close(fig)
 
+  return plt.gcf()
 
 def plot_pred_scores(
     preds,
@@ -304,3 +310,19 @@ def plot_timeline(tasks, figsize=None):
   ax.set_yticks(list(inds.values()))
   ax.set_yticklabels(list(inds.keys()))
   plt.show()
+
+
+
+def figure_to_base64(fig, format='png', data_encoded=True, close=False):
+  buf = io.BytesIO()
+  fig.savefig(buf, format=format)
+  buf.seek(0)
+  string = base64.b64encode(buf.read())
+
+  if close:
+    plt.close(fig)
+
+  if data_encoded:
+    return f"data:image/{format};base64,{quote(string)}"
+
+  return string
