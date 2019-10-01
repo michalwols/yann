@@ -37,25 +37,18 @@ class Params(HyperParams):
 
 # parse command line arguments
 params = Params.from_command()
-params.validate()
-
-print(params)
 
 # set random, numpy and pytorch seeds in one call
 yann.seed(params.seed)
-
 
 lenet = Stack(
   Infer(nn.Conv2d, 10, kernel_size=5),
   nn.MaxPool2d(2),
   nn.ReLU(inplace=True),
-
   Infer(nn.Conv2d, 20, kernel_size=5),
   nn.MaxPool2d(2),
   nn.ReLU(inplace=True),
-
   Flatten(),
-
   Infer(nn.Linear, 50),
   nn.ReLU(inplace=True),
   Infer(nn.Linear, 10),
