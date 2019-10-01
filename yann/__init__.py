@@ -10,7 +10,7 @@ register = registry
 resolve = registry.resolve
 
 from .utils import to_numpy
-
+import numpy as np
 
 default_device = torch.device('cuda') \
   if torch.cuda.is_available() else torch.device('cpu')
@@ -31,6 +31,16 @@ def seed(val=1, deterministic=False):
   except:
     pass
   return val
+
+
+def get_item(x):
+  if torch.is_tensor(x):
+    if x.is_cuda:
+      x = x.cpu()
+    return x.item()
+  elif isinstance(x, np.ndarray):
+    return x.item()
+  return x
 
 
 def benchmark():
