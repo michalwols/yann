@@ -39,6 +39,14 @@ class Stack(nn.Module):
   def __len__(self):
     return len(self._modules)
 
+  def modules(self, type=None):
+    if type is None:
+      yield from super().modules()
+    else:
+      for m in super().modules():
+        if isinstance(m, type):
+          yield m
+
   def __getitem__(self, x):
     if isinstance(x, slice):
       layers = list(self.children())
@@ -54,9 +62,16 @@ class Stack(nn.Module):
       )
     elif isclass(x):
       return [m for m in self.children() if isinstance(m, x)]
+    elif isinstance(x, str):
+      return getattr(self, x)
     else:
       return list(self.children())[x]
 
   def __setitem__(self, x, value):
     key = list(self._modules.keys())[x]
     setattr(self, key, value)
+
+  def upto(self, module):
+    layers = list(self.children())
+    stop = layers.index(module)
+    return self[:stop + 1]
