@@ -1,3 +1,5 @@
+from abc import ABCMeta
+
 class styles(dict):
   def __init__(self, *args, **props):
     super().__init__()
@@ -6,6 +8,7 @@ class styles(dict):
         self.update(args[0])
     if isinstance(args[0], str):
       for l in args[0].split(';'):
+        l = l.strip()
         if l:
           k, v = l.split(':')
 
@@ -20,10 +23,11 @@ class styles(dict):
 
 class Node:
   NAME = None
-  EMPTY = False
+  CHILDREN = False
 
   def __init__(self, *children, style=None, **props):
-    self.children = children
+    self._display_handle = None
+    self.children = list(children)
     self.props = props
     self.style = style if isinstance(style, styles) else styles(style)
 
@@ -32,7 +36,14 @@ class Node:
     return self.NAME or self.__class__.__name__
 
   def __str__(self):
-    if self.EMPTY:
+    return self.html()
+
+  __repr__ = __str__
+
+  _repr_html_ = __str__
+
+  def html(self):
+    if self.CHILDREN:
       return f"""
          <{self.name} {' '.join(
         f'{k}="{v}"' for k, v in self.props.items())}  style="{self.style}"/>
@@ -41,18 +52,83 @@ class Node:
     return f"""
     <{self.name} {' '.join(
       f'{k}="{v}"' for k, v in self.props.items())} style="{self.style}">
-       {' '.join(str(c) for c in self.children)}
+       {self.format_children()}
     </{self.name}>
     """
 
-  __repr__ = __str__
+  def __call__(self, *children):
+    self.children = list(children)
+    return self
 
-  def render(self, target='notebook'):
-    if target == 'notebook':
-      from IPython.core.display import display, HTML
-      return display(HTML(str(self)))
+  def render(self):
+    from IPython.core.display import HTML
+    return HTML(self.html())
 
-    return str(self)
+  def format_children(self):
+    return ' '.join(str(c) for c in self.children)
+
+  def display(self):
+    from IPython.core.display import display
+    self._display_handle = display(self.render(), display_id=True)
+
+  def update(self):
+    if self._display_handle:
+      self._display_handle.update(self.render())
+      
+
+def prop(name):
+  def g(self):
+    return getattr(self, f'_{name}')
+
+  def s(self, val):
+    setattr(self, f'_{name}', val)
+    self.update()
+
+  return property(g, s)
+
+
+class ReactiveNodeMeta(ABCMeta):
+  def __new__(mcls, name, bases, namespace):
+    annotations = namespace.get('__annotations__', {})
+
+    props = set()
+    prop_defaults = {}
+    for name, annotation in annotations.items():
+      if annotation is prop:
+        if name in namespace:
+          prop_defaults[name] = namespace[name]
+        namespace[name] = prop(name)
+        props.add(name)
+    if '_props' in namespace:
+      namespace['_props'].update(props)
+    else:
+      namespace['_props'] = props
+
+    if '_default_props' in namespace:
+      namespace['_default_props'].update(prop_defaults)
+    else:
+      namespace['_default_props'] = prop_defaults
+
+    return super().__new__(mcls, name, bases, namespace)
+
+class ReactiveMixin(metaclass=ReactiveNodeMeta):
+  _props: set
+  _default_props: dict
+
+  def __init__(self, *args, **props):
+    super(ReactiveMixin, self).__init__(*args, **props)
+    self._init_props(**props)
+  
+  def _init_props(self, **passed_props):
+    for prop in self._props:
+      if prop not in passed_props and prop in self._default_props:
+        setattr(self, prop, self._default_props[prop])
+      elif prop in passed_props:
+        setattr(self, prop, passed_props[prop])
+
+
+class EmptyNode(Node):
+  CHILDREN = True
 
 
 class div(Node): pass
@@ -61,11 +137,40 @@ class div(Node): pass
 class span(Node): pass
 
 
-class img(Node):
-  EMPTY = True
-
-
+class img(EmptyNode): pass
 class p(Node): pass
-
-
 class h1(Node): pass
+class h2(Node): pass
+class h3(Node): pass
+class h4(Node): pass
+class progress(EmptyNode): pass
+
+
+class matplotfig(img):
+  NAME = 'img'
+
+  def __init__(self, figure, live=False, style=None, **props):
+    super(matplotfig, self).__init__(style=style, **props)
+
+    self.figure = figure
+    self.live = live
+
+    if not self.live:
+      from .plot import figure_to_base64
+      self.props['src'] = figure_to_base64(figure, data_encoded=True)
+
+
+  def html(self):
+    if self.live:
+      from .plot import figure_to_base64
+      self.props['src'] = figure_to_base64(self.figure, data_encoded=True)
+    if 'src' not in self.props:
+      from .plot import figure_to_base64
+      self.props['src'] = figure_to_base64(self.figure, data_encoded=True)
+
+    return super(matplotfig, self).html()
+
+
+
+
+
