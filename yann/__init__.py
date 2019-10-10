@@ -146,7 +146,7 @@ def freeze(x, exclude=None):
     if exclude:
       for m in x.modules():
         if not isinstance(m, exclude):
-          for p in x.parameters(recurse=False):
+          for p in m.parameters(recurse=False):
             p.requires_grad = False
     else:
       for p in x.parameters():
