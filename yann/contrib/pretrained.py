@@ -3,6 +3,32 @@ from ..data.containers import Outputs, Inputs
 from ..models import Model
 
 
+def register_models():
+  import logging
+  from .. import registry
+  from ..config.registry import pass_args, is_public_callable
+
+  try:
+    import pretrainedmodels.models
+  except ImportError:
+    logging.warn(
+      "Couldn't register pretrainedmodels models because it's not "
+      "installed\n to install run `pip install pretrainedmodels`"
+    )
+  else:
+    registry.model.pretrainedmodels.index(
+      pretrainedmodels.models,
+      init=pass_args,
+      include=is_public_callable
+    )
+
+# auto register the models on import of this module
+# NOTE:
+#   prerainedmodels has some top level model instantiation
+#   which cause the registration process to take a few seconds
+register_models()
+
+
 class PretrainedModel(Model):
   def __init__(self, *args, **kwargs):
     self.activation = None
