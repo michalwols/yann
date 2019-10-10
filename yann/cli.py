@@ -84,12 +84,55 @@ def registry(names):
   import yann
 
   if not names:
-    print(yann.registry)
+    yann.registry.print_tree()
   else:
-    x = yann.registry
+    registry = yann.registry
     for n in names:
-      x = getattr(x, n)
-    print(x)
+      registry = getattr(registry, n)
+    registry.print_tree()
+
+
+@cli.command()
+def scaffold():
+  """
+  TODO: use cookiecutter to scaffold a new project
+  https://github.com/drivendata/cookiecutter-data-science
+
+  support different scaffolds
+
+  data/
+    raw/
+    processed/
+  train-runs/
+  notebooks/
+  docs/
+  tests/
+  {{project_name}}/
+    models/
+    datasets/
+    cli.py
+    train.py
+    evaluate.py
+    serve.py
+  requirements.txt
+  conda.yml
+  setup.py
+  dockerfile
+  run
+  README.md
+
+
+  run
+    prepare-data()
+    test()
+    train()
+    evaluate()
+    install-dependencies()
+    save-dependencies()
+    demo()
+    deploy()
+  """
+  raise NotImplementedError()
 
 
 def main():
