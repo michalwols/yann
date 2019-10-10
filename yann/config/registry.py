@@ -16,6 +16,17 @@ def pass_args(x, *args, **kwargs):
   return x(*args, **kwargs)
 
 
+def is_public(x):
+  return (hasattr(x, '__name__') and not x.__name__.startswith('_'))
+
+
+def is_public_callable(x):
+  return (
+      hasattr(x, '__name__')
+      and not x.__name__.startswith('_')
+      and callable(x)
+  )
+
 class default:
   init = pass_args
 
@@ -43,6 +54,12 @@ class Record:
     """
     self.x = x
     self.init = init
+
+  def __call__(self, *args, **kwargs):
+    if self.init:
+      return self.init(self.x, *args, **kwargs)
+    else:
+      return self.x(*args, **kwargs)
 
 
 class Resolver:
@@ -109,11 +126,20 @@ class Resolver:
 
 
 class Registry:
-  def __init__(self, types=None):
-    self._records = {}
-    self._children = defaultdict(Registry)
+  def __init__(self, types=None, private=False):
+    """
+
+    Args:
+      types: only allow given types as entries
+      private: if true will not have it's entries exposed to higher level registries
+    """
+    self._records = OrderedDict()
+    self._subregistries = defaultdict(Registry)
+
     self.resolve = Resolver(self)
+
     self.types = types
+    self.is_private = False
 
   def register(self, x, name=None, init=None):
     if isinstance(x, str) and name is None and init is None:
@@ -142,11 +168,17 @@ class Registry:
 
     return x
 
+  def public_subregistries(self):
+    for registry in self._subregistries.values():
+      if not registry.is_private:
+        yield registry
+
+
   def __contains__(self, name):
     if name in self._records:
       return True
-    for c in self._children.values():
-      if name in c:
+    for registry in self.public_subregistries():
+      if name in registry:
         return True
     return False
 
@@ -168,11 +200,11 @@ class Registry:
   def __getattr__(self, name: str) -> 'Registry':
     if name in self.__dict__:
       return self.__dict__[name]
-    return self._children[name]
+    return self._subregistries[name]
 
   def __setattr__(self, key, value):
     if isinstance(value, Registry):
-      self._children[key] = value
+      self._subregistries[key] = value
     else:
       self.__dict__[key] = value
 
@@ -180,9 +212,9 @@ class Registry:
     if item in self._records:
       return self._records[item]
 
-    for c in self._children.values():
+    for registry in self.public_subregistries():
       try:
-        return c[item]
+        return registry[item]
       except KeyError:
         pass
 
@@ -193,14 +225,17 @@ class Registry:
   def values(self):
     return dedupe((
       *(r.x for r in self._records.values()),
-      *chain(*(c.values() for c in self._children.values()))
+      *chain(*(c.values() for c in self.public_subregistries()))
     ))
 
   def items(self):
     return (
       *((k, r.x) for k, r in self._records.items()),
-      *chain(*(c.items() for c in self._children.values()))
+      *chain(*(c.items() for c in self.public_subregistries()))
     )
+
+  def keys(self):
+    return (x[0] for x in self.items())
 
   def __len__(self):
     return len(self.values())
@@ -211,7 +246,9 @@ class Registry:
       types=None,
       get_names=None,
       include=None,
-      init=None
+      exclude=None,
+      init=None,
+      include_private=False
   ):
     """
     Indexes a module. If types are specified will only include entries of
@@ -237,6 +274,13 @@ class Registry:
       if include and not include(item):
         continue
 
+      if exclude and exclude(item):
+        continue
+
+      if not include_private and not is_public(item):
+        continue
+
+
       names = get_names(item) if get_names else default.get_names(item)
 
       self.register(item, name=names, init=init)
@@ -250,13 +294,30 @@ class Registry:
     for x in items:
       self.register(x, init=init)
 
+  def print_tree(self, contents=True, indent=0):
+    if not indent:
+      print(f'registry{" (Private - not resolvable from higher scopes)" if self.is_private else ""}')
+      indent += 2
+    for name, registry in self._subregistries.items():
+      print(f"{' ' * indent}.{name} {' (Private - not resolvable from higher scopes)' if registry.is_private else ''}")
+      registry.print_tree(indent=indent + 2, contents=contents)
+
+    if contents:
+      for name, record in self._records.items():
+        if isinstance(record.x, partial) or not hasattr(record.x, '__module__'):
+          details = str(record.x)
+        else:
+          details = f"{record.x.__module__}.{record.x.__name__}"
+        print(f"{' ' * (indent + 2) }- {name}\t\t({details})")
+
+
   def __str__(self):
     parts = [
       ''.join(f"  '{name}': {r.x.__name__}  ({r.init})\n"
               for name, r in self._records.items())
     ]
 
-    for name, c in self._children.items():
+    for name, c in self._subregistries.items():
       parts.append(f"\n{name}:\n")
       parts.append(str(c))
 
