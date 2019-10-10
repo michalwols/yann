@@ -57,3 +57,20 @@ def shuffle(*sequences):
      [s[i] for i in order] if isinstance(s, (tuple, list)) else s[order]
      for s in sequences
   )
+
+def flatten(x, out=None, prefix='', sep='_'):
+  """
+  Flatten nested dict
+  """
+  out = out if out is not None else {}
+
+  if isinstance(x, dict):
+    for k in x:
+      flatten(x[k], out=out, prefix=f"{prefix}{sep if prefix else ''}{k}", sep=sep)
+  elif isinstance(x, (list, tuple)):
+    for k, v in enumerate(x):
+      flatten(k, out=out, prefix=f"{prefix}{sep if prefix else ''}{k}", sep=sep)
+  else:
+    out[prefix] = x
+
+  return out
