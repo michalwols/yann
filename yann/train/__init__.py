@@ -1,3 +1,7 @@
+
+from pathlib import Path
+from ..data.io import load_json
+from ..data import flatten
 from .classification import Trainer
 from ..callbacks import Callback
 
@@ -20,3 +24,12 @@ def train(model, batches, optimizer, loss, device=None, step=step, callback: Cal
     if device:
       inputs, targets = inputs.to(device), targets.to(device)
     yield step(model, inputs, targets, optimizer, loss)
+
+
+def collect_summaries(root='.', name='summary.json', pandas=True):
+  s = [load_json(f) for f in Path(root).glob(f'**/*{name}')]
+  if pandas:
+    import pandas as pd
+    return pd.DataFrame([flatten(x) for x in s])
+  else:
+    return s

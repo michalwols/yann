@@ -10,6 +10,7 @@ from typing import Optional
 from .. import callbacks as yann_callbacks
 from .. import resolve, evaluate
 from ..data import TransformDataset, get_dataset_name, Classes
+from ..data.io import save_json
 from ..export import export
 from ..inference.predict import Classifier
 from ..train.base import BaseTrainer
@@ -443,6 +444,39 @@ class Trainer(BaseTrainer):
 
     if skipped:
       logging.warning(f'skipped {skipped} when loading checkpoint')
+
+  def summary(self):
+    summary = {
+      'name': self.name,
+      'path': str(self.root),
+      'num_steps': self.num_steps,
+      'num_samples': self.num_samples,
+      'num_epochs': self.num_epochs,
+      'time_created': str(self.time_created),
+      'params': dict(self.params) if self.params else {},
+      'metrics': {
+        'train': {
+          k: ({'min': min(v), 'max': max(v)} if len(v) else {}) for k, v in self.history.metrics.items()
+        },
+        'validation': {
+          k: ({'min': min(v), 'max': max(v)} if len(v) else {}) for k, v in self.history.val_metrics.items()
+        }
+      }
+    }
+
+    summary['duration'] = None
+    if len(self.history.metrics.times) > 1:
+      try:
+        summary['duration'] = self.history.metrics.times[-1] - self.history.metrics.times[0]
+      except:
+        pass
+
+    return summary
+
+  def save_summary(self):
+    dest = self.root / 'summary.json'
+    save_json(self.summary(), dest)
+    return dest
 
   def __str__(self):
     return f"""
