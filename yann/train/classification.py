@@ -46,6 +46,7 @@ class Trainer(BaseTrainer):
       sampler=None,
       num_workers=8,
       transform=None,
+      transform_batch=None,
       lr_scheduler=None,
       lr_batch_step=False,
       callbacks=None,
@@ -106,6 +107,8 @@ class Trainer(BaseTrainer):
     if transform:
       self.dataset = TransformDataset(self.dataset, transform)
     self.transform = transform
+
+    self.transform_batch = transform_batch
 
     self.batch_size = batch_size
 
@@ -243,6 +246,9 @@ class Trainer(BaseTrainer):
   def batches(self, device=None):
     device = device or self.device
     for inputs, targets in self.loader:
+      if self.transform_batch:
+        inputs, targets = self.transform_batch(inputs, targets)
+
       if device:
         yield inputs.to(device), targets.to(device)
       else:
