@@ -339,7 +339,6 @@ class Trainer(BaseTrainer):
           self.lr_scheduler.step(epoch=self.num_epochs)
 
         self.on_epoch_end(epoch=self.num_epochs)
-        self.num_epochs += 1
 
       self.on_train_end()
     except Exception as e:
