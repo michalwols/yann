@@ -13,13 +13,20 @@ def base64str(img):
   )
 
 
-def show_images(paths, labels=None, urls=False, w=400, h=400):
+def show_images(paths, labels=None, urls=None, w=400, h=400):
   from IPython.core.display import display, HTML
+  from pathlib import Path
+
+  if isinstance(paths[0], (tuple, list)):
+    items = paths
+  else:
+    items = zip_longest(paths, labels or [])
+
 
   tags = []
-  for x, l in zip_longest(paths, labels or []):
-    if urls:
-      src = x
+  for x, l in items:
+    if urls or (urls is not False and isinstance(x, (str, Path)) and str(x).startswith('http')):
+      src = str(x)
     else:
       img = Image.open(x) if isinstance(x, str) else x
       img.thumbnail((w, h))
@@ -39,9 +46,11 @@ def show_images(paths, labels=None, urls=False, w=400, h=400):
     else:
       tags.append(
         f'''
-        <img 
-          style="max-width: {w}px; max-height: {h}px; margin: 3px;"
-           src={src} />
+        <div style="display: inline-block; padding: 3px">
+          <img 
+            style="max-width: {w}px; max-height: {h}px; margin: 3px;"
+             src={src} />
+        </div>
         '''
       )
   return display(HTML(f'<div>{"".join(tags)}</div>'))
