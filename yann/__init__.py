@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.32'
+__version__ = '0.0.33'
 
 import torch
 from torch import nn
@@ -28,6 +28,7 @@ def seed(val=1, deterministic=False):
 
     if deterministic:
       torch.cuda.deterministic = True
+      # torch.cuda.benchmark = False
   except:
     pass
   return val
@@ -111,7 +112,8 @@ from torch.nn.modules.batchnorm import _BatchNorm
 def split_regularization_params(
     module: nn.Module,
     excluded_modules=(_BatchNorm,),
-    excluded_names=('bias',)
+    excluded_names=('bias',),
+    param_groups=True,
 ):
   """
   filter out parameters which should not be regularized
@@ -128,10 +130,10 @@ def split_regularization_params(
             no_reg.append(param)
           else:
             reg.append(param)
-  return reg, no_reg
-
-
-
+  if param_groups:
+    return [dict(params=reg), dict(params=no_reg, weight_decay=0)]
+  else:
+    return reg, no_reg
 
 
 def trainable(parameters):
@@ -139,11 +141,32 @@ def trainable(parameters):
 
 
 # TODO: handle batchnorm
-def freeze(parameters):
-  if isinstance(parameters, nn.Module):
-    parameters = parameters.parameters()
-  for p in parameters:
-    p.requires_grad = False
+def freeze(x, exclude=None):
+  if isinstance(x, nn.Module):
+    if exclude:
+      for m in x.modules():
+        if not isinstance(m, exclude):
+          for p in x.parameters(recurse=False):
+            p.requires_grad = False
+    else:
+      for p in x.parameters():
+        p.requires_grad = False
+  elif exclude:
+    raise ValueError(
+      "can't exclude modules if parameters are passed, "
+      "pass an instance of nn.Module if you need to "
+      "exclude certain modules")
+  else:
+    for p in x:
+      p.requires_grad = False
+
+
+def freeze_non_batchnorm(x):
+  """
+  Freeze layers except batchnorm
+  should be used when fine tuning / transfer learning
+  """
+  return freeze(x, exclude=_BatchNorm)
 
 
 def unfreeze(parameters):
@@ -151,6 +174,12 @@ def unfreeze(parameters):
     parameters = parameters.parameters()
   for p in parameters:
     p.requires_grad = True
+
+
+def filter_modules(module: nn.Module, type):
+  for m in module.modules():
+    if isinstance(m, type):
+      yield m
 
 
 def replace_linear(model, num_outputs, layer_name='last_linear'):
