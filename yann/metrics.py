@@ -132,20 +132,38 @@ class Meter:
     self.sum += val
     self.count += 1
 
+  @property
   def average(self):
     return self.sum / self.count
 
 
-class MovingAvgMeter:
-  def __init__(self, window=10):
-    self.queue = deque(maxlen=window)
+class WindowMeter:
+  def __init__(self, length=10):
+    self.length = length
+    self.values = deque(maxlen=length)
+
+  def reset(self):
+    self.values = deque(maxlen=self.length)
 
   def update(self, val):
-    self.queue.append(val)
+    self.values.append(val)
 
-  def value(self):
-    if not self.queue: return None
-    return sum(self.queue) / len(self.queue)
+  @property
+  def sum(self):
+    return sum(self.values)
+
+  @property
+  def max(self):
+    return max(self.values)
+
+  @property
+  def min(self):
+    return min(self.values)
+
+  @property
+  def average(self):
+    if not self.values: return None
+    return sum(self.values) / len(self.values)
 
 
 def exp_moving_avg(cur, prev=None, alpha=.05, steps=None):
