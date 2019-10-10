@@ -20,6 +20,7 @@ def load_pickle(path, mode='rb'):
 def save_json(obj, path, mode='w'):
   with open(str(path), mode) as f:
     json.dump(obj, f)
+  return path
 
 
 def load_json(path, mode='r'):
