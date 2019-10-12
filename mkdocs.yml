@@ -1,0 +1,10 @@
+site_name: 'Yann - Yet Another Neural Network Library'
+site_description: 'An easy to use machine learning library for Pytorch'
+repo_name: 'michalwols/yann'
+repo_url: 'https://github.com/michalwols/yann'
+theme:
+  name: 'material'
+markdown_extensions:
+  - codehilite:
+      linenums: true
+  - admonition
