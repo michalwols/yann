@@ -99,3 +99,4 @@ Measure your performance against the test set. Evaluate your model against your 
 - [Troubleshooting Deep Neural Networks - A Field Guide to Fixing Your Model](http://josh-tobin.com/troubleshooting-deep-neural-networks.html)
 - [Hidden Technical Debt in Machine Learning Systems](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems)
 - [Andrew Ng's Machine LEarning Yearning](https://github.com/ajaymache/machine-learning-yearning)
+- [Organizing machine learning projects: project management guidelines](https://www.jeremyjordan.me/ml-projects-guide/)
