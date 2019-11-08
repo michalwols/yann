@@ -23,6 +23,8 @@ class Container(abc.MutableMapping):
     return len(self._keys)
 
   def __getitem__(self, x):
+    if isinstance(x, str):
+      return getattr(self, x)
     if isinstance(x, int):
       k = self._keys[x]
       return getattr(self, k)
@@ -33,6 +35,8 @@ class Container(abc.MutableMapping):
   def __setitem__(self, key, value):
     if isinstance(key, int):
       setattr(self, self._keys[key], value)
+    elif isinstance(key, str):
+      setattr(self, key, value)
 
   def __delitem__(self, key):
     pass

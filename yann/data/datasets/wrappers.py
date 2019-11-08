@@ -61,6 +61,18 @@ class Slice(DatasetWrapper):
 class Subset(DatasetWrapper):
   pass
 
+class IndexedView(DatasetWrapper):
+  def __init__(self, dataset, indices):
+    super(IndexedView, self).__init__(dataset)
+
+    self.indices = indices
+
+  def __getitem__(self, idx):
+    return self.dataset[self.indices[idx]]
+
+  def __len__(self):
+    return len(self.indices)
+
 
 class LookupCache(DatasetWrapper):
   """

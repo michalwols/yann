@@ -5,6 +5,45 @@ import tarfile
 from collections import namedtuple
 import csv
 import gzip
+from pathlib import Path
+
+
+
+class Loader:
+  """
+
+    gs://bucket/file.th
+    ./foo/**/*.jpg
+
+    Args:
+      path:
+
+    Returns:
+  """
+  def __call__(self, path, **kwargs):
+    path = Path(path)
+    if hasattr(self, path.suffix):
+      return getattr(self, path.suffix)(**kwargs)
+
+  def csv(self):
+    pass
+
+  def json(self):
+    pass
+
+  def jsonlines(self):
+    pass
+
+
+load = Loader()
+
+
+class Saver:
+  def __call__(self, x, path, **kwargs):
+    pass
+
+
+save = Saver()
 
 
 def save_pickle(obj, path, mode='wb'):

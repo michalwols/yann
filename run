@@ -19,6 +19,13 @@ function release() {
   twine upload dist/*
 }
 
+function serve-docs() {
+  mkdocs serve
+}
+
+function deploy-docs() {
+  mkdocs gh-deploy
+}
 
 if declare -f "$1" > /dev/null
 then

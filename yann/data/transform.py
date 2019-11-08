@@ -95,6 +95,12 @@ class ImageTransformer(Transformer):
       ]))
     )
 
+  def state_dict(self):
+    pass
+
+  def load_state_dict(self):
+    pass
+
 
 class DictTransformer:
   def __init__(self, **transforms):
@@ -164,8 +170,6 @@ def get_image(x, space=None) -> Image.Image:
     return img.convert(space) if space else img
 
 
-
-
 def mixup(inputs, targets, alpha=1):
   """
   Args:
@@ -181,7 +185,6 @@ def mixup(inputs, targets, alpha=1):
     fraction * inputs + (1 - fraction) * inputs[shuffled_indices],
     fraction * targets + (1 - fraction) * targets[shuffled_indices]
   )
-
 
 
 def cutout(img, percent=.3, value=0):

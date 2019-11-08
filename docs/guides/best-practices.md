@@ -99,3 +99,5 @@ Measure your performance against the test set. Evaluate your model against your 
 - [Troubleshooting Deep Neural Networks - A Field Guide to Fixing Your Model](http://josh-tobin.com/troubleshooting-deep-neural-networks.html)
 - [Hidden Technical Debt in Machine Learning Systems](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems)
 - [Andrew Ng's Machine LEarning Yearning](https://github.com/ajaymache/machine-learning-yearning)
+- [Twitter Thread](https://mobile.twitter.com/karpathy/status/1013244313327681536)
+- [What should I do when my neural network doesn't learn?](https://stats.stackexchange.com/questions/352036/what-should-i-do-when-my-neural-network-doesnt-learn)

@@ -6,3 +6,7 @@ class YannException(Exception):
 
 class ShapeInferenceError(YannException):
   pass
+
+
+class CheckFailure(YannException):
+  pass

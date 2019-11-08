@@ -74,7 +74,7 @@ class Node:
   def update(self):
     if self._display_handle:
       self._display_handle.update(self.render())
-      
+
 
 def prop(name):
   def g(self):
@@ -118,7 +118,7 @@ class ReactiveMixin(metaclass=ReactiveNodeMeta):
   def __init__(self, *args, **props):
     super(ReactiveMixin, self).__init__(*args, **props)
     self._init_props(**props)
-  
+
   def _init_props(self, **passed_props):
     for prop in self._props:
       if prop not in passed_props and prop in self._default_props:
@@ -171,6 +171,44 @@ class matplotfig(img):
     return super(matplotfig, self).html()
 
 
+def _cell(val, size=25):
+  return div(
+    style=f'width: {size}px; height: {size}px; display: inline-block; background-color: rgba({50 + val}, {20 + val * .8}, {80 + val * .6}, 1); margin: 0; border: 1px solid rgba(0,0,0, .05)')
 
 
+def _row(*args):
+  return div(*args, style='margin: 0; padding: 0; font-size:0; white-space: nowrap;')
 
+
+def tensor(t, cell_size=15, scaled=None, min=None, max=None):
+  if t.numel() > 50000:
+    raise ValueError('tensor too large')
+  if scaled is None:
+    max = t.max() if max is None else max
+    min = t.min() if min is None else min
+    scaled = (t.float() - min) / (max-min) * 255
+
+  if t.ndim == 1:
+    return div(
+      f"shape: {tuple(t.shape)}",
+      _row(*(_cell(v, size=cell_size) for v in scaled))
+    )
+
+  if t.ndim == 2:
+    return div(
+      f"shape: {tuple(t.shape)}",
+      *[
+        _row(*(_cell(v, size=cell_size) for v in row)) for row in scaled
+      ]
+    )
+
+  if t.ndim >= 3:
+    return div(
+      f"shape: {tuple(t.shape)}",
+      div(
+        *(div(style='border: 1px solid #CCC; padding: 5px; margin: 3px; display: inline-block; border-radius: 6px')(
+          f"index: {n}", tensor(x, scaled=x, cell_size=cell_size, min=min, max=max)
+        ) for n, x in enumerate(scaled)
+        )
+      )
+    )

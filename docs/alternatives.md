@@ -3,97 +3,100 @@
 
 ## Generic Frameworks
 
-### Ignite
+#### Ignite
 [https://github.com/pytorch/ignite](https://github.com/pytorch/ignite)
 
-### Catalyst
+#### Catalyst
 [https://github.com/catalyst-team/catalyst](https://github.com/catalyst-team/catalyst)
 
-### Fast.ai
+#### Fast.ai
 [https://github.com/fastai/fastai](https://github.com/fastai/fastai)
 
 https://github.com/fastai/fastai_dev
 
-### Bootstrap Pytorch
+#### Bootstrap Pytorch
 [https://github.com/Cadene/bootstrap.pytorch](https://github.com/Cadene/bootstrap.pytorch)
 
-### Torch-Lightning
+#### Torch-Lightning
 
-### Skorch
+#### Skorch
 [https://github.com/skorch-dev/skorch](https://github.com/skorch-dev/skorch)
 
-### Torchbearer
+#### Torchbearer
 https://github.com/pytorchbearer/torchbearer
 
 ## Natural Language Processing
 
-### AllenNLP
+#### AllenNLP
 
-### Spacy
+#### Spacy
 
-## Flair
+#### Flair
 https://github.com/zalandoresearch/flair
 
-### OpenNMT
+#### OpenNMT
 [https://github.com/OpenNMT/OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py)
 
-### StanfordNLP
+#### StanfordNLP
 
-### Fairseq
+#### Fairseq
 [https://github.com/pytorch/fairseq](https://github.com/pytorch/fairseq)
 
-### Huggingface Transformers
+#### Huggingface Transformers
 https://github.com/huggingface/transformers
 
-### PyText
+#### PyText
 https://github.com/facebookresearch/pytext
 
-### Translate
+#### Translate
 [https://github.com/pytorch/translate](https://github.com/pytorch/translate)
 
 ## Computer Vision
 
-### Torchvision
+#### Torchvision
 [https://github.com/pytorch/vision](https://github.com/pytorch/vision)
 
-### MMCV
+#### MMCV
 https://github.com/open-mmlab/mmcv
 
-### MMDetection
+#### MMDetection
 [https://github.com/open-mmlab/mmdetection](https://github.com/open-mmlab/mmdetection)
 
-### Detectron2
+#### Detectron2
 https://github.com/facebookresearch/detectron2
 
-### Kornia
+#### Kornia
 
 https://github.com/arraiyopensource/kornia/
 
+#### torchcv
+[https://github.com/donnyyou/torchcv](https://github.com/donnyyou/torchcv)
 
-### cirtorch - cnnimageretrieval
+
+#### cirtorch - cnnimageretrieval
 https://github.com/filipradenovic/cnnimageretrieval-pytorch
 
-### Pretrained Models
+#### Pretrained Models
 [https://github.com/Cadene/pretrained-models.pytorch](https://github.com/Cadene/pretrained-models.pytorch)
 
-### PyTorch Image Models
+#### PyTorch Image Models
 [https://github.com/rwightman/pytorch-image-models](https://github.com/rwightman/pytorch-image-models)
 
 ## Reinforcement Learning
 
-### Horizon
+#### Horizon
 https://github.com/facebookresearch/ReAgent
 
 ## Recommender Systems
 
-### Spotlight
+#### Spotlight
 https://github.com/maciejkula/spotlight
 
 ## Meta Learning
 
 ## Graphs
 
-### Pytorch Geometric
+#### Pytorch Geometric
 [https://github.com/rusty1s/pytorch_geometric](https://github.com/rusty1s/pytorch_geometric)
 
 
@@ -107,10 +110,15 @@ https://github.com/maciejkula/spotlight
 
 ## Speech / Audio
 
-### Pytorch-Kaldi
+#### Pytorch-Kaldi
 [https://github.com/mravanelli/pytorch-kaldi](https://github.com/mravanelli/pytorch-kaldi)
 
 ## Medical
 
-### MedicalTorch
+#### MedicalTorch
 [https://github.com/perone/medicaltorch](https://github.com/perone/medicaltorch)
+
+## Active Learning
+
+#### Bayesian Active Learning (Baal)
+[https://github.com/ElementAI/baal](https://github.com/ElementAI/baal)

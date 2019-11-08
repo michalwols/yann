@@ -1,5 +1,7 @@
 import lmdb
 import pickle
+import json
+from contextlib import contextmanager
 
 from ..serialize import serialize_arrow, deserialize_arrow, to_bytes, to_unicode
 from ..images import image_to_bytes, image_from_bytes
@@ -10,6 +12,8 @@ class LMDB:
     self.path = path
     self.db = None
     self.open(map_size=map_size, **kwargs)
+
+    self._current_transaction = None
 
   @property
   def stats(self):
@@ -29,28 +33,55 @@ class LMDB:
     del self.db
 
   def __getitem__(self, key):
-    with self.db.begin(write=False) as t:
-      return self.deserialize(t.get(self.serialize_key(key)))
+    # TODO: support indexing multiple values
+    if self._current_transaction:
+      return self.deserialize(self._current_transaction.get(self.serialize_key(key)))
+    else:
+      with self.db.begin(write=False) as t:
+        return self.deserialize(t.get(self.serialize_key(key)))
 
   def __setitem__(self, key, value):
-    with self.db.begin(write=True) as t:
-      return t.put(self.serialize_key(key), self.serialize(value))
+    if self._current_transaction:
+      return self._current_transaction.put(self.serialize_key(key), self.serialize(value))
+    else:
+      with self.db.begin(write=True) as t:
+        return t.put(self.serialize_key(key), self.serialize(value))
 
   def __delitem__(self, key):
-    with self.db.begin(write=True) as t:
-      return t.delete(self.serialize_key(key))
+    if self._current_transaction:
+      return self._current_transaction.delete(self.serialize_key(key))
+    else:
+      with self.db.begin(write=True) as t:
+        return t.delete(self.serialize_key(key))
 
   def __iter__(self):
-    with self.db.begin(write=False) as t:
-      for k, v in t.cursor():
+    if self._current_transaction:
+      for k, v in self._current_transaction.cursor():
         yield self.deserialize_key(k), self.deserialize(v)
+    else:
+      with self.db.begin(write=False) as t:
+        for k, v in t.cursor():
+          yield self.deserialize_key(k), self.deserialize(v)
 
   def update(self, items):
     if isinstance(items, dict):
       items = items.items()
-    with self.db.begin(write=True) as t:
+    if self._current_transaction:
       for k, v in items:
-        t.put(self.serialize_key(k), self.serialize(v))
+        self._current_transaction.put(self.serialize_key(k), self.serialize(v))
+    else:
+      with self.db.begin(write=True) as t:
+        for k, v in items:
+          t.put(self.serialize_key(k), self.serialize(v))
+
+  @contextmanager
+  def transaction(self, write=False, buffers=False):
+    with self.db.begin(write=write, buffers=buffers) as t:
+      self._current_transaction = t
+
+      yield
+
+      self._current_transaction = None
 
   @staticmethod
   def serialize_key(x):
@@ -109,7 +140,6 @@ class PickleLMDB(LMDB):
     return pickle.loads(x)
 
 
-
 class ImageLMDB(LMDB):
   format = 'jpeg'
 
@@ -124,3 +154,21 @@ class ImageLMDB(LMDB):
 
   def deserialize(self, x):
     return image_from_bytes(x)
+
+
+class JSONLMDB(LMDB):
+  @staticmethod
+  def serialize_key(x):
+    return to_bytes(x)
+
+  @staticmethod
+  def deserialize_key(x):
+    return to_unicode(x)
+
+  @staticmethod
+  def serialize(x):
+    return to_bytes(json.dumps(x))
+
+  @staticmethod
+  def deserialize(x):
+    return json.loads(to_unicode(x))

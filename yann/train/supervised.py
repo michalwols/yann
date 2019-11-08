@@ -6,9 +6,11 @@ import torch
 import torch.nn
 from torch.utils.data import DataLoader
 from typing import Optional
+import types
+from callbacks import get_callbacks
 
 from .. import callbacks as yann_callbacks
-from .. import resolve, evaluate
+from .. import resolve, evaluate, to
 from ..data import TransformDataset, get_dataset_name, Classes
 from ..data.io import save_json
 from ..export import export
@@ -30,6 +32,44 @@ def get_model_name(model):
     return model.name
 
   return model.__class__.__name__
+
+
+class Paths:
+  # TODO: add a way to display the directory tree
+  def __init__(self, root):
+    self.root = pathlib.Path(root)
+
+  @property
+  def checkpoints(self):
+    return self.root / 'checkpoints'
+
+  @property
+  def tensorboard(self):
+    return self.root / 'tensorboard'
+
+  @property
+  def logs(self):
+    return self.root / 'logs'
+
+  @property
+  def evals(self):
+    return self.root / 'evals'
+
+  @property
+  def plots(self):
+    return self.root / 'plots'
+
+  @property
+  def model_outputs(self):
+    return self.root / 'model_outputs'
+
+  @property
+  def model_exports(self):
+    return self.root / 'model_exports'
+
+  @property
+  def summary(self):
+    return self.root / 'summary.json'
 
 
 class Trainer(BaseTrainer):
@@ -64,7 +104,9 @@ class Trainer(BaseTrainer):
       root='./train-runs/',
       metrics=None,
       collate=None,
-      params=None
+      params=None,
+      pin_memory=True,
+      step=None
   ):
     super().__init__()
 
@@ -116,7 +158,7 @@ class Trainer(BaseTrainer):
     self.loader = loader or DataLoader(
       self.dataset,
       batch_size=self.batch_size,
-      pin_memory=True,
+      pin_memory=pin_memory,
       shuffle=False if sampler else True,
       sampler=sampler,
       num_workers=num_workers,
@@ -146,6 +188,9 @@ class Trainer(BaseTrainer):
     )
     self.lr_batch_step = lr_batch_step
 
+    if step is not None:
+      self.override(self.step, step)
+
     self.num_samples = 0
     self.num_steps = 0
     self.num_epochs = 0
@@ -160,9 +205,14 @@ class Trainer(BaseTrainer):
     self.root = pathlib.Path(root) / self.name / timestr(self.time_created)
     self.root.mkdir(parents=True, exist_ok=True)
 
+    self.paths = Paths(self.root)
+
     self.history = None
     has_history = False
     if callbacks:
+      if callbacks is True:
+        # if callbacks=True use the default set of callbacks
+        callbacks = get_callbacks()
       for c in callbacks:
         if isinstance(c, yann_callbacks.History):
           self.history = c
@@ -217,6 +267,9 @@ class Trainer(BaseTrainer):
     logging.debug(f"setting '{key}' to {value}")
     super(Trainer, self).__setattr__(key, value)
 
+  # @classmethod
+  # def from_params(cls, params):
+  #   pass
 
   def to(self, device=None):
     self.device = device
@@ -239,6 +292,12 @@ class Trainer(BaseTrainer):
 
       return decorated
 
+  def train_mode(self):
+    self.model.train()
+
+  def eval_mode(self):
+    self.model.eval()
+
   def epochs(self, num=None):
     for e in counter(start=self.num_epochs, end=self.num_epochs + num):
       yield e
@@ -246,20 +305,42 @@ class Trainer(BaseTrainer):
 
   def batches(self, device=None):
     device = device or self.device
-    for inputs, targets in self.loader:
+    for batch in self.loader:
       if self.transform_batch:
-        inputs, targets = self.transform_batch(inputs, targets)
+        batch = self.transform_batch(*batch)
 
       if device:
-        yield inputs.to(device), targets.to(device)
+        yield to(*batch, device=device)
       else:
-        yield inputs, targets
+        yield batch
 
       self.num_steps += 1
-      self.num_samples += len(inputs)
+      self.num_samples += len(batch[0])
+
+  def override(self, method, function=False):
+    """
+    Override a method of the trainer
+    Args:
+      method: str or method reference
+      function: function to be used as a replacement for the given method
+    """
+    method = method if isinstance(method, str) else method.__name__
+    if not hasattr(self, method):
+      raise AttributeError(f"Can't override method '{method}' because it's not defined")
+    if function is False:
+      # assume it's used as a decorator
+      # @train.override('step')
+      # def custom_step(trainer, inputs, targets):
+      def decorator(f):
+        setattr(self, method, types.MethodType(f, self))
+      return decorator
+    else:
+      setattr(self, method, types.MethodType(function, self))
 
   def step(self, inputs, target):
-    self.model.train()
+    if not self.model.training:
+      self.model.train()
+
     self.optimizer.zero_grad()
 
     outputs = self.model(inputs)
@@ -381,6 +462,7 @@ class Trainer(BaseTrainer):
     return path
 
   def load_checkpoint(self, path, metadata=True):
+    # TODO: add 'latest', 'best' support
     data = torch.load(path)
     self.load_state_dict(data, metadata=metadata)
 
@@ -447,7 +529,7 @@ class Trainer(BaseTrainer):
   def summary(self):
     summary = {
       'name': self.name,
-      'path': str(self.root),
+      'root': str(self.root),
       'num_steps': self.num_steps,
       'num_samples': self.num_samples,
       'num_epochs': self.num_epochs,

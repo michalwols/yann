@@ -24,7 +24,7 @@ def receptive_field(module: nn.Module, input_shape=(1, 1, 256, 256)):
   indicator = torch.zeros_like(output)
   indicator[(0, 0, *(n // 2 for n in indicator.shape[2:]))] = 1
 
-  loss = torch.mean(output * indicator)
+  loss = torch.sum(output * indicator)
   loss.backward()
 
   grad = input.grad.numpy()

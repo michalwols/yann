@@ -1,10 +1,8 @@
 import subprocess
 
 from ..callbacks.base import Callback
+from ..utils.bash import run
 
-
-def run(command):
-  return subprocess.check_call(command, shell=True)
 
 
 def gcloud(command):

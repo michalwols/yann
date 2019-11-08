@@ -15,6 +15,13 @@ class TargetTransformer:
     pass
 
 
+# TODO:
+# - add hierarchy support (parents, children meta) (maybe even graphs)
+# - Classes(apple=meta, juice=bar) or dict
+# - nn.Embeddimg with classes.embed(dims=4)
+#    - looks like target embeddings were tried before: https://arxiv.org/abs/1806.10805
+
+
 class Classes(TargetTransformer):
   valid_encodings = {
     'index',
@@ -39,7 +46,10 @@ class Classes(TargetTransformer):
     assert default_encoding in self.valid_encodings, \
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
-    
+
+  def weights(self):
+    raise NotImplementedError()
+
   @classmethod
   def ordered(cls, num, meta=None, default_encoding='index'):
     return Classes(range(num), meta=meta, default_encoding=default_encoding)
@@ -51,7 +61,7 @@ class Classes(TargetTransformer):
       f"Classes(\n" 
       f"  count={len(self)},\n" 
       f"  default_encoding={self.default_encoding}\n"
-      f"  names=[{', '.join(self.names[:c])}, ..., {', '.join(self.names[-c:])}]\n"
+      f"  names=[{', '.join([str(x) for x in self.names[:c]])}, ..., {', '.join([str(x) for x in self.names[-c:]])}]\n"
       # f"  encoded={self.encode(self.names[:c])}, ..., {self.encode(self.names[-c:])}\n"
       f")"
     )

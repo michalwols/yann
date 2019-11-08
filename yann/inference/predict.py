@@ -1,9 +1,15 @@
 import torch
 
-from .. import evalmode
+from .. import eval_mode
+from .core import inference_stream
 
 
 class Predictor:
+  # model: torch.nn.Module
+  def __init__(self, model):
+    self.model: torch.nn.Module = model
+
+
   def __call__(self, *args, **kwargs):
     x = self.load(*args, **kwargs)
     x = self.transform(x)
@@ -27,6 +33,9 @@ class Predictor:
   def posprocess(self, inputs):
     return inputs
 
+  def stream(self, batches):
+    pass
+
 
 class Classifier(Predictor):
   def __init__(self, model, classes=None, preprocess=None, postprocess=None):
@@ -38,7 +47,7 @@ class Classifier(Predictor):
 
   def __call__(self, *args, **kwargs):
     x = self.preprocess(*args, **kwargs)
-    with evalmode(self.model):
+    with eval_mode(self.model):
       x = self.model(x)
 
     return self.classes.decode(x)

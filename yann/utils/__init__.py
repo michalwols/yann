@@ -4,18 +4,20 @@ import torch
 from PIL import Image
 import sys
 
+
 def camel_to_snake(text):
   s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', text)
   return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
 
 def abbreviate(text):
   return re.sub(r"([a-zA-Z])[a-z]*[^A-Za-z]*",r"\1", text).lower()
 
 
-def get_arg_parser(x, description=None, epilog=None, **kwargs):
+def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
     import argparse
     from ..params import Field
-    parser = argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
+    parser = parser or argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
     for k, v in x.items():
         if isinstance(v, dict):
             parser.add_argument(
@@ -100,5 +102,5 @@ def to_numpy(x):
   if isinstance(x, np.ndarray):
     return x
   if torch.is_tensor(x):
-    return x.to('cpu').numpy()
+    return x.to('cpu').detach().numpy()
   return np.array(x)

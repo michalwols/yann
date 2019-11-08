@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.33'
+__version__ = '0.0.36'
 
 import torch
 from torch import nn
@@ -9,8 +9,61 @@ from .config.setup import registry
 register = registry
 resolve = registry.resolve
 
-from .utils import to_numpy
+from .utils import to_numpy, repeat, counter
 import numpy as np
+
+from .data import batches, shuffle, chunk
+from .data.io import load, save
+from .data.utils import pad, pad_to_largest
+from .data import datasets
+from .viz import show, plot
+
+
+from .testing import Checker
+
+# T = torch.Tensor
+#
+# check = Checker()
+#
+#
+#
+# def serialize():
+#   pass
+#
+# def deserialize():
+#   pass
+#
+#
+# class Cache:
+#   def __call__(self, data):
+#     pass
+#
+# def cache(data=None, path=None, recompute=None, validate=False, hash=True):
+#   """
+#
+#   processed_data
+#
+#   yann.cache(processed_data
+#
+#
+#   Args:
+#     data:
+#     path:
+#     recompute:
+#     validate:
+#     hash:
+#
+#   Returns:
+#
+#   """
+#
+#
+# def checkpoint():
+#   pass
+#
+# def load_checkpoint():
+#   pass
+
 
 default_device = torch.device('cuda') \
   if torch.cuda.is_available() else torch.device('cpu')
@@ -176,13 +229,30 @@ def unfreeze(parameters):
     p.requires_grad = True
 
 
-def filter_modules(module: nn.Module, type):
-  for m in module.modules():
+def filter_modules(module: nn.Module, type, named=True):
+  for n, m in module.named_modules():
     if isinstance(m, type):
-      yield m
+      if named:
+        yield n, m
+      else:
+        yield m
 
 
-def replace_linear(model, num_outputs, layer_name='last_linear'):
+def replace_linear(model, num_outputs, layer_name=None):
+  if layer_name is None:
+    linear_layers = list(filter_modules(model, nn.Linear, named=True))
+    if len(linear_layers) == 1:
+      layer_name = linear_layers[0][0]
+    elif len(linear_layers) == 0:
+      raise ValueError('No linear layers found in model')
+    else:
+      raise ValueError(
+        f'Multiple linear layers found and layer name was not provided, '
+        f'provide a valid layer_name, '
+        f'(valid names: {", ".join([n for n, m in linear_layers])})'
+      )
+  if not hasattr(model, layer_name):
+    raise ValueError(f'Model does not have a linear layer named "{layer_name}"')
   setattr(
     model,
     layer_name,
@@ -190,6 +260,8 @@ def replace_linear(model, num_outputs, layer_name='last_linear'):
       getattr(model, layer_name).in_features,
       num_outputs)
   )
+
+  return layer_name
 
 
 def to_fp16(model):
@@ -205,9 +277,8 @@ def to_fp16(model):
 
 
 
-
 @contextmanager
-def evalmode(*modules, grad=False):
+def eval_mode(*modules, grad=False):
   if grad:
     training = (m.training for m in modules)
     try:
@@ -227,3 +298,35 @@ def evalmode(*modules, grad=False):
         for m, train in zip(modules, training):
           if train:
             m.train()
+
+
+@contextmanager
+def train_mode(*modules):
+  initial_training_states = (m.training for m in modules)
+  try:
+    for m in modules:
+      m.train()
+
+    yield
+
+  finally:
+    for m, train in zip(modules, initial_training_states):
+      if train:
+        m.train()
+      else:
+        m.eval()
+
+
+@contextmanager
+def optim_step(optimizer, zero_grad=True):
+  if zero_grad:
+    optimizer.zero_grad()
+
+  yield
+
+  optimizer.step()
+
+
+def to(*items, **kwargs):
+  """call `.to()` on all items that have a `to()` method, skips ones that don't"""
+  return tuple(x.to(**kwargs) if hasattr(x, 'to') else x for x in items)

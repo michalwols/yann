@@ -2,11 +2,10 @@ from typing import Union, Iterable, Any
 from glob import iglob
 import os
 
-from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex
-
-
 import torch
 from torch.utils import data
+
+from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex, IndexedView
 
 from ..classes import Classes
 

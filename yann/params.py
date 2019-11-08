@@ -1,7 +1,40 @@
+"""
+
+
+# TODO:
+- add a way to bind params to a function
+  # inspired by https://github.com/google/gin-config
+  p = Params()
+
+  @p.bind(('batch_size'), prefix=True)
+  def train(batch_size: int = 32):
+    pass
+
+  @p.bind({'batch_size': 'bs'}, prefix='train')
+  def train(batch_size):
+    pass
+
+  @p.bind('smooth')
+  def loss(x, y, smooth=.2):
+    pass
+
+  p.from_command()
+  train()
+
+- add __instance_fields__, __fields__ is a class attribute
+
+
+- Params.sample()
+- Params.sampler() # sample without replacement
+- Params.grid()
+
+"""
+
 from abc import ABCMeta
 from collections import OrderedDict
 from copy import deepcopy
 from .utils import get_arg_parser
+
 
 class Field:
   def __init__(self, help=None, type=None, required=False, default=None):
@@ -71,7 +104,12 @@ class HyperParamsBase:
     return params
 
   @classmethod
+  def from_env(cls, prefix=''):
+    raise NotImplementedError()
+
+  @classmethod
   def load(cls, path):
+
     if path.endswith(('yaml', 'yml')):
       import yaml
       with open(path, 'r') as f:
@@ -81,6 +119,12 @@ class HyperParamsBase:
       import json
       data = json.load(path)
       return cls(**data)
+
+  def save(self, path):
+    from .data.io import save_json
+    save_json(dict(self), path)
+
+
 
   def on_change(self, callback):
     self._change_callbacks.append(callback)

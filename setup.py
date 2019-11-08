@@ -1,11 +1,20 @@
 from setuptools import setup, find_packages
 
-with open("README.md", "r") as fh:
-  long_description = fh.read()
+# with open("README.md", "r") as fh:
+#   long_description = fh.read()
+
+
+long_description = f"""
+# yann (Yet Another Neural Network Library)
+
+Yann is an extended version of torch.nn, adding a ton of sugar to make training models as fast and easy as possible.
+
+"""
+
 
 setup(
   name='yann',
-  version='0.0.32',
+  version='0.0.36',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",

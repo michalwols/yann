@@ -2,7 +2,7 @@ import logging
 
 import torch
 
-from .registry import Registry, pass_args
+from .registry import Registry, pass_args, is_public_callable
 
 ## Configure Registry
 
@@ -83,31 +83,24 @@ registry.lr_scheduler.index(
 from torchvision import models
 
 
-def is_public_callable(x):
-  return (
-      hasattr(x, '__name__')
-      and not x.__name__.startswith('_')
-      and callable(x)
-  )
-
-
 registry.model.torchvision.index(
   models,
   init=pass_args,
   include=is_public_callable
 )
 
-try:
-  import pretrainedmodels.models
-except ImportError:
-  logging.debug("Couldn't register pretrainedmodels models because it's not "
-                "installed")
-else:
-  registry.model.pretrainedmodels.index(
-    pretrainedmodels.models,
-    init=pass_args,
-    include=is_public_callable
-  )
+# NOTE: moved to yann.contrib.pretrainedmodels
+# try:
+#   import pretrainedmodels.models
+# except ImportError:
+#   logging.debug("Couldn't register pretrainedmodels models because it's not "
+#                 "installed")
+# else:
+#   registry.model.pretrainedmodels.index(
+#     pretrainedmodels.models,
+#     init=pass_args,
+#     include=is_public_callable
+#   )
 
 from .. import metrics
 registry.metric.update((
