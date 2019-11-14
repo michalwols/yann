@@ -6,16 +6,19 @@ import torch.cuda
 
 from ..viz.plot import plot_timeline
 
+def time(name=None, sync=False):
+  return Task(name=name, sync=sync, log=True)
 
 class Task:
-  __slots__ = ('name', 'start_time', 'end_time', 'meta', 'sync')
+  __slots__ = ('name', 'start_time', 'end_time', 'meta', 'sync', 'log')
 
-  def __init__(self, name=None, start=None, end=None, meta=None, sync=False):
+  def __init__(self, name=None, start=None, end=None, meta=None, sync=False, log=False):
     self.name = name
     self.start_time = start
     self.end_time = end
     self.meta = meta or {}
     self.sync = sync
+    self.log = log
 
   def start(self, time=None, meta=None, sync=None):
     if meta:
@@ -25,6 +28,8 @@ class Task:
       torch.cuda.synchronize()
 
     self.start_time = time or datetime.now()
+    if self.log:
+      print(f'starting {self.name or id(self)}')
 
   def end(self, time=None, meta=None, sync=None):
     sync = sync if sync is not None else self.sync
@@ -32,6 +37,8 @@ class Task:
       torch.cuda.synchronize()
 
     self.end_time = time or datetime.now()
+    if self.log:
+      print(f'completed {self.name or id(self)} in {self.seconds:.9g} seconds')
 
     if meta:
       self.meta.update(meta)
@@ -55,6 +62,8 @@ class Task:
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.end()
 
+  def __repr__(self):
+    return f"Task({self.name or id(self)}, seconds={self.seconds:.9g}, sync={self.sync})"
 
 class Timer:
   def __init__(self, name=None, log=False):

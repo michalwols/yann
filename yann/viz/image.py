@@ -17,6 +17,9 @@ def show_images(paths, labels=None, urls=None, w=400, h=400):
   from IPython.core.display import display, HTML
   from pathlib import Path
 
+  if isinstance(paths, (str, Path)):
+    paths = [paths]
+
   if isinstance(paths[0], (tuple, list)):
     items = paths
   else:

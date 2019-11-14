@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-__version__ = '0.0.36'
+__version__ = '0.0.37'
 
 import torch
 from torch import nn
@@ -17,7 +17,8 @@ from .data.io import load, save
 from .data.utils import pad, pad_to_largest
 from .data import datasets
 from .viz import show, plot
-
+from .utils.timer import time
+from .utils.profile import profile
 
 from .testing import Checker
 
@@ -65,8 +66,20 @@ from .testing import Checker
 #   pass
 
 
-default_device = torch.device('cuda') \
-  if torch.cuda.is_available() else torch.device('cpu')
+class default:
+  device = torch.device('cuda') \
+    if torch.cuda.is_available() else torch.device('cpu')
+
+  batch_size = None
+  num_workers = None
+  optimizer = None
+
+  callbacks = None
+
+  train_root = None
+  datasets_root = None
+
+  checkpoint_name_format = ''
 
 
 def seed(val=1, deterministic=False):

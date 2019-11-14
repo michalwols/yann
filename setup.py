@@ -14,7 +14,7 @@ Yann is an extended version of torch.nn, adding a ton of sugar to make training 
 
 setup(
   name='yann',
-  version='0.0.36',
+  version='0.0.37',
   description='yet another neural network library',
   long_description=long_description,
   long_description_content_type="text/markdown",

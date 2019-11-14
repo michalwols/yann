@@ -104,3 +104,32 @@ def to_numpy(x):
   if torch.is_tensor(x):
     return x.to('cpu').detach().numpy()
   return np.array(x)
+
+
+class RangeMap(dict):
+  def __init__(self, items=None):
+    super().__init__()
+
+    if isinstance(items, dict):
+      items = items.items()
+
+    if items:
+      for k, v in items:
+        self[k] = v
+
+  def __getitem__(self, item):
+    if isinstance(item, tuple):
+      return super().__getitem__(item)
+
+    if item is not None:
+      for (min, max), value in self.items():
+        if min is not None and item < min:
+          continue
+        if max is not None and item > max:
+          continue
+        return value
+
+    raise KeyError(f'Key `{item}` does not fall in any of the ranges')
+
+  def __call__(self, item):
+    return self[item]

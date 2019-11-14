@@ -7,10 +7,9 @@ import torch.nn
 from torch.utils.data import DataLoader
 from typing import Optional
 import types
-from callbacks import get_callbacks
-
+from ..callbacks import get_callbacks
 from .. import callbacks as yann_callbacks
-from .. import resolve, evaluate, to
+from .. import resolve, evaluate, to, default, trainable
 from ..data import TransformDataset, get_dataset_name, Classes
 from ..data.io import save_json
 from ..export import export
@@ -92,7 +91,7 @@ class Trainer(BaseTrainer):
       lr_batch_step=False,
       callbacks=None,
       device=None,
-      trainable_parameters=None,
+      parameters='trainable',
       batch_size=16,
       val_dataset=None,
       val_loader=None,
@@ -125,9 +124,12 @@ class Trainer(BaseTrainer):
       required=True,
       validate=callable,
     )
+
+    if parameters == 'trainable' and self.model:
+      parameters = trainable(self.model.parameters())
     self.optimizer = resolve.optimizer(
       optimizer,
-      args=(trainable_parameters or self.model.parameters(),),
+      args=(parameters or self.model.parameters(),),
       required=True,
       validate=lambda x: hasattr(x, 'step')
     )
@@ -218,6 +220,7 @@ class Trainer(BaseTrainer):
           self.history = c
           has_history = True
           break
+    metrics = (metrics,) if isinstance(metrics, str) else metrics
     self.history = self.history or yann_callbacks.History(*(metrics or ()))
 
     self.callbacks = callbacks or [
@@ -234,11 +237,11 @@ class Trainer(BaseTrainer):
 
     self.function_callback = None
 
+    device = default.device if device is None else device
     if device:
       self.device = torch.device(device) if isinstance(device, str) else device
       self.to(self.device)
-    else:
-      self.device = None
+
 
   def __setattr__(self, key, value):
     if key == 'optimizer':
@@ -274,8 +277,12 @@ class Trainer(BaseTrainer):
   def to(self, device=None):
     self.device = device
 
-    if self.model:
-      self.model.to(self.device)
+    to(
+      self.model,
+      self.loss,
+      self.optimizer,
+      device=self.device
+    )
 
   def on(self, event, callback=None):
     if not self.function_callback:

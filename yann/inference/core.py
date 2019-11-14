@@ -23,7 +23,7 @@ def inference_stream(
     progress=10,
     eval=True,
 ):
-  device = device or yann.default_device
+  device = device or yann.default.device
 
   if isinstance(model, str):
     model = torch.jit.load(model, 'cpu')

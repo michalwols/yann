@@ -171,17 +171,23 @@ class matplotfig(img):
     return super(matplotfig, self).html()
 
 
+
 def _cell(val, size=25):
   return div(
-    style=f'width: {size}px; height: {size}px; display: inline-block; background-color: rgba({50 + val}, {20 + val * .8}, {80 + val * .6}, 1); margin: 0; border: 1px solid rgba(0,0,0, .05)')
+    style=(
+      f'width: {size}px; height: {size}px;'
+      f' display: inline-block;'
+      f' background-color: rgba({50 + val}, {20 + val * .8}, {80 + val * .6}, 1);'
+      f' margin: 0; border: 1px solid rgba(0,0,0, .05)'
+    ))
 
 
 def _row(*args):
   return div(*args, style='margin: 0; padding: 0; font-size:0; white-space: nowrap;')
 
 
-def tensor(t, cell_size=15, scaled=None, min=None, max=None):
-  if t.numel() > 50000:
+def tensor(t, cell_size=15, scaled=None, min=None, max=None, max_elements=50000):
+  if t.numel() > max_elements:
     raise ValueError('tensor too large')
   if scaled is None:
     max = t.max() if max is None else max

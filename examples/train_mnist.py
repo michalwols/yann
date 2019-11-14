@@ -1,12 +1,11 @@
 import torch
 from torch import nn
 from torchvision import transforms
-from torch.optim import SGD
 
 import yann
-from yann.train import Trainer
 from yann.modules import Stack, Flatten, Infer
 from yann.params import HyperParams, Choice, Range
+from yann.train import Trainer
 
 
 class Params(HyperParams):
@@ -67,8 +66,7 @@ train = Trainer(
     transforms.Normalize((0.1307,), (0.3081,))
   ]),
   loss='nll_loss',
-  metrics=('accuracy',),
-  device=yann.default_device
+  metrics=('accuracy',)
 )
 
 train(params.epochs)

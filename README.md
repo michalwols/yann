@@ -76,8 +76,7 @@ train = Trainer(
     transforms.Normalize((0.1307,), (0.3081,))
   ]),
   loss='nll_loss',
-  metrics=('accuracy',),
-  device=yann.default_device
+  metrics=('accuracy',)
 )
 
 train(params.epochs)
