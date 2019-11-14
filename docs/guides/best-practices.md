@@ -101,3 +101,4 @@ Measure your performance against the test set. Evaluate your model against your 
 - [Andrew Ng's Machine LEarning Yearning](https://github.com/ajaymache/machine-learning-yearning)
 - [Twitter Thread](https://mobile.twitter.com/karpathy/status/1013244313327681536)
 - [What should I do when my neural network doesn't learn?](https://stats.stackexchange.com/questions/352036/what-should-i-do-when-my-neural-network-doesnt-learn)
+- [Organizing machine learning projects: project management guidelines](https://www.jeremyjordan.me/ml-projects-guide/)
