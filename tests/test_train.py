@@ -6,7 +6,8 @@ from torch.optim import SGD
 from yann.callbacks import (
   History, HistoryPlotter, HistoryWriter, Logger, Checkpoint
 )
-from yann.data.datasets import TinyDigits
+from yann.datasets import TinyDigits
+from yann.datasets.wrappers import Slice
 from yann.modules import Flatten
 from yann.train import Trainer
 
@@ -32,7 +33,7 @@ def test_train(tmpdir, device):
   train = Trainer(
     root=tmpdir,
     model=model,
-    dataset=TinyDigits(),
+    dataset=Slice(TinyDigits(), 0, 256),
     device=device,
     optimizer=SGD(model.parameters(), lr=.01, momentum=0.9, weight_decay=.001),
     loss=nn.CrossEntropyLoss(),
@@ -45,9 +46,9 @@ def test_train(tmpdir, device):
     ]
   )
 
-  train(10)
+  train(2)
 
-  assert train.checkpoints_root.is_dir()
+  assert train.paths.checkpoints.is_dir()
   assert train.history.metrics
 
   export_path = train.export()
@@ -56,18 +57,18 @@ def test_train(tmpdir, device):
   assert export_path.is_dir()
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize('device', devices)
-def test_train_resolved(tmpdir, device):
-  from yann.data.transform import ImageTransformer
-
-  train = Trainer(
-    root=tmpdir,
-    model='densenet121',
-    dataset='CIFAR10',
-    loss='CrossEntropy',
-    optimizer='SGD',
-    transform=ImageTransformer(resize=224)
-  )
-
-  train(1)
+# @pytest.mark.slow
+# @pytest.mark.parametrize('device', devices)
+# def test_train_resolved(tmpdir, device):
+#   from yann.data.transform import ImageTransformer
+#
+#   train = Trainer(
+#     root=tmpdir,
+#     model='densenet121',
+#     dataset='CIFAR10',
+#     loss='CrossEntropy',
+#     optimizer='SGD',
+#     transform=ImageTransformer(resize=224)
+#   )
+#
+#   # train(1)
