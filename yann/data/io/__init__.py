@@ -6,41 +6,57 @@ from collections import namedtuple
 import csv
 import gzip
 from pathlib import Path
-
+import torch
 
 
 class Loader:
   """
-
     gs://bucket/file.th
     ./foo/**/*.jpg
-
-    Args:
-      path:
-
-    Returns:
   """
-  def __call__(self, path, **kwargs):
+
+  def __call__(self, path, format=None, deserialize=None, filesystem=None, **kwargs):
     path = Path(path)
-    if hasattr(self, path.suffix):
-      return getattr(self, path.suffix)(**kwargs)
+    format = format or path.suffix[1:]
+    if hasattr(self, format):
+      return getattr(self, format)(str(path), **kwargs)
+    raise ValueError(f'File format not supported ({format})')
 
-  def csv(self):
-    pass
+  def th(self, path, **kwargs):
+    return torch.load(path, **kwargs)
 
-  def json(self):
-    pass
+  def json(self, path, **kwargs):
+    return load_json(path, **kwargs)
 
-  def jsonlines(self):
-    pass
+  def pickle(self, path, **kwargs):
+    return load_pickle(path, **kwargs)
+
+  pkl = pickle
 
 
 load = Loader()
 
 
 class Saver:
-  def __call__(self, x, path, **kwargs):
-    pass
+  def __call__(
+    self, x, path, format=None, serialize=None, filesystem=None, **kwargs
+  ):
+    path = Path(path)
+    format = format or path.suffix[1:]
+    if hasattr(self, format):
+      return getattr(self, format)(x, path, **kwargs)
+    raise ValueError(f'File format not supported ({format})')
+
+  def th(self, x, path, **kwargs):
+    return torch.save(x, path, **kwargs)
+
+  def json(self, x, path, **kwargs):
+    return save_json(x, path, **kwargs)
+
+  def pickle(self, x, path, **kwargs):
+    return save_pickle(x, path, **kwargs)
+
+  pkl = pickle
 
 
 save = Saver()
@@ -95,6 +111,12 @@ def untar(path):
     tar.extractall()
 
 
+def unzip(zip, dest):
+  import zipfile
+  with zipfile.ZipFile(zip, 'r') as f:
+      f.extractall(dest)
+
+
 def iter_csv(path, header=True, tuples=True, sep=',', quote='"', **kwargs):
   with open(path) as f:
     reader = csv.reader(f, delimiter=sep, quotechar=quote, **kwargs)
@@ -122,4 +144,3 @@ def write_csv(data, path, header=None):
       writer.writerow(header)
     for row in data:
       writer.writerow(row)
-
