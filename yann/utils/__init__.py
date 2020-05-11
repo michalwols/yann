@@ -1,8 +1,14 @@
-import numpy as np
 import re
+import sys
+
+import numpy as np
 import torch
 from PIL import Image
-import sys
+import datetime
+
+
+def timestr(d=None):
+  return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
 
 
 def camel_to_snake(text):
@@ -15,35 +21,35 @@ def abbreviate(text):
 
 
 def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
-    import argparse
-    from ..params import Field
-    parser = parser or argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
-    for k, v in x.items():
-        if isinstance(v, dict):
-            parser.add_argument(
-                f"-{abbreviate(k)}",
-                f"--{camel_to_snake(k)}",
-                default=v.get('default'),
-                type=v.get('type'),
-                action=v.get('action'),
-                help=v.get('help'),
-                required=v.get('required'),
-                choices=v.get('choices'),
-                dest=v.get('dest')
-            )
-        elif isinstance(v, Field):
-          parser.add_argument(
-            f"-{abbreviate(k)}",
-            f"--{camel_to_snake(k)}",
-            default=v.default,
-            type=v.type,
-            help=f"{v.help or k} (default: {v.default})",
-            required=v.required,
-            choices=getattr(v, 'choices', None),
-          )
-        else:
-            parser.add_argument(f"-{abbreviate(k)}", f"--{camel_to_snake(k)}", default=v, type=type(v))
-    return parser
+  import argparse
+  from ..params import Field
+  parser = parser or argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
+  for k, v in x.items():
+    if isinstance(v, dict):
+      parser.add_argument(
+        f"-{abbreviate(k)}",
+        f"--{camel_to_snake(k)}",
+        default=v.get('default'),
+        type=v.get('type'),
+        action=v.get('action'),
+        help=v.get('help'),
+        required=v.get('required'),
+        choices=v.get('choices'),
+        dest=v.get('dest')
+      )
+    elif isinstance(v, Field):
+      parser.add_argument(
+        f"-{abbreviate(k)}",
+        f"--{camel_to_snake(k)}",
+        default=v.default,
+        type=v.type,
+        help=f"{v.help or k} (default: {v.default})",
+        required=v.required,
+        choices=getattr(v, 'choices', None),
+      )
+    else:
+      parser.add_argument(f"-{abbreviate(k)}", f"--{camel_to_snake(k)}", default=v, type=type(v))
+  return parser
 
 
 def truthy(items):
@@ -133,3 +139,47 @@ class RangeMap(dict):
 
   def __call__(self, item):
     return self[item]
+
+
+def pretty_size(bytes):
+  num = bytes
+  for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+    if num < 1024.0:
+      return f'{num:3.1f} {unit}'
+    num /= 1024.0
+
+
+def print_tree(root, indent=2, depth=None, filter=None):
+  from pathlib import Path
+  from datetime import datetime
+  root = Path(root)
+  for path in sorted((root, *root.rglob('*'))):
+    d = len(path.relative_to(root).parts)
+    if depth and depth < d:
+      continue
+    if not path.is_dir() and filter and not path.match(filter):
+      continue
+    if path.is_dir():
+      print(f'{" " * (d * indent)} /{path.name}/')
+    else:
+      print(
+        f'{" " * (d * indent)}  - {path.name:25} '
+        f'{f"({pretty_size(path.stat().st_size)})":15} '
+        f'{datetime.fromtimestamp(path.stat().st_mtime)}'
+      )
+
+
+def fully_qulified_name(x):
+  module = x.__class__.__module__
+  if module is None or module == str.__class__.__module__:
+    return x.__class__.__name__
+  else:
+    return f'{module}.{x.__class__.__name__}'
+
+
+def hash_params(module):
+    from hashlib import sha1
+    s = sha1()
+    for p in module.parameters():
+      s.update(to_numpy(p).tobytes())
+    return s.hexdigest()
