@@ -2,6 +2,8 @@ import logging
 
 import datetime
 import pathlib
+import uuid
+
 import torch
 import torch.nn
 from torch.utils.data import DataLoader
@@ -10,17 +12,15 @@ import types
 from ..callbacks import get_callbacks
 from .. import callbacks as yann_callbacks
 from .. import resolve, evaluate, to, default, trainable
-from ..data import TransformDataset, get_dataset_name, Classes
+from ..data import get_dataset_name, Classes
+from ..datasets import TransformDataset
 from ..data.io import save_json
 from ..export import export
 from ..inference.predict import Classifier
 from ..train.base import BaseTrainer
 from ..utils.decorators import lazy
-from ..utils import counter
-
-
-def timestr(d=None):
-  return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
+from ..utils.ids import memorable_id
+from ..utils import counter, print_tree, timestr, hash_params
 
 
 def get_model_name(model):
@@ -38,9 +38,19 @@ class Paths:
   def __init__(self, root):
     self.root = pathlib.Path(root)
 
+    self.checkpoint_format = '{}{}'
+
+  def create(self):
+    self.root.mkdir(parents=True, exist_ok=True)
+
   @property
   def checkpoints(self):
-    return self.root / 'checkpoints'
+    path = self.root / 'checkpoints'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+  def checkpoint(self, **kwargs):
+    return self.checkpoints / self.checkpoint_format.format(**kwargs)
 
   @property
   def tensorboard(self):
@@ -59,16 +69,19 @@ class Paths:
     return self.root / 'plots'
 
   @property
-  def model_outputs(self):
-    return self.root / 'model_outputs'
+  def outputs(self):
+    return self.root / 'outputs'
 
   @property
-  def model_exports(self):
-    return self.root / 'model_exports'
+  def exports(self):
+    return self.root / 'exports'
 
   @property
   def summary(self):
     return self.root / 'summary.json'
+
+  def tree(self, **kwargs):
+    print_tree(self.root, **kwargs)
 
 
 class Trainer(BaseTrainer):
@@ -100,14 +113,17 @@ class Trainer(BaseTrainer):
       parallel=False,
       name=None,
       description=None,
-      root='./train-runs/',
+      root='./experiments/train-runs/',
       metrics=None,
       collate=None,
       params=None,
       pin_memory=True,
-      step=None
+      step=None,
+      id=None
   ):
     super().__init__()
+
+    self.id = id or memorable_id()
 
     self.params = params
 
@@ -204,10 +220,8 @@ class Trainer(BaseTrainer):
     )
     self.description = description
 
-    self.root = pathlib.Path(root) / self.name / timestr(self.time_created)
-    self.root.mkdir(parents=True, exist_ok=True)
-
-    self.paths = Paths(self.root)
+    self.paths = Paths(pathlib.Path(root)  / self.name / timestr(self.time_created))
+    self.paths.create()
 
     self.history = None
     has_history = False
@@ -242,6 +256,10 @@ class Trainer(BaseTrainer):
       self.device = torch.device(device) if isinstance(device, str) else device
       self.to(self.device)
 
+  @property
+  def root(self):
+    """for backwards compatibility, self.paths.root used to be on self.root"""
+    return self.paths.root
 
   def __setattr__(self, key, value):
     if key == 'optimizer':
@@ -312,6 +330,7 @@ class Trainer(BaseTrainer):
 
   def batches(self, device=None):
     device = device or self.device
+
     for batch in self.loader:
       if self.transform_batch:
         batch = self.transform_batch(*batch)
@@ -448,23 +467,12 @@ class Trainer(BaseTrainer):
       postprocess=None
     )
 
-  def get_checkpoint_name(self):
-    return (
-      f"{self.name}-steps_{self.num_steps}.th"
-    )
-
-  @property
-  def checkpoints_root(self):
-    root = self.root / 'checkpoints'
-    root.mkdir(parents=True, exist_ok=True)
-    return root
-
-  def checkpoint(self, root='./', name=None):
+  def checkpoint(self, name=None):
     state = self.state_dict()
-    path = str(self.checkpoints_root /
-               (f"{name}.th" if name else
-                f"{timestr()}-epoch-{self.num_epochs:03d}-"
-                f"steps-{self.num_steps:05d}.th"))
+    path = str(self.paths.checkpoints / (
+      f"{name}.th" if name else
+      f"{timestr()}-epoch-{self.num_epochs:03d}-steps-{self.num_steps:05d}.th"
+    ))
     torch.save(state, path)
     return path
 
@@ -474,7 +482,7 @@ class Trainer(BaseTrainer):
     self.load_state_dict(data, metadata=metadata)
 
   def export(self, path=None, trace=False, meta=None, postprocess=None):
-    path = path or self.root / 'exports' / timestr()
+    path = path or self.paths.exports / timestr()
     export(
       model=self.model,
       preprocess=self.val_transform,
@@ -484,7 +492,7 @@ class Trainer(BaseTrainer):
       path=path,
       meta=dict(
         name=self.name,
-        root=str(self.root),
+        root=str(self.paths.root),
         dataset=get_dataset_name(self.dataset),
         num_steps=self.num_steps,
         **(meta or {})
@@ -496,12 +504,14 @@ class Trainer(BaseTrainer):
   def state_dict(self):
     data = {
       'metadata': {
+        'id': self.id,
         'num_steps': self.num_steps,
         'num_samples': self.num_samples,
         'num_epochs': self.num_epochs,
         'batch_size': self.batch_size,
         'name': self.name,
-        'time_created': datetime.datetime.utcnow()
+        'time_created': self.time_created,
+        'param_hash': hash_params(self.model)
       }
     }
 
@@ -535,6 +545,7 @@ class Trainer(BaseTrainer):
 
   def summary(self):
     summary = {
+      'id': self.id,
       'name': self.name,
       'root': str(self.root),
       'num_steps': self.num_steps,
@@ -562,12 +573,12 @@ class Trainer(BaseTrainer):
     return summary
 
   def save_summary(self):
-    dest = self.root / 'summary.json'
-    save_json(self.summary(), dest)
-    return dest
+    save_json(self.summary(), self.paths.summary)
+    return self.paths.summary
 
   def __str__(self):
     return f"""
+id: {self.id}
 name: {self.name}
 root: {self.root}
 batch_size: {self.batch_size}
