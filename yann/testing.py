@@ -1,3 +1,12 @@
+"""
+
+
+
+TODO: snapshot testing
+TODO: acceptance criteria / validation against test set
+"""
+
+
 import torch
 from contextlib import contextmanager
 
@@ -6,37 +15,40 @@ from .exceptions import CheckFailure
 
 
 def check_tensor(
-    t: torch.Tensor,
-    device=None,
-    dtype=None,
-    requires_grad=None,
-    contiguous=None,
-    pinned=None,
-    share_memory=None,
-    not_share_memory=None,
-    shape=None,
-    same=None,
-    different=None,
-    anomalies=True,
-    equal=None,
-    close=None,
-    like=None,
-    lt=None,
-    gt=None,
-    lte=None,
-    gte=None,
-    none=False
+  t: torch.Tensor,
+  device=None,
+  dtype=None,
+  requires_grad=None,
+  contiguous=None,
+  pinned=None,
+  share_memory=None,
+  not_share_memory=None,
+  shape=None,
+  same=None,
+  different=None,
+  anomalies=True,
+  equal=None,
+  close=None,
+  like=None,
+  lt=None,
+  gt=None,
+  lte=None,
+  gte=None,
+  none=False
 ):
   if share_memory is not None:
     assert t.storage().data_ptr() == share_memory.storage().data_ptr()
   if not_share_memory is not None:
-    assert t.storage().data_ptr() != not_share_memory.storage().data_ptr()
+    assert t.storage().data_ptr() != not_share_memory.storage(
+    ).data_ptr()
   if different is not None:
     assert different is not t
   if same is not None:
     assert same is t
   if like is not None:
-    check_tensor(t, device=like.device, shape=like.shape, dtype=like.shape)
+    check_tensor(
+      t, device=like.device, shape=like.shape, dtype=like.shape
+    )
   if not none:
     assert t is not None
   if device:
@@ -69,7 +81,7 @@ def check_tensor(
   if lt is not None:
     assert (t < lt).all()
   if lte is not None:
-      assert (t <= lte).all(), lte
+    assert (t <= lte).all(), lte
   if gt is not None:
     assert (t > gt).all(), t > gte
   if gte is not None:
@@ -97,14 +109,19 @@ def newly_allocated_tensors(count=None, max=None):
   diff = len(new_tensors)
 
   if count is not None and count != diff:
-    raise CheckFailure(f'Expected {count} tensor allocations but got {diff}')
+    raise CheckFailure(
+      f'Expected {count} tensor allocations but got {diff}'
+    )
   if max is not None:
-    raise CheckFailure(f'Expected at most {count} tensor allocations but got {diff}')
+    raise CheckFailure(
+      f'Expected at most {count} tensor allocations but got {diff}'
+    )
 
 
 class Checker:
   def newly_allocated_tensors(self, count=None, max=None):
     return newly_allocated_tensors(count=count, max=max)
+
 
 # def profile(name=None, sync=True, max=None, track=False, log=True):
 #   """
@@ -128,7 +145,6 @@ class Checker:
 # with profile('forward pass', max=.3):
 #   pass
 
-
 # def assert_finite(x):
 #   pass
 #
@@ -140,3 +156,54 @@ class Checker:
 # def check_numerical_issues(function, shapes, types):
 #   pass
 
+
+def rand_image_tensor(
+  height,
+  width=None,
+  channels=3,
+  min=0,
+  max=1,
+  dtype=None,
+  device=None
+):
+  if width is None:
+    width = height
+  t = torch.rand(channels, height, width, dtype=dtype, device=device)
+  return (min - max) * t + max
+
+
+def rand_image_batch(
+  height,
+  width=None,
+  channels=3,
+  num=16,
+  min=0,
+  max=1,
+  dtype=None,
+  device=None
+):
+  if width is None:
+    width = height
+  t = torch.rand(
+    num, channels, height, width, dtype=dtype, device=device
+  )
+  return (min - max) * t + max
+
+
+def check_model(
+  model,
+  input=None,
+  output=None,
+  input_shape=None,
+  output_shape=None,
+  # loss=None,
+  device=None,
+  dtype=None
+):
+  device = device or model.device
+  input = input if input is not None else torch.rand(
+    input_shape, device=device, dtype=dtype
+  )
+
+  output = model(input)
+  check_tensor(output, shape=output_shape, equal=output)
