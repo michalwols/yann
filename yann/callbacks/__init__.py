@@ -5,7 +5,6 @@ from .history import History, HistoryPlotter, HistoryWriter
 from .logging import Logger
 from .stop import StopOnNaN
 from .timing import Timing
-from .tensorboard import Tensorboard
 
 def get_callbacks(
     interactive=True,
