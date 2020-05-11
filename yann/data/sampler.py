@@ -2,6 +2,7 @@ from torch.utils.data.sampler import Sampler
 import random
 from collections import defaultdict
 
+from . import batches
 
 class BalancedTargetSampler(Sampler):
   def __init__(self, dataset, targets=None, size=None):
@@ -32,3 +33,32 @@ class BalancedTargetSampler(Sampler):
 
   def __len__(self):
     return self.size or len(self.dataset)
+
+
+from torch.utils.data import Sampler
+
+
+class BatchShuffleSampler(Sampler):
+  """
+  Splits sorted data into `batch_size` chunks, then shuffles those chunks.
+
+  Useful when dataset is sorted by length and want each batch to have items
+  of around same length but want to randomize the batch order
+
+  ex:
+    list(BatchShuffleSampler(range(12), 3))
+    >> [9, 10, 11, 3, 4, 5, 6, 7, 8, 0, 1, 2]
+  """
+
+  def __init__(self, data, batch_size):
+    super().__init__(data)
+    self.data = data
+    self.batch_size = batch_size
+
+  def __len__(self):
+    return len(self.data)
+
+  def __iter__(self):
+    bs = list(batches(range(len(self)), size=self.batch_size))
+    random.shuffle(bs)
+    return (s for b in bs for s in b)
