@@ -30,3 +30,13 @@ def receptive_field(module: nn.Module, input_shape=(1, 1, 256, 256)):
   grad = input.grad.numpy()
   nonzero_indices = np.where(grad != 0)
   return tuple(x.max() - x.min() + 1 for x in nonzero_indices)
+
+
+def fill_dims(t, f=1):
+  if t.ndim == 0:
+    return
+  for n, x in enumerate(t):
+    t[n, ...] += n * f
+    fill_dims(t[n], f / 10)
+
+  return t
