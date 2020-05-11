@@ -194,5 +194,7 @@ class CombinedLoss(_Loss):
     return _reduce(loss, reduction=self.reduction, reduce=self.reduce)
 
 
+MultiTaskLoss = CombinedLoss
+
 # class MultiTaskLoss(_Loss):
 #   pass
