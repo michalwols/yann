@@ -72,9 +72,12 @@ def export(
   if predict:
     save_pickle(predict, path / 'predict.pkl')
 
-  subprocess.call(
-    ['conda', 'env', 'export', '-f', os.path.join(path, 'env.yml')]
-  )
+  try:
+    subprocess.call(
+      ['conda', 'env', 'export', '-f', os.path.join(path, 'env.yml')]
+    )
+  except:
+    pass # FIXME
 
   subprocess.call(
     ['pip', 'freeze'], stdout=open(os.path.join(path, 'requirements.txt'), 'w')
