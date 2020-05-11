@@ -3,7 +3,7 @@ import subprocess
 def run(command):
   out = subprocess.check_output(command, shell=True)
   if out:
-    return out.decode('utf-8')
+    return out.decode('utf-8').strip()
 
 
 def git_hash():
