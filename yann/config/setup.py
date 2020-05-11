@@ -21,7 +21,7 @@ registry.dataset.index(
       download=download)
 )
 
-from ..data.datasets import imagenette
+from ..datasets import imagenette
 registry.dataset.index(
   imagenette,
   types=(Dataset,),

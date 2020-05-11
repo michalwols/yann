@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
-from .datasets import TransformDataset
+from ..datasets import TransformDataset
 
 
 class TransformLoader(DataLoader):
