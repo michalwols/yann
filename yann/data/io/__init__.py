@@ -31,6 +31,18 @@ class Loader:
   def pickle(self, path, **kwargs):
     return load_pickle(path, **kwargs)
 
+  def parquet(self, path, **kwargs):
+    import pandas as pd
+    return pd.read_parquet(path, **kwargs)
+
+  def csv(self, path, **kwargs):
+    import pandas as pd
+    return pd.read_csv(path, **kwargs)
+
+  def tsv(self, path, **kwargs):
+    import pandas as pd
+    return pd.read_csv(path, **kwargs)
+
   pkl = pickle
 
 
