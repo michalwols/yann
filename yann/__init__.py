@@ -21,6 +21,7 @@ from .utils.timer import time
 from .utils.profile import profile
 
 from .testing import Checker
+from .data.loaders import loader
 
 # T = torch.Tensor
 #

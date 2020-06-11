@@ -52,7 +52,7 @@ class Sliceable(DatasetWrapper):
 
 
 class Slice(DatasetWrapper):
-  def __init__(self, dataset, start=0, end=None):
+  def __init__(self, dataset, start=None, end=None):
     super(Slice, self).__init__(dataset)
 
     self.start = start
@@ -67,8 +67,8 @@ class Slice(DatasetWrapper):
     return self.end - self.start
 
 
-class Subset(DatasetWrapper):
-  pass
+# class Subset(DatasetWrapper):
+#   pass
 
 class IndexedView(DatasetWrapper):
   def __init__(self, dataset, indices):
@@ -121,10 +121,10 @@ class LookupCache(DatasetWrapper):
 
 
 class TransformDataset(DatasetWrapper):
-  def __init__(self, dataset, transforms):
+  def __init__(self, dataset, transform):
     super().__init__(dataset)
-    self.transforms = transforms if isinstance(transforms, tuple) else (
-      transforms,)
+    self.transforms = transform if isinstance(transform, tuple) else (
+      transform,)
 
   def __getitem__(self, idx):
     return tuple(
