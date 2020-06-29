@@ -1,5 +1,12 @@
 import numpy as np
+from collections import Counter
 
+# from enum import Enum
+#
+# class Encoding(Enum):
+#   index = 'index'
+#   one_hot = 'one_hot'
+#   normalized_one_hot = 'normalized_one_hot'
 
 class TargetTransformer:
   def encode(self, x, many=True):
@@ -31,15 +38,23 @@ class Classes(TargetTransformer):
 
   def __init__(
       self,
-      names,
+      names=None,
       meta=None,
-      default_encoding='index'
+      counts=None,
+      default_encoding='index',
   ):
-    self.names = list(names)
+    if names:
+      self.names = list(names)
+    elif meta:
+      self.names = sorted(meta.keys())
+    elif counts:
+      self.names = sorted(counts.keys())
+    else:
+      raise ValueError('At least one of names, counts or meta must be defined')
     self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = meta
     
-    self.counts = None
+    self.counts = counts
 
     self.dtype = 'float32'
 
@@ -47,12 +62,33 @@ class Classes(TargetTransformer):
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
 
-  def weights(self):
-    raise NotImplementedError()
+  def weights(self, list=True):
+    if self.counts:
+      total = sum(self.counts.values())
+      if list:
+        return [total / self.counts[n] for n in self.names]
+      else:
+        return {n: total / c for n, c in self.counts.items()}
+    raise NotImplementedError(
+      'Weights can not be determined unless `counts` are set'
+    )
 
   @classmethod
-  def ordered(cls, num, meta=None, default_encoding='index'):
-    return Classes(range(num), meta=meta, default_encoding=default_encoding)
+  def from_labels(cls, labels, **kwargs):
+    counts = Counter()
+    for l in labels:
+      if isinstance(l, str):
+        counts[l] += 1
+      else:
+        counts.update(l)
+    return cls(
+      counts=counts,
+      **kwargs
+    )
+
+  @classmethod
+  def ordered(cls, num, **kwargs):
+    return Classes(range(num), **kwargs)
 
   def __repr__(self):
     c = min(len(self.names) // 2, 3)
