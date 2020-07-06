@@ -14,6 +14,7 @@ import numpy as np
 
 from .data import batches, shuffle, chunk
 from .data.io import load, save
+from .data.io.download import download
 from .data.utils import pad, pad_to_largest
 # from .data import datasets
 from .viz import show, plot
