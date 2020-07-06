@@ -106,7 +106,8 @@ class Classes(TargetTransformer):
     return {
       'names': self.names,
       'meta': self.meta,
-      'default_encoding': self.default_encoding
+      'default_encoding': self.default_encoding,
+      'counts': self.counts
     }
 
   def load_state_dict(self, data):
@@ -118,6 +119,7 @@ class Classes(TargetTransformer):
     self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = data['meta']
     self.default_encoding = data['default_encoding']
+    self.counts = data.get('counts')
 
   def __getitem__(self, idx):
     return self.names[idx]
