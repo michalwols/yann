@@ -4,13 +4,16 @@ __version__ = '0.0.38'
 
 import torch
 from torch import nn
+import numpy as np
 from .config.setup import registry
 
 register = registry
 resolve = registry.resolve
 
+from pathlib import Path
+
 from .utils import to_numpy, repeat, counter
-import numpy as np
+
 
 from .data import batches, shuffle, chunk
 from .data.io import load, save
@@ -69,6 +72,8 @@ from .data.loaders import loader
 
 
 class default:
+  root = Path('~/.yann/')
+
   device = torch.device('cuda') \
     if torch.cuda.is_available() else torch.device('cpu')
 
@@ -79,7 +84,7 @@ class default:
   callbacks = None
 
   train_root = None
-  datasets_root = None
+  datasets_root = root / 'datasets'
 
   checkpoint_name_format = ''
 
@@ -228,6 +233,8 @@ def freeze(x, exclude=None):
     for p in x:
       p.requires_grad = False
 
+  return x
+
 
 def freeze_non_batchnorm(x):
   """
@@ -266,14 +273,21 @@ def replace_linear(model, num_outputs, layer_name=None):
         f'provide a valid layer_name, '
         f'(valid names: {", ".join([n for n, m in linear_layers])})'
       )
-  if not hasattr(model, layer_name):
-    raise ValueError(f'Model does not have a linear layer named "{layer_name}"')
+
+
+  if '.' in layer_name:
+    *path, layer_name = list(layer_name.split('.'))
+    for p in path:
+      model = getattr(model, p)
+
+  old_linear = getattr(model, layer_name)
+  new_linear = nn.Linear(old_linear.in_features, num_outputs)
+  new_linear.to(old_linear.weight.device)
+
   setattr(
     model,
     layer_name,
-    nn.Linear(
-      getattr(model, layer_name).in_features,
-      num_outputs)
+    new_linear
   )
 
   return layer_name
@@ -290,6 +304,12 @@ def to_fp16(model):
       layer.float()
 
 
+def none_grad(model: nn.Module):
+  """
+  more efficient version of zero_grad()
+  """
+  for p in model.parameters():
+    p.grad = None
 
 
 @contextmanager
