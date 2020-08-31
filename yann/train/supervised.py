@@ -1,14 +1,19 @@
+from statistics import mean
+
 import logging
 
 import datetime
 import pathlib
 import uuid
-
+import math
 import torch
 import torch.nn
-from torch.utils.data import DataLoader
-from typing import Optional
+from torch.utils.data import DataLoader, Sampler
+from torch.optim.optimizer import Optimizer
+from typing import Optional, Callable
 import types
+
+from ..params import HyperParams
 from ..callbacks import get_callbacks
 from .. import callbacks as yann_callbacks
 from .. import resolve, evaluate, to, default, trainable
@@ -86,12 +91,21 @@ class Paths:
 
 class Trainer(BaseTrainer):
   model: torch.nn.Module
+  loss: Callable
+  optimizer: Optional[Optimizer]
+
   lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler]
   loader: DataLoader
+  classes: Optional[Classes]
+  sampler: Optional[Sampler]
+  params: Optional[HyperParams]
+  paths: Paths
+
+
 
   def __init__(
       self,
-      model,
+      model=None,
       dataset=None,
       optimizer=None,
       loss=None,
@@ -121,6 +135,40 @@ class Trainer(BaseTrainer):
       step=None,
       id=None
   ):
+    """
+
+    Args:
+      model: model to train
+      dataset:
+      optimizer:
+      loss:
+      loader:
+      sampler:
+      num_workers:
+      transform:
+      transform_batch: transform function that augments a batch of data
+      lr_scheduler:
+      lr_batch_step: if true will call optimizer.step() after each batch,
+        otherwise will call it at the end of each epoch
+      callbacks:
+      device:
+      parameters:
+      batch_size:
+      val_dataset:
+      val_loader:
+      val_transform:
+      classes:
+      parallel:
+      name:
+      description:
+      root:
+      metrics:
+      collate:
+      params:
+      pin_memory:
+      step:
+      id:
+    """
     super().__init__()
 
     self.id = id or memorable_id()
@@ -324,6 +372,9 @@ class Trainer(BaseTrainer):
     self.model.eval()
 
   def epochs(self, num=None):
+    """
+    Yields current epoch count and keeps internal epoch count
+    """
     for e in counter(start=self.num_epochs, end=self.num_epochs + num):
       yield e
       self.num_epochs += 1
@@ -443,7 +494,11 @@ class Trainer(BaseTrainer):
             else:
               self.lr_scheduler.step(epoch=self.num_epochs)
         elif self.lr_scheduler and not self.lr_batch_step:
-          self.lr_scheduler.step(epoch=self.num_epochs)
+          if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
+            loss = mean(self.history.metrics['loss'][-20:])
+            self.lr_scheduler.step(metrics=loss, epoch=self.num_epochs)
+          else:
+            self.lr_scheduler.step(epoch=self.num_epochs)
 
         self.on_epoch_end(epoch=self.num_epochs)
 
@@ -532,6 +587,7 @@ class Trainer(BaseTrainer):
     for k, v in data.items():
       if 'state_dict' in v and hasattr(self, k):
         getattr(self, k).load_state_dict(v['state_dict'])
+        logging.debug(f"loaded {k}")
       else:
         skipped.add(k)
 
@@ -628,6 +684,7 @@ samples: {self.num_samples}
   def __repr__(self):
     return (
       f"Trainer("
+      f"\n  id={self.id},"
       f"\n  name={self.name},"
       f"\n  root={self.root},"
       f"\n  batch_size={self.batch_size},"
