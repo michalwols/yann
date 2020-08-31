@@ -78,6 +78,8 @@ registry.lr_scheduler.index(
   lr_scheduler,
   types=(lr_scheduler._LRScheduler,)
 )
+# ReduceLROnPlateau subclasses object
+registry.lr_scheduler.register(lr_scheduler.ReduceLROnPlateau)
 
 # Models
 from torchvision import models

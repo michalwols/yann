@@ -126,20 +126,22 @@ class Resolver:
 
 
 class Registry:
-  def __init__(self, types=None, private=False):
+  def __init__(self, types=None, private=False, name=None):
     """
 
     Args:
       types: only allow given types as entries
       private: if true will not have it's entries exposed to higher level registries
     """
+    self.name = name
+
     self._records = OrderedDict()
-    self._subregistries = defaultdict(Registry)
+    self._subregistries = {}
 
     self.resolve = Resolver(self)
 
     self.types = types
-    self.is_private = False
+    self.is_private = private
 
   def register(self, x, name=None, init=None):
     if isinstance(x, str) and name is None and init is None:
@@ -173,7 +175,6 @@ class Registry:
       if not registry.is_private:
         yield registry
 
-
   def __contains__(self, name):
     if name in self._records:
       return True
@@ -191,15 +192,12 @@ class Registry:
   def __call__(self, x, name=None, init=None):
     return self.register(x, name, init)
 
-  def __setitem__(self, name, x):
-    if isinstance(x, Record):
-      self._records[name] = x
-    else:
-      self.register(x=x, name=name)
-
   def __getattr__(self, name: str) -> 'Registry':
     if name in self.__dict__:
       return self.__dict__[name]
+    # allow defining new registries on attribute lookup
+    if name not in self._subregistries:
+      self._subregistries[name] = Registry(name=name)
     return self._subregistries[name]
 
   def __setattr__(self, key, value):
@@ -207,6 +205,12 @@ class Registry:
       self._subregistries[key] = value
     else:
       self.__dict__[key] = value
+
+  def __setitem__(self, name, x):
+    if isinstance(x, Record):
+      self._records[name] = x
+    else:
+      self.register(x=x, name=name)
 
   def __getitem__(self, item) -> Record:
     if item in self._records:
@@ -307,18 +311,19 @@ class Registry:
         if isinstance(record.x, partial) or not hasattr(record.x, '__module__'):
           details = str(record.x)
         else:
-          details = f"{record.x.__module__}.{record.x.__name__}"
+          details = f"{record.x.__module__}.{record.x.__name__ if hasattr(record.x, '__name__') else record.x}"
         print(f"{' ' * (indent + 2) }- {name}\t\t({details})")
 
 
   def __str__(self):
-    parts = [
-      ''.join(f"  '{name}': {r.x.__name__}  ({r.init})\n"
-              for name, r in self._records.items())
-    ]
-
-    for name, c in self._subregistries.items():
-      parts.append(f"\n{name}:\n")
-      parts.append(str(c))
-
-    return ''.join(parts)
+    return f"<Registry '{self.name}' ({len(self)} entries)>"
+    # parts = [
+    #   ''.join(f"  '{name}': {r.x.__name__ if hasattr(r.x, '__name__') else r.x}  ({r.init})\n"
+    #           for name, r in self._records.items())
+    # ]
+    #
+    # for name, c in self._subregistries.items():
+    #   parts.append(f"\n{name}:\n")
+    #   parts.append(str(c))
+    #
+    # return ''.join(parts)
