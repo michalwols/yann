@@ -45,7 +45,7 @@ class History(Callback):
 
   def on_validation_end(self, loss=None, outputs=None, targets=None, trainer=None):
     self.val_metrics.update(
-      step=trainer.num_steps,
+      step=trainer.num_epochs,
       loss=loss,
       **evaluate_metrics(targets=targets, outputs=outputs, metrics=self.metric_funcs)
     )

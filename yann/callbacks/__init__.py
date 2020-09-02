@@ -5,6 +5,7 @@ from .history import History, HistoryPlotter, HistoryWriter
 from .logging import Logger
 from .stop import StopOnNaN
 from .timing import Timing
+from .progbar import ProgressBar
 
 def get_callbacks(
     interactive=True,
@@ -13,10 +14,12 @@ def get_callbacks(
     log=True,
     checkpoint=True,
     time=False,
+    progress=True
 ):
   return [
     x for x in (
       # History(),
+      progress and ProgressBar(notebook=interactive),
       plot and HistoryPlotter(save=not interactive),
       write and HistoryWriter(),
       checkpoint and Checkpoint(),
