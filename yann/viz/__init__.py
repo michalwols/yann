@@ -39,8 +39,8 @@ class Shower:
 
     return x
 
-  def images(self, images):
-    return show_images(images)
+  def images(self, *args, **kwargs):
+    return show_images(*args, **kwargs)
 
   def tensor(self, t, *args, **kwargs):
     from .html import tensor
