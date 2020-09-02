@@ -1,31 +1,29 @@
-from statistics import mean
-
-import logging
-
 import datetime
+import logging
 import pathlib
-import uuid
-import math
 import torch
 import torch.nn
-from torch.utils.data import DataLoader, Sampler
-from torch.optim.optimizer import Optimizer
-from typing import Optional, Callable
 import types
+from statistics import mean
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import Sampler
+from typing import Optional, Callable
 
-from ..params import HyperParams
-from ..callbacks import get_callbacks
+from yann.utils import fully_qualified_name
+from yann.data.loaders import DataLoader
 from .. import callbacks as yann_callbacks
 from .. import resolve, evaluate, to, default, trainable
+from ..callbacks import get_callbacks
 from ..data import get_dataset_name, Classes
-from ..datasets import TransformDataset
 from ..data.io import save_json
+from ..datasets import TransformDataset
 from ..export import export
 from ..inference.predict import Classifier
+from ..params import HyperParams
 from ..train.base import BaseTrainer
+from ..utils import counter, print_tree, timestr, hash_params
 from ..utils.decorators import lazy
 from ..utils.ids import memorable_id
-from ..utils import counter, print_tree, timestr, hash_params
 
 
 def get_model_name(model):
@@ -574,7 +572,7 @@ class Trainer(BaseTrainer):
       if hasattr(v, 'state_dict'):
         data[k] = {
           'state_dict': v.state_dict(),
-          'class': v.__class__.__name__
+          'class': fully_qualified_name(v)
         }
 
     return data
