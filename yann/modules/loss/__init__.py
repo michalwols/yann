@@ -3,7 +3,8 @@ import torch.nn.functional as F
 from torch.nn.modules.loss import _Loss, _WeightedLoss
 from torch import nn
 
-from ..data.classes import smooth as label_smoothing
+from yann.data.classes import smooth as label_smoothing
+
 
 def _reduce(x, reduce=True, reduction=None):
   if not reduce:
