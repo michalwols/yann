@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from . import batches
 
+
 class BalancedTargetSampler(Sampler):
   def __init__(self, dataset, targets=None, size=None):
     super().__init__(dataset)
@@ -17,12 +18,18 @@ class BalancedTargetSampler(Sampler):
 
     if targets:
       for n, ts in enumerate(targets):
-        for t in ts:
-          self.target_to_indices[t].append(n)
+        if isinstance(ts, (list, tuple)):
+          for t in ts:
+            self.target_to_indices[t].append(n)
+        else:
+          self.target_to_indices[ts].append(n)
     else:
       for n, (x, ts) in enumerate(dataset):
-        for t in ts:
-          self.target_to_indices[t].append(n)
+        if isinstance(ts, (list, tuple)):
+          for t in ts:
+            self.target_to_indices[t].append(n)
+        else:
+          self.target_to_indices[ts].append(n)
 
     self.targets = list(self.target_to_indices)
 

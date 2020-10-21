@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from collections import abc
+from typing import List
 
 
 class Container(abc.MutableMapping):
@@ -61,3 +62,4 @@ class Samples:
 
   def __iter__(self):
     return (*self.inputs, *self.targets)
+

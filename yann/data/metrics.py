@@ -88,6 +88,17 @@ class MetricStore:
       except:
         pass
 
+  def summary(self):
+    s = {}
+    for metric, values in self.values.items():
+      try:
+        s[f"{metric}_min"] = min(values)
+        s[f"{metric}_max"] = max(values)
+      except:
+        pass
+    return s
+
+
   def __repr__(self):
     return  f"MetricStore({', '.join(f'{k}=(min={min(v)}, max={max(v)})' for k,v in self.values.items())}, len={len(self)})"
 

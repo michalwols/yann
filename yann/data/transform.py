@@ -204,6 +204,18 @@ def cutout(img, percent=.3, value=0):
   return Image.fromarray(img) if pil_img else img
 
 
+def cutmix(inputs, targets, beta):
+  lam = np.random.beta(beta, beta)
+  rand_index = torch.randperm(inputs.size()[0]).cuda()
+  target_a = targets
+  target_b = targets[rand_index]
+  bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+  inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+  # adjust lambda to exactly match pixel ratio
+  lam = 1 - (
+        (bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+
+
 
 def get_imagenet_transformers(size=224, resize=256, fixres=False):
   train_transform = Transformer(
