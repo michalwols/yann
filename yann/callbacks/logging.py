@@ -39,8 +39,8 @@ class Logger(Callback):
 
       if self.batch_string:
         self.log(self.batch_string.format(
-          batch=batch, **({m: v[-1] for m, v in
-                           trainer.history.metrics.items()})))
+          batch=batch,
+          **({m: v[-1] for m, v in trainer.history.metrics.items()})))
       else:
         self.log(
           batch=f'{batch:>8}',

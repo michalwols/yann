@@ -14,8 +14,15 @@ def get_callbacks(
     log=True,
     checkpoint=True,
     time=False,
-    progress=True
+    progress=True,
+    tensorboard=True,
 ):
+
+  if tensorboard:
+    from .tensorboard import Tensorboard
+    tb = Tensorboard()
+  else:
+    tb = None
   return [
     x for x in (
       # History(),
@@ -24,5 +31,6 @@ def get_callbacks(
       write and HistoryWriter(),
       checkpoint and Checkpoint(),
       log and Logger(),
-      time and Timing()
+      time and Timing(),
+      tb
     ) if x]
