@@ -24,11 +24,20 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
   import argparse
   from ..params import Field
   parser = parser or argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
+
+  abbreviations = set()
+
   for k, v in x.items():
+    names = []
+    abbreviated = abbreviate(k)
+    if abbreviated not in abbreviations:
+      names.append(f"-{abbreviated}")
+      abbreviations.add(abbreviated)
+    names.append(f"--{camel_to_snake(k)}")
+
     if isinstance(v, dict):
       parser.add_argument(
-        f"-{abbreviate(k)}",
-        f"--{camel_to_snake(k)}",
+        *names,
         default=v.get('default'),
         type=v.get('type'),
         action=v.get('action'),
@@ -39,8 +48,7 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
       )
     elif isinstance(v, Field):
       parser.add_argument(
-        f"-{abbreviate(k)}",
-        f"--{camel_to_snake(k)}",
+        *names,
         default=v.default,
         type=v.type,
         help=f"{v.help or k} (default: {v.default})",
@@ -48,7 +56,7 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
         choices=getattr(v, 'choices', None),
       )
     else:
-      parser.add_argument(f"-{abbreviate(k)}", f"--{camel_to_snake(k)}", default=v, type=type(v))
+      parser.add_argument(*names, default=v, type=type(v))
   return parser
 
 
@@ -169,7 +177,7 @@ def print_tree(root, indent=2, depth=None, filter=None):
       )
 
 
-def fully_qulified_name(x):
+def fully_qualified_name(x):
   module = x.__class__.__module__
   if module is None or module == str.__class__.__module__:
     return x.__class__.__name__
