@@ -413,6 +413,15 @@ class Trainer(BaseTrainer):
       setattr(self, method, types.MethodType(function, self))
 
   def step(self, inputs, target):
+    """
+
+    Args:
+      inputs:
+      target:
+
+    Returns:
+
+    """
     if not self.model.training:
       self.model.train()
 
@@ -520,13 +529,13 @@ class Trainer(BaseTrainer):
       postprocess=None
     )
 
-  def checkpoint(self, name=None):
+  def checkpoint(self, name=None) -> pathlib.Path:
     state = self.state_dict()
-    path = str(self.paths.checkpoints / (
+    path = self.paths.checkpoints / (
       f"{name}.th" if name else
       f"{timestr()}-epoch-{self.num_epochs:03d}-steps-{self.num_steps:05d}.th"
-    ))
-    torch.save(state, path)
+    )
+    torch.save(state, str(path))
     return path
 
   def load_checkpoint(self, path, metadata=True):
