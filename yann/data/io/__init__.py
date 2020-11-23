@@ -43,6 +43,12 @@ class Loader:
     import pandas as pd
     return pd.read_csv(path, **kwargs)
 
+  def yaml(self, path, **kwargs):
+    import yaml
+    with open(path, 'r') as f:
+      return yaml.load(f)
+  
+  yml = yaml
   pkl = pickle
 
 
@@ -65,11 +71,17 @@ class Saver:
   def json(self, x, path, **kwargs):
     return save_json(x, path, **kwargs)
 
+  def yaml(self, x, path, **kwargs):
+    import yaml
+    with open(path, 'w') as f:
+      yaml.dump(x, f)
+
+
   def pickle(self, x, path, **kwargs):
     return save_pickle(x, path, **kwargs)
 
   pkl = pickle
-
+  yml = yaml
 
 save = Saver()
 

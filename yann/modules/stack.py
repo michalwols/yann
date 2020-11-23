@@ -68,8 +68,11 @@ class Stack(nn.Module):
       return list(self.children())[x]
 
   def __setitem__(self, x, value):
-    key = list(self._modules.keys())[x]
-    setattr(self, key, value)
+    if isinstance(x, int):
+      key = list(self._modules.keys())[x]
+      setattr(self, key, value)
+    else:
+      setattr(self, x, value)
 
   def upto(self, module):
     layers = list(self.children())

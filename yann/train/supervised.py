@@ -36,6 +36,17 @@ def get_model_name(model):
   return model.__class__.__name__
 
 
+class Events:
+  train_start = 'train_start'
+  train_end = 'train_end'
+  epoch_start = 'epoch_start'
+  epoch_end = 'epoch_end'
+  batch_start = 'batch_start'
+  batch_end = 'batch_end'
+  batch_error = 'batch_error'
+  error = 'error'
+
+
 class Paths:
   # TODO: add a way to display the directory tree
   def __init__(self, root):
@@ -98,7 +109,6 @@ class Trainer(BaseTrainer):
   sampler: Optional[Sampler]
   params: Optional[HyperParams]
   paths: Paths
-
 
 
   def __init__(
@@ -302,6 +312,10 @@ class Trainer(BaseTrainer):
       self.device = torch.device(device) if isinstance(device, str) else device
       self.to(self.device)
 
+  @classmethod
+  def from_params(cls, params, **kwargs):
+    return cls(**params, **kwargs, params=params)
+
   @property
   def root(self):
     """for backwards compatibility, self.paths.root used to be on self.root"""
@@ -333,10 +347,6 @@ class Trainer(BaseTrainer):
 
     logging.debug(f"setting '{key}' to {value}")
     super(Trainer, self).__setattr__(key, value)
-
-  # @classmethod
-  # def from_params(cls, params):
-  #   pass
 
   def to(self, device=None):
     self.device = device
@@ -413,18 +423,7 @@ class Trainer(BaseTrainer):
       setattr(self, method, types.MethodType(function, self))
 
   def step(self, inputs, target):
-    """
-
-    Args:
-      inputs:
-      target:
-
-    Returns:
-
-    """
-    if not self.model.training:
-      self.model.train()
-
+    self.train_mode()
     self.optimizer.zero_grad()
 
     outputs = self.model(inputs)
@@ -438,7 +437,7 @@ class Trainer(BaseTrainer):
     loader = loader or self.val_loader
     device = device or self.device
 
-    self.model.eval()
+    self.eval_mode()
 
     self.on_validation_start()
 
@@ -538,10 +537,10 @@ class Trainer(BaseTrainer):
     torch.save(state, str(path))
     return path
 
-  def load_checkpoint(self, path, metadata=True):
+  def load_checkpoint(self, path, metadata=True, map_location=None):
     # TODO: add 'latest', 'best' support
     data = torch.load(path)
-    self.load_state_dict(data, metadata=metadata)
+    self.load_state_dict(data, metadata=metadata, map_location=map_location)
 
   def export(self, path=None, trace=False, meta=None, postprocess=None):
     path = path or self.paths.exports / timestr()
@@ -586,14 +585,14 @@ class Trainer(BaseTrainer):
 
     return data
 
-  def load_state_dict(self, data, metadata=True):
+  def load_state_dict(self, data, metadata=True, map_location=None):
     """
     TODO: add a way to specify which parts should be loaded (ex: model only)
     """
     skipped = set()
     for k, v in data.items():
       if 'state_dict' in v and hasattr(self, k):
-        getattr(self, k).load_state_dict(v['state_dict'])
+        getattr(self, k).load_state_dict(v['state_dict'], map_location=map_location)
         logging.debug(f"loaded {k}")
       else:
         skipped.add(k)

@@ -109,22 +109,13 @@ class HyperParamsBase:
 
   @classmethod
   def load(cls, path):
-
-    if path.endswith(('yaml', 'yml')):
-      import yaml
-      with open(path, 'r') as f:
-        data = yaml.safe_load(f)
-        return cls(**data)
-    elif path.endswith('json'):
-      import json
-      data = json.load(path)
-      return cls(**data)
+    import yann
+    data = yann.load(path)
+    return cls(**data)
 
   def save(self, path):
-    from .data.io import save_json
-    save_json(dict(self), path)
-
-
+    import yann
+    yann.save(dict(self), path)
 
   def on_change(self, callback):
     self._change_callbacks.append(callback)
@@ -239,3 +230,13 @@ class MetaHyperParams(ABCMeta):
 
 class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
   pass
+
+
+def sample(params, fields=None):
+  pass
+
+
+def grid(params, fields=None):
+  pass
+
+

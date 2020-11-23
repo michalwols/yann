@@ -10,13 +10,19 @@ def residual(input, block, identity=None):
 
 
 class Residual(nn.Module):
-  def __init__(self, block, identity=None):
+  def __init__(self, block, identity=None, activation=None):
     super().__init__()
     self.block = block
     self.identity = identity
+    self.activation = activation
 
   def forward(self, input):
-    processed = self.block(input)
+    residual = self.block(input)
     if self.identity:
       input = self.identity(input)
-    return input + processed
+
+    input += residual
+    if self.activation:
+      return self.activation(input)
+    else:
+      return input
