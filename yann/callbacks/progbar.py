@@ -18,7 +18,10 @@ class ProgressBar(Callback):
 
   def on_epoch_start(self, epoch=None, trainer=None):
     if self.notebook:
-      from tqdm.notebook import tqdm
+      try:
+        from tqdm.notebook import tqdm
+      except:
+        from tqdm import tqdm
     else:
       from tqdm import tqdm
     self.bar = tqdm(
