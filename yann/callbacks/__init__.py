@@ -7,6 +7,15 @@ from .stop import StopOnNaN
 from .timing import Timing
 from .progbar import ProgressBar
 
+
+def _maybe_init(value, cls, **kwargs):
+  if value is None or value is False:
+    return None
+  if isinstance(value, dict):
+    return cls(**{**value, **kwargs})
+  return cls(**kwargs)
+
+
 def get_callbacks(
     interactive=True,
     plot=True,
@@ -20,17 +29,17 @@ def get_callbacks(
 
   if tensorboard:
     from .tensorboard import Tensorboard
-    tb = Tensorboard()
+    tb = _maybe_init(tensorboard, Tensorboard)
   else:
     tb = None
   return [
     x for x in (
       # History(),
-      progress and ProgressBar(notebook=interactive),
-      plot and HistoryPlotter(save=not interactive),
-      write and HistoryWriter(),
-      checkpoint and Checkpoint(),
-      log and Logger(),
-      time and Timing(),
+      _maybe_init(progress, ProgressBar, notebook=interactive),
+      _maybe_init(plot, HistoryPlotter, save=not interactive),
+      _maybe_init(write, HistoryWriter),
+      _maybe_init(checkpoint, Checkpoint),
+      _maybe_init(log, Logger),
+      _maybe_init(time, Timing),
       tb
     ) if x]

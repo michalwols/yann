@@ -37,7 +37,13 @@ from .utils import get_arg_parser
 
 
 class Field:
-  def __init__(self, help=None, type=None, required=False, default=None):
+  def __init__(
+    self,
+    help=None,
+    type=None,
+    required=False,
+    default=None,
+  ):
     self.help = help
     self.type = type
     self.required = required
@@ -83,7 +89,9 @@ class HyperParamsBase:
       if k in self.__fields__:
         setattr(self, k, v)
       else:
-        raise ValueError(f'Unknown parameter: {k}, should be one of {", ".join(self.__fields__)}')
+        raise ValueError(
+          f'Unknown parameter: {k}, should be one of {", ".join(self.__fields__)}'
+        )
 
   def validate(self):
     for k, f in self.__fields__.items():
@@ -95,7 +103,9 @@ class HyperParamsBase:
   @classmethod
   def from_command(cls, cmd=None, validate=False, **kwargs):
     parser = get_arg_parser(cls.__fields__, **kwargs)
-    parsed = parser.parse_args(cmd.split() if isinstance(cmd, str) else cmd)
+    parsed = parser.parse_args(
+      cmd.split() if isinstance(cmd, str) else cmd
+    )
     params = cls(**vars(parsed))
 
     if validate:
@@ -106,6 +116,10 @@ class HyperParamsBase:
   @classmethod
   def from_env(cls, prefix=''):
     raise NotImplementedError()
+
+  @classmethod
+  def from_constants(cls):
+    pass
 
   @classmethod
   def load(cls, path):
@@ -126,6 +140,9 @@ class HyperParamsBase:
         c(k, v)
     super.__setattr__(self, k, v)
 
+  def __iter__(self):
+    return iter(self.keys())
+
   def __getitem__(self, item):
     if isinstance(item, (tuple, list)):
       return tuple(getattr(self, k) for k in item)
@@ -133,6 +150,13 @@ class HyperParamsBase:
 
   def __setitem__(self, k, v):
     setattr(self, k, v)
+
+  def __len__(self):
+    return len(self.__fields__)
+
+  def __eq__(self, other):
+    return len(self) == len(other) and self.keys() == other.keys(
+    ) and all(self[k] == other[k] for k in self.keys())
 
   def fork(self, **args):
     return HyperParams(**{**self.items(), **args})
@@ -146,10 +170,13 @@ class HyperParamsBase:
 
   def __str__(self):
     return (
-        f'{self.__class__.__name__}(\n' +
-        ',\n'.join('  {}={}'.format(k, v) for k, v in self.items()) +
-        '\n)'
+      f'{self.__class__.__name__}(\n' +
+      ',\n'.join('  {}={}'.format(k, v) for k, v in self.items()) +
+      '\n)'
     )
+
+  def __contains__(self, key):
+    return key in self.__fields__
 
   def __len__(self):
     return len(self.keys())
@@ -172,8 +199,13 @@ class HyperParamsBase:
       scope[k.upper() if uppercase else k] = v
 
   @classmethod
-  def collect(cls, scope=None, types=(int, str, float, bool),
-              upper_only=True, lowercase=True):
+  def collect(
+    cls,
+    scope=None,
+    types=(int, str, float, bool),
+    upper_only=True,
+    lowercase=True
+  ):
     scope = globals() if scope is None else scope
 
     d = {}
@@ -196,19 +228,22 @@ class MetaHyperParams(ABCMeta):
     fields = OrderedDict()
 
     for base in reversed(bases):
-      if issubclass(base, HyperParamsBase) and base != HyperParamsBase:
+      if issubclass(
+        base, HyperParamsBase
+      ) and base != HyperParamsBase:
         fields.update(deepcopy(base.__fields__))
 
     existing_attributes = set(dir(HyperParamsBase)) | set(fields)
 
     new_attributes = {
-      k: v for (k, v) in namespace.items()
-      if k not in existing_attributes
-         and not k.startswith('_')
-         and not callable(v)
+      k: v
+      for (k, v) in namespace.items()
+      if k not in existing_attributes and not k.startswith('_') and
+      not callable(v)
     }
 
-    for name, annotation in namespace.get('__annotations__', {}).items():
+    for name, annotation in namespace.get('__annotations__',
+                                          {}).items():
       if name not in new_attributes:
         continue
       if isinstance(annotation, Field):
@@ -222,21 +257,16 @@ class MetaHyperParams(ABCMeta):
       else:
         fields[name] = Field(default=value, type=type(value))
 
-    return super().__new__(metaclass, class_name, bases, {
-      '__fields__': fields,
-      **namespace,
-    })
+    return super().__new__(
+      metaclass, class_name, bases, {
+        '__fields__': fields,
+        **namespace,
+      }
+    )
 
 
 class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
   pass
 
-
-def sample(params, fields=None):
-  pass
-
-
-def grid(params, fields=None):
-  pass
 
 

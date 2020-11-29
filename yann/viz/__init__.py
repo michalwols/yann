@@ -13,22 +13,22 @@ class Shower:
     if isinstance(x, (list, tuple)):
       if isinstance(x[0], str):
         if x[0].lower().endswith(('.jpg', '.jpeg', '.png')):
-          return self.images(x)
+          return self.images(x, **kwargs)
 
       try:
         from PIL import Image
         if isinstance(x[0], Image.Image):
-          return self.images(x)
+          return self.images(x, **kwargs)
       except:
         pass
     if isinstance(x, str):
       if x.lower().endswith(('.jpg', '.jpeg', '.png')):
-        return self.images(x)
+        return self.images(x, **kwargs)
 
     try:
       from PIL import Image
       if isinstance(x, Image.Image):
-        return self.images(x)
+        return self.images(x, **kwargs)
     except:
       pass
 

@@ -72,3 +72,13 @@ def test_train(tmpdir, device):
 #   )
 #
 #   # train(1)
+
+
+def test_transforms():
+
+  t = Trainer(
+    transform={
+      'mask': 'foo',
+      'label': 'foo'
+    }
+  )

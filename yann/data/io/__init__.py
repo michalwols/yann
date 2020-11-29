@@ -47,9 +47,11 @@ class Loader:
     import yaml
     with open(path, 'r') as f:
       return yaml.load(f)
-  
+
   yml = yaml
   pkl = pickle
+  pt = th
+  pth = th
 
 
 load = Loader()
@@ -82,6 +84,8 @@ class Saver:
 
   pkl = pickle
   yml = yaml
+  pt = th
+  pth = th
 
 save = Saver()
 
