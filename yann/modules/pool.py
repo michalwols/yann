@@ -1,6 +1,6 @@
 from torch.nn import functional as F
-
-
+import torch
+from torch import nn
 
 def mac(batch):
   """MAC Pooling"""
@@ -24,3 +24,14 @@ def generalized_mean(batch, p=3, eps=1e-8):
   ) ** (1 / p)
 
 gem = generalized_mean
+
+
+
+class GeM(nn.Module):
+  def __init__(self, p=3, eps=1e-8):
+    super(GeM, self).__init__()
+    self.p = nn.Parameter(torch.Tensor([p]))
+    self.eps = eps
+
+  def forward(self, x):
+    return gem(x, p=self.p, eps=self.eps)
