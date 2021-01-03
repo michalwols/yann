@@ -516,17 +516,8 @@ class Trainer(BaseTrainer):
   def __call__(self, *args, **kwargs):
     self.run(*args, **kwargs)
 
-  def stop(self):
-    self._stop = True
-
-  @lazy
-  def predict(self):
-    return Classifier(
-      model=self.model,
-      classes=self.classes,
-      preprocess=self.transform,
-      postprocess=None
-    )
+  def stop(self, val=True):
+    self._stop = val
 
   def checkpoint(self, name=None) -> pathlib.Path:
     state = self.state_dict()
