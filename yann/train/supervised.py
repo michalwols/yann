@@ -373,8 +373,12 @@ class Trainer(BaseTrainer):
 
       return decorated
 
-  def train_mode(self):
-    self.model.train()
+  @property
+  def training(self):
+    return self.model.training
+
+  def train_mode(self, mode=True):
+    self.model.train(mode=mode)
 
   def eval_mode(self):
     self.model.eval()
