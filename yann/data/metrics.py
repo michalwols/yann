@@ -1,5 +1,5 @@
 from time import time as get_time
-
+from statistics import mean
 
 def padded_insert(items, index, value, null_val=None):
   """
@@ -66,6 +66,9 @@ class MetricStore:
 
   def __contains__(self, item):
     return item in self.values
+
+  def running_mean(self, metric, window=20):
+    return mean(self[metric][-window:])
 
   def keys(self):
     return self.values.keys()
