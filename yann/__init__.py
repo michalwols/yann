@@ -365,3 +365,7 @@ def optim_step(optimizer, zero_grad=True):
 def to(*items, **kwargs):
   """call `.to()` on all items that have a `to()` method, skips ones that don't"""
   return tuple(x.to(**kwargs) if hasattr(x, 'to') else x for x in items)
+
+
+def get_device(module):
+  return next(module.parameters()).device
