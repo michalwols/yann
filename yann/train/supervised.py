@@ -18,11 +18,9 @@ from ..data import get_dataset_name, Classes
 from ..data.io import save_json
 from ..datasets import TransformDataset
 from ..export import export
-from ..inference.predict import Classifier
 from ..params import HyperParams
 from ..train.base import BaseTrainer
 from ..utils import counter, print_tree, timestr, hash_params
-from ..utils.decorators import lazy
 from ..utils.ids import memorable_id
 
 
@@ -199,6 +197,7 @@ class Trainer(BaseTrainer):
 
     if parameters == 'trainable' and self.model:
       parameters = trainable(self.model.parameters())
+
     self.optimizer = resolve.optimizer(
       optimizer,
       args=(parameters or self.model.parameters(),),
@@ -307,6 +306,8 @@ class Trainer(BaseTrainer):
 
     self.function_callback = None
 
+    self._use_callbacks = True
+
     device = default.device if device is None else device
     if device:
       self.device = torch.device(device) if isinstance(device, str) else device
@@ -399,9 +400,9 @@ class Trainer(BaseTrainer):
         batch = self.transform_batch(*batch)
 
       if device:
-        yield to(*batch, device=device)
+        yield self.num_steps, to(*batch, device=device)
       else:
-        yield batch
+        yield self.num_steps, batch
 
       self.num_steps += 1
       self.num_samples += len(batch[0])
@@ -426,96 +427,154 @@ class Trainer(BaseTrainer):
     else:
       setattr(self, method, types.MethodType(function, self))
 
-  def step(self, inputs, target):
-    self.train_mode()
-    self.optimizer.zero_grad()
+  def step(self, inputs=None, targets=None):
+    """
+    Single training step, including forward pass, backward and optimizer update
+    """
+    if not self.training:
+      self.train_mode()
 
-    outputs = self.model(inputs)
-    loss = self.loss(outputs, target)
-    loss.backward()
-    self.optimizer.step()
+    outputs, loss = self.forward(
+      inputs=inputs,
+      targets=targets
+    )
+
+    self.update(
+      loss=loss,
+      inputs=inputs,
+      targets=targets,
+      outputs=outputs
+    )
 
     return outputs, loss
+
+  def forward(self, inputs=None, targets=None):
+    outputs = self.model(inputs)
+    loss = self.loss(outputs, targets)
+    return outputs, loss
+
+  def update(self, loss=None, inputs=None, targets=None, outputs=None):
+    """
+    Handles resetting gradients, running backward pass and optimizer step
+    """
+    self.optimizer.zero_grad()
+    loss.backward()
+    self.optimizer.step()
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
     device = device or self.device
 
-    self.eval_mode()
+    if self.training:
+      self.eval_mode()
 
-    self.on_validation_start()
+    if self._use_callbacks:
+      self.on_validation_start()
 
-    ts, os = [], []
-    with torch.no_grad():
-      for inputs, targets, outputs in evaluate(self.model, loader, device):
-        self.on_validation_batch(inputs=inputs, targets=targets,
-                                 outputs=outputs)
-        ts.append(targets)
-        os.append(outputs)
+    ts, os, loss = [], [], None
+    if loader is not None:
+      with torch.no_grad():
+        for inputs, targets, outputs in evaluate(
+            model=self.model,
+            batches=loader,
+            device=device
+        ):
+          if self._use_callbacks:
+            self.on_validation_batch(
+              inputs=inputs,
+              targets=targets,
+              outputs=outputs
+            )
+          ts.append(targets)
+          os.append(outputs)
 
-      ts = torch.cat(ts)
-      os = torch.cat(os)
-      loss = self.loss(os, ts)
-    self.on_validation_end(targets=ts, outputs=os, loss=loss)
+        ts = torch.cat(ts)
+        os = torch.cat(os)
+
+        loss = self.loss(os, ts)
+
+    if self._use_callbacks:
+      self.on_validation_end(
+        targets=ts,
+        outputs=os,
+        loss=loss
+      )
+
     return loss
 
   def run(self, epochs=None):
     self._stop = False
-    try:
-      self.on_train_start()
 
-      for _ in self.epochs(num=epochs):
-        self.on_epoch_start(epoch=self.num_epochs)
-        for batch_idx, (inputs, targets) in enumerate(self.batches()):
-          self.on_batch_start(
-            batch=batch_idx,
-            inputs=inputs,
-            targets=targets
-          )
-          try:
-            outputs, loss = self.step(inputs, targets)
-          except KeyboardInterrupt as e:
-            self.stop()
-            break
-          except Exception as e:
-            self.on_batch_error(batch=batch_idx, error=e)
+    if self._use_callbacks:
+      try:
+        self.on_train_start()
+
+        for epoch_idx in self.epochs(num=epochs):
+          self.on_epoch_start(epoch=self.num_epochs)
+          for batch_idx, (inputs, targets) in self.batches():
+            self.on_batch_start(
+              batch=batch_idx,
+              inputs=inputs,
+              targets=targets
+            )
+            try:
+              outputs, loss = self.step(inputs=inputs, targets=targets)
+            except KeyboardInterrupt as e:
+              self.stop()
+              break
+            except Exception as e:
+              self.on_batch_error(batch=batch_idx, error=e)
+              if self._stop: break
+              raise e
+
+            self.on_batch_end(
+              batch=batch_idx,
+              inputs=inputs,
+              targets=targets,
+              outputs=outputs,
+              loss=loss
+            )
+
+            if self.lr_scheduler and self.lr_batch_step:
+              self._lr_scheduler_step(step=batch_idx)
+
             if self._stop: break
-            raise e
+          if self._stop: break
 
-          self.on_batch_end(
-            batch=batch_idx,
-            inputs=inputs,
-            targets=targets,
-            outputs=outputs,
-            loss=loss
-          )
+          val_loss = self.validate() if self.val_loader else None
+          if self.lr_scheduler and not self.lr_batch_step:
+            self._lr_scheduler_step(
+              step=epoch_idx,
+              metric=self.history.metrics.running_mean('loss')
+                if val_loss is None else val_loss,
+            )
+
+          self.on_epoch_end(epoch=epoch_idx)
+
+        self.on_train_end()
+      except Exception as e:
+        self.on_error(e)
+        raise e
+    else:
+      for epoch_idx in self.epochs(num=epochs):
+        for batch_idx, (inputs, targets) in self.batches():
+          outputs, loss = self.step(inputs=inputs, targets=targets)
 
           if self.lr_scheduler and self.lr_batch_step:
-            self.lr_scheduler.step(epoch=self.num_steps)
+            self.lr_scheduler.step(epoch=batch_idx)
 
-          if self._stop: break
-        if self._stop: break
+        val_loss = self.validate() if self.val_loader else None
+        self._lr_scheduler_step(
+          step=epoch_idx,
+          metric=self.history.metrics.running_mean('loss') if val_loss is None else val_loss
+        )
 
-        if self.val_loader:
-          val_loss = self.validate()
-          if self.lr_scheduler and not self.lr_batch_step:
-            if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
-             self.lr_scheduler.step(metrics=val_loss, epoch=self.num_epochs)
-            else:
-              self.lr_scheduler.step(epoch=self.num_epochs)
-        elif self.lr_scheduler and not self.lr_batch_step:
-          if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
-            loss = mean(self.history.metrics['loss'][-20:])
-            self.lr_scheduler.step(metrics=loss, epoch=self.num_epochs)
-          else:
-            self.lr_scheduler.step(epoch=self.num_epochs)
-
-        self.on_epoch_end(epoch=self.num_epochs)
-
-      self.on_train_end()
-    except Exception as e:
-      self.on_error(e)
-      raise e
+  def _lr_scheduler_step(self, step=None, metric=None):
+    if self.lr_scheduler:
+      if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
+        self.lr_scheduler.step(metrics=metric, epoch=step)
+      else:
+        self.lr_scheduler(epoch=step)
 
   def __call__(self, *args, **kwargs):
     self.run(*args, **kwargs)
