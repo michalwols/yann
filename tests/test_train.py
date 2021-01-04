@@ -11,7 +11,6 @@ from yann.datasets.wrappers import Slice
 from yann.modules import Flatten
 from yann.train import Trainer
 
-from torchvision.models.resnet import resnet18
 
 devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 
@@ -74,11 +73,11 @@ def test_train(tmpdir, device):
 #   # train(1)
 
 
-def test_transforms():
-
-  t = Trainer(
-    transform={
-      'mask': 'foo',
-      'label': 'foo'
-    }
-  )
+# def test_transforms():
+#
+#   t = Trainer(
+#     transform={
+#       'mask': 'foo',
+#       'label': 'foo'
+#     }
+#   )
