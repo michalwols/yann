@@ -16,11 +16,7 @@ class DatasetWrapper:
     # proxy attribute lookups to the wrapped dataset so the
     # wrappers can transparently wrap datasets without breaking
     # code that expects a plain dataset
-    if hasattr(self.dataset, item):
-      return getattr(self.dataset, item)
-    else:
-      raise AttributeError(f"unknown attribute: {item}")
-
+    return getattr(self.dataset, item)
 
 
 class IncludeIndex(DatasetWrapper):
