@@ -54,8 +54,7 @@ def loader(
     return data
   if isinstance(data, str):
     data = yann.resolve.dataset(data)
-  if isinstance(data, (Dataset, Iterable)):
-    if transform:
-      return TransformLoader(data, transform=transform, **kwargs)
-    else:
-      return DataLoader(data, **kwargs)
+  if transform:
+    return TransformLoader(data, transform=transform, **kwargs)
+  else:
+    return DataLoader(data, **kwargs)
