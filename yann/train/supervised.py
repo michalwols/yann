@@ -1,16 +1,16 @@
+import inspect
+
 import datetime
 import logging
 import pathlib
 import torch
 import torch.nn
 import types
-from statistics import mean
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import Sampler
+from torch.utils.data import Sampler, DataLoader
 from typing import Optional, Callable
 
 from yann.utils import fully_qualified_name
-from yann.data.loaders import DataLoader
 from .. import callbacks as yann_callbacks
 from .. import resolve, evaluate, to, default, trainable
 from ..callbacks import get_callbacks
@@ -109,6 +109,8 @@ class Trainer(BaseTrainer):
   paths: Paths
 
 
+  DataLoader = DataLoader
+
   def __init__(
       self,
       model=None,
@@ -117,6 +119,7 @@ class Trainer(BaseTrainer):
       loss=None,
       loader=None,
       sampler=None,
+      batch_sampler=None,
       num_workers=8,
       transform=None,
       transform_batch=None,
@@ -183,7 +186,7 @@ class Trainer(BaseTrainer):
 
     self.model = resolve.model(
       model,
-      required=True,
+      required=False,
       validate=callable
     )
     if parallel:
@@ -191,7 +194,7 @@ class Trainer(BaseTrainer):
 
     self.loss = resolve.loss(
       loss,
-      required=True,
+      required=False,
       validate=callable,
     )
 
@@ -201,13 +204,13 @@ class Trainer(BaseTrainer):
     self.optimizer = resolve.optimizer(
       optimizer,
       args=(parameters or self.model.parameters(),),
-      required=True,
+      required=False,
       validate=lambda x: hasattr(x, 'step')
     )
 
     self.dataset = resolve.dataset(
       dataset,
-      required=not loader,
+      required=False,
     )
 
     if classes:
@@ -228,15 +231,33 @@ class Trainer(BaseTrainer):
 
     self.batch_size = batch_size
 
-    self.loader = loader or DataLoader(
-      self.dataset,
-      batch_size=self.batch_size,
-      pin_memory=pin_memory,
-      shuffle=False if sampler else True,
-      sampler=sampler,
-      num_workers=num_workers,
-      **({'collate_fn': collate} if collate else {})
-    )
+    if loader is not None:
+      self.loader = loader
+    else:
+      if batch_sampler is not None:
+        loader_signature = inspect.signature(self.DataLoader)
+        if 'batch_sampler' not in loader_signature.parameters:
+          raise ValueError('batch_sampler provided but DataLoader does not support it, might need to upgrade pytorch to newer version')
+        self.loader = self.DataLoader(
+          self.dataset,
+          # batch_size=self.batch_size,
+          batch_sampler=batch_sampler,
+          pin_memory=pin_memory,
+          # shuffle=False if sampler else True,
+          # sampler=sampler,
+          num_workers=num_workers,
+          **({'collate_fn': collate} if collate else {})
+        )
+      else:
+        self.loader = self.DataLoader(
+          self.dataset,
+          batch_size=self.batch_size,
+          pin_memory=pin_memory,
+          shuffle=False if sampler else True,
+          sampler=sampler,
+          num_workers=num_workers,
+          **({'collate_fn': collate} if collate else {})
+        )
 
     self.val_dataset = resolve.dataset(
       val_dataset,
@@ -247,11 +268,11 @@ class Trainer(BaseTrainer):
     if self.val_transform:
       self.val_dataset = TransformDataset(self.val_dataset, self.val_transform)
 
-    self.val_loader = val_loader or (val_dataset and DataLoader(
+    self.val_loader = val_loader or (val_dataset and self.DataLoader(
       self.val_dataset,
       batch_size=batch_size,
       shuffle=False,
-      pin_memory=True,
+      pin_memory=pin_memory,
       num_workers=num_workers
     ))
 
