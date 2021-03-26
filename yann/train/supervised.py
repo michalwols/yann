@@ -595,7 +595,7 @@ class Trainer(BaseTrainer):
       if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
         self.lr_scheduler.step(metrics=metric, epoch=step)
       else:
-        self.lr_scheduler(epoch=step)
+        self.lr_scheduler.step(epoch=step)
 
   def __call__(self, *args, **kwargs):
     self.run(*args, **kwargs)
