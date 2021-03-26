@@ -18,7 +18,14 @@ def show_images(paths, labels=None, urls=None, w=400, h=400):
   from pathlib import Path
 
   if isinstance(paths, (str, Path)):
-    paths = [paths]
+    if '*' in paths:
+      from glob import glob
+      paths = glob(paths)
+    else:
+      paths = [paths]
+
+  if callable(labels):
+    labels = [labels(p) for p in paths]
 
   if isinstance(paths[0], (tuple, list)):
     items = paths

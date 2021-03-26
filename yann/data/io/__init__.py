@@ -48,6 +48,13 @@ class Loader:
     with open(path, 'r') as f:
       return yaml.load(f)
 
+  def image(self, path, **kwargs):
+    import PIL.Image
+    return PIL.Image.open(path)
+
+  png = image
+  jpeg = image
+  jpg = image
   yml = yaml
   pkl = pickle
   pt = th
