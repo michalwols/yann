@@ -8,6 +8,7 @@ import torch.nn
 import types
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
+from torch.cuda.amp import autocast, GradScaler
 from typing import Optional, Callable
 
 from yann.utils import fully_qualified_name
@@ -107,7 +108,7 @@ class Trainer(BaseTrainer):
   sampler: Optional[Sampler]
   params: Optional[HyperParams]
   paths: Paths
-
+  grad_scaler: Optional[GradScaler]
 
   DataLoader = DataLoader
 
@@ -134,6 +135,8 @@ class Trainer(BaseTrainer):
       val_transform=None,
       classes=None,
       parallel=False,
+      amp=False,
+      grad_scaler=None,
       name=None,
       description=None,
       root='./experiments/train-runs/',
@@ -230,6 +233,12 @@ class Trainer(BaseTrainer):
     self.transform_batch = transform_batch
 
     self.batch_size = batch_size
+
+    self.amp = amp
+    if grad_scaler is False:
+      self.grad_scaler = None
+    else:
+      self.grad_scaler = grad_scaler or (GradScaler() if self.amp else None)
 
     if loader is not None:
       self.loader = loader
@@ -470,8 +479,13 @@ class Trainer(BaseTrainer):
     return outputs, loss
 
   def forward(self, inputs=None, targets=None):
-    outputs = self.model(inputs)
-    loss = self.loss(outputs, targets)
+    if self.amp:
+      with autocast():
+        outputs = self.model(inputs)
+        loss = self.loss(outputs, targets)
+    else:
+      outputs = self.model(inputs)
+      loss = self.loss(outputs, targets)
     return outputs, loss
 
   def update(self, loss=None, inputs=None, targets=None, outputs=None):
@@ -479,8 +493,14 @@ class Trainer(BaseTrainer):
     Handles resetting gradients, running backward pass and optimizer step
     """
     self.optimizer.zero_grad()
-    loss.backward()
-    self.optimizer.step()
+
+    if self.grad_scaler:
+      self.grad_scaler.scale(loss).backward()
+      self.grad_scaler.step(self.optimizer)
+      self.grad_scaler.update()
+    else:
+      loss.backward()
+      self.optimizer.step()
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
