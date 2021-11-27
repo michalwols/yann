@@ -23,11 +23,14 @@ class Logger(Callback):
     else:
       print(*args, file=self.dest)
 
+  def __call__(self, *args, **kwargs):
+    self.log(*args, **kwargs)
+
   def on_train_start(self, trainer=None):
     self.log('Starting training\n', trainer)
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
-    if batch % self.batch_freq == 0:
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
+    if index % self.batch_freq == 0:
       if not self.logged_batch_shapes:
         try:
           self.log("\nBatch inputs shape:", tuple(inputs.size()),
@@ -39,11 +42,11 @@ class Logger(Callback):
 
       if self.batch_string:
         self.log(self.batch_string.format(
-          batch=batch,
+          batch=index,
           **({m: v[-1] for m, v in trainer.history.metrics.items()})))
       else:
         self.log(
-          batch=f'{batch:>8}',
+          batch=f'{index:>8}',
           **({m: f'{v[-1]:.4f}' for m, v in trainer.history.metrics.items()}))
 
   def on_epoch_start(self, epoch, trainer=None):

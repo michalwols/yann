@@ -16,7 +16,7 @@ class DatasetWrapper:
     # proxy attribute lookups to the wrapped dataset so the
     # wrappers can transparently wrap datasets without breaking
     # code that expects a plain dataset
-    return getattr(self.dataset, item)
+    return super().__getattr__(self.dataset, item)
 
 
 class IncludeIndex(DatasetWrapper):
@@ -136,19 +136,19 @@ class TransformDataset(DatasetWrapper):
       f'\n)')
 
 
-class Noisy(DatasetWrapper):
-  def __init__(self, dataset, p=0.1):
-    super().__init__(dataset)
-    self.p = p
-
-
-class Imbalanced(DatasetWrapper):
-  pass
-
-
-class SemiSupervised(DatasetWrapper):
-  """TODO: hide subset of labels"""
-  pass
+# class Noisy(DatasetWrapper):
+#   def __init__(self, dataset, p=0.1):
+#     super().__init__(dataset)
+#     self.p = p
+#
+#
+# class Imbalanced(DatasetWrapper):
+#   pass
+#
+#
+# class SemiSupervised(DatasetWrapper):
+#   """TODO: hide subset of labels"""
+#   pass
 
 
 class SwallowErrors(DatasetWrapper):

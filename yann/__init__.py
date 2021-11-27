@@ -12,20 +12,18 @@ resolve = registry.resolve
 
 from pathlib import Path
 
-from .utils import to_numpy, repeat, counter
+from yann.utils import to_numpy, repeat, counter
+from yann.data import batches, shuffle, chunk
+from yann.data.io import load, save
+from yann.data.io.download import download
+from yann.data.utils import pad, pad_to_largest
+# from yann.data import datasets
+from yann.viz import show, plot
+from yann.utils.timer import time
+from yann.utils.profile import profile
 
-
-from .data import batches, shuffle, chunk
-from .data.io import load, save
-from .data.io.download import download
-from .data.utils import pad, pad_to_largest
-# from .data import datasets
-from .viz import show, plot
-from .utils.timer import time
-from .utils.profile import profile
-
-from .testing import Checker
-from .data.loaders import loader
+from yann.testing import Checker
+from yann.data.loaders import loader
 
 # T = torch.Tensor
 #
@@ -127,13 +125,17 @@ def detect_anomalies(val=True):
   torch.autograd.set_detect_anomaly(val)
 
 
-def evaluate(model, batches, device=None):
+def evaluate(model, batches, device=None, transform=None):
+  model = yann.resolve.model(model, required=True)
+  if isinstance(batches, str):
+    batches = yann.loader(batches, transform=transform)
+
   for x, y in batches:
     if device:
       x, y = x.to(device), y.to(device)
 
     model.eval()
-    with torch.no_grad():
+    with torch.inference_mode():
       pred = model(x)
 
     yield x, y, pred
@@ -364,8 +366,36 @@ def optim_step(optimizer, zero_grad=True):
 
 def to(*items, **kwargs):
   """call `.to()` on all items that have a `to()` method, skips ones that don't"""
-  return tuple(x.to(**kwargs) if hasattr(x, 'to') else x for x in items)
+  return tuple(
+    x.to(**kwargs) if hasattr(x, 'to')
+    else x
+    for x in items
+  )
 
 
 def get_device(module):
   return next(module.parameters()).device
+
+
+def get_trainer(params=None, **kwargs):
+  from yann.train import Trainer
+  return Trainer(params=params, **kwargs)
+
+
+def get_model_name(model):
+  if isinstance(model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel)):
+    model = model.module
+
+  if hasattr(model, 'name'):
+    return model.name
+
+  return model.__class__.__name__
+
+
+
+
+
+
+
+import yann.train
+import yann.params

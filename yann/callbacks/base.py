@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+
 class Callback:
   def on_train_start(self, trainer=None):
     pass
@@ -7,10 +8,10 @@ class Callback:
   def on_epoch_start(self, epoch=None, trainer=None):
     pass
 
-  def on_batch_start(self, batch=None, inputs=None, targets=None, trainer=None):
+  def on_step_start(self, index=None, inputs=None, targets=None, trainer=None):
     pass
 
-  def on_batch_end(self, batch=None, inputs=None, targets=None, outputs=None, loss=None,
+  def on_step_end(self, index=None, inputs=None, targets=None, outputs=None, loss=None,
                    trainer=None):
     pass
 
@@ -30,7 +31,7 @@ class Callback:
   def on_train_end(self, trainer=None):
     pass
 
-  def on_batch_error(self, batch=None, error=None, trainer=None):
+  def on_step_error(self, index=None, error=None, trainer=None):
     pass
 
   def on_error(self, error=None, trainer=None):
@@ -41,8 +42,8 @@ class FunctionCallback(Callback):
   _valid_names = {
     'train_start',
     'epoch_start',
-    'batch_start',
-    'batch_end',
+    'step_start',
+    'step_end',
     'epoch_end',
     'validation_start',
     'validation_batch',
@@ -71,12 +72,12 @@ class FunctionCallback(Callback):
     for f in self.callbacks['epoch_start']:
       f(*args, **kwargs)
 
-  def on_batch_start(self, *args, **kwargs):
-    for f in self.callbacks['batch_start']:
+  def on_step_start(self, *args, **kwargs):
+    for f in self.callbacks['step_start']:
       f(*args, **kwargs)
 
-  def on_batch_end(self, *args, **kwargs):
-    for f in self.callbacks['batch_end']:
+  def on_step_end(self, *args, **kwargs):
+    for f in self.callbacks['step_end']:
       f(*args, **kwargs)
 
   def on_epoch_end(self, *args, **kwargs):
@@ -113,8 +114,8 @@ class TempCallback(Callback):
   def unregister(self):
     raise NotImplementedError()
 
-  def on_batch_end(self, batches, *args, **kwargs):
-    if self.steps and self.steps < batches:
+  def on_step_end(self, index, *args, **kwargs):
+    if self.steps and self.steps < index:
       self.unregister()
 
   def on_epoch_end(self, epoch=None, loss=None, metrics=None, trainer=None):

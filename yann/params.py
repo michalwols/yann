@@ -228,22 +228,19 @@ class MetaHyperParams(ABCMeta):
     fields = OrderedDict()
 
     for base in reversed(bases):
-      if issubclass(
-        base, HyperParamsBase
-      ) and base != HyperParamsBase:
+      if issubclass(base, HyperParamsBase) and base != HyperParamsBase:
         fields.update(deepcopy(base.__fields__))
 
-    existing_attributes = set(dir(HyperParamsBase)) | set(fields)
+    # existing_attributes = set(dir(HyperParamsBase)) | set(fields)
 
     new_attributes = {
       k: v
       for (k, v) in namespace.items()
-      if k not in existing_attributes and not k.startswith('_') and
+      if not k.startswith('_') and
       not callable(v)
     }
 
-    for name, annotation in namespace.get('__annotations__',
-                                          {}).items():
+    for name, annotation in namespace.get('__annotations__', {}).items():
       if name not in new_attributes:
         continue
       if isinstance(annotation, Field):
@@ -258,7 +255,10 @@ class MetaHyperParams(ABCMeta):
         fields[name] = Field(default=value, type=type(value))
 
     return super().__new__(
-      metaclass, class_name, bases, {
+      metaclass,
+      class_name,
+      bases,
+      {
         '__fields__': fields,
         **namespace,
       }

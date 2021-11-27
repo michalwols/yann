@@ -14,10 +14,10 @@ class Timing(Callback):
   def on_train_start(self, *args, **kwargs):
     self.start_time = time.time()
 
-  def on_batch_start(self, *args, **kwargs):
+  def on_step_start(self, *args, **kwargs):
     self.starts.append(time.time())
 
-  def on_batch_end(self, *args, **kwargs):
+  def on_step_end(self, *args, **kwargs):
     self.ends.append(time.time())
 
   @property

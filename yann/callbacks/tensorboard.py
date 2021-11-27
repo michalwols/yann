@@ -68,14 +68,14 @@ class Tensorboard(Callback):
       except ValueError as e:
         log.error(e)
 
-  def on_batch_start(self, inputs=None, **kwargs):
+  def on_step_start(self, inputs=None, **kwargs):
     if not self.logged_model_graph:
-      self.writer.add_graph(self.trainer.model, inputs)
+      self.writer.add_graph(self.sanitize_model(self.trainer.model), inputs)
       self.logged_model_graph = True
 
-  def on_batch_end(
+  def on_step_end(
     self,
-    batch=None,
+    index=None,
     inputs=None,
     targets=None,
     outputs=None,
@@ -89,3 +89,8 @@ class Tensorboard(Callback):
   def on_validation_end(self, targets=None, outputs=None, loss=None, trainer=None):
     for metric, values in trainer.history.val_metrics.items():
       self.writer.add_scalar(f'validation/{metric}', values[-1], global_step=len(values) - 1)
+
+  def sanitize_model(self, model):
+    if isinstance(model, nn.DataParallel):
+      return model.module
+    return model

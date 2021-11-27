@@ -35,9 +35,9 @@ class ProgressBar(Callback):
   ):
     self.bar.close()
 
-  def on_batch_end(
+  def on_step_end(
     self,
-    batch=None,
+    index=None,
     inputs=None,
     targets=None,
     outputs=None,

@@ -36,7 +36,7 @@ class History(Callback):
 
     self.trainer = None
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
     self.metrics.update(
       step=trainer.num_steps,
       loss=loss,
@@ -113,7 +113,7 @@ class HistoryPlotter(Callback):
       self.root = trainer.root
       self.history = self.history or trainer.history
 
-  def on_batch_end(self, *args, trainer=None, **kwargs):
+  def on_step_end(self, *args, trainer=None, **kwargs):
     if trainer.num_steps % self.freq == 0:
       self.plot(
         title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}'
@@ -169,8 +169,8 @@ class HistoryWriter(Callback):
   def on_train_start(self, trainer=None):
     self.prep_files(trainer.root if trainer else None)
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
-    if batch % self.write_freq:
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
+    if index % self.write_freq:
       return
 
     if self.header is None:
@@ -186,7 +186,7 @@ class HistoryWriter(Callback):
       + '\n'
     )
 
-    if batch % self.flush_freq == 0:
+    if index % self.flush_freq == 0:
       self.train_file.flush()
 
   def on_validation_end(self, targets=None, outputs=None, loss=None,

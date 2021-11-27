@@ -2,7 +2,7 @@ import torch
 
 def evaluate_metrics(targets=None, outputs=None, metrics=None):
   values = {}
-  with torch.no_grad():
+  with torch.inference_mode():
     for name, metric in metrics.items():
       values[name] = metric(targets, outputs)
   return values

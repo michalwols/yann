@@ -1,11 +1,11 @@
-from torch.utils.data import DataLoader as TorchLoader, RandomSampler, SequentialSampler, Dataset
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
 from typing import Union, Iterable, Optional, Callable
 
 from ..datasets import TransformDataset
 import yann
 
 
-class DataLoader(TorchLoader):
+class LoopedDataLoader(DataLoader):
   """
   Reuse the same iterator for multiple epochs to avoid startup penalty of
   initializing it each time
@@ -45,7 +45,7 @@ class TransformLoader(DataLoader):
 
 
 def loader(
-  data: Union[str, Iterable, Dataset, TorchLoader],
+  data: Union[str, Iterable, Dataset, DataLoader],
   transform: Optional[Callable] = None,
   **kwargs
 ):

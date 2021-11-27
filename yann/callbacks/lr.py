@@ -70,7 +70,7 @@ class SGDR(Callback):
   def update_lr(self, lr):
     set_param(self.optimizer, 'lr', lr)
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
     if self.cur_step >= self.cur_cycle_len:
       self.restart()
     else:
@@ -133,7 +133,7 @@ class LRRangeTest(Callback):
     if self.log_freq:
       print(self)
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
     self.losses.append(loss.item())
     self.avg_loss = exp_moving_avg(self.losses[-1], self.avg_loss,
                                    steps=len(self.losses))
@@ -190,7 +190,7 @@ class CyclicalLR(Callback):
   def on_train_start(self, trainer=None):
     set_param(trainer.optimizer, 'lr', self.cur_lr)
 
-  def on_batch_end(self, batch, inputs, targets, outputs, loss, trainer=None):
+  def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
     if self.cur_step % self.cycle_len // self.steps:
       self.cur_lr -= self.step
     else:

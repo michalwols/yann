@@ -2,113 +2,65 @@ import inspect
 
 import datetime
 import logging
-import pathlib
 import torch
 import torch.nn
 import types
+from pathlib import Path
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from typing import Optional, Callable
 
+import yann
+from yann import resolve, evaluate, to, default
 from yann.utils import fully_qualified_name
-from .. import callbacks as yann_callbacks
-from .. import resolve, evaluate, to, default, trainable
-from ..callbacks import get_callbacks
-from ..data import get_dataset_name, Classes
-from ..data.io import save_json
-from ..datasets import TransformDataset
-from ..export import export
-from ..params import HyperParams
-from ..train.base import BaseTrainer
-from ..utils import counter, print_tree, timestr, hash_params
-from ..utils.ids import memorable_id
-
-
-def get_model_name(model):
-  if isinstance(model, torch.nn.DataParallel):
-    model = model.module
-
-  if hasattr(model, 'name'):
-    return model.name
-
-  return model.__class__.__name__
-
-
-class Events:
-  train_start = 'train_start'
-  train_end = 'train_end'
-  epoch_start = 'epoch_start'
-  epoch_end = 'epoch_end'
-  batch_start = 'batch_start'
-  batch_end = 'batch_end'
-  batch_error = 'batch_error'
-  error = 'error'
-
-
-class Paths:
-  # TODO: add a way to display the directory tree
-  def __init__(self, root):
-    self.root = pathlib.Path(root)
-
-    self.checkpoint_format = '{}{}'
-
-  def create(self):
-    self.root.mkdir(parents=True, exist_ok=True)
-
-  @property
-  def checkpoints(self):
-    path = self.root / 'checkpoints'
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-  def checkpoint(self, **kwargs):
-    return self.checkpoints / self.checkpoint_format.format(**kwargs)
-
-  @property
-  def tensorboard(self):
-    return self.root / 'tensorboard'
-
-  @property
-  def logs(self):
-    return self.root / 'logs'
-
-  @property
-  def evals(self):
-    return self.root / 'evals'
-
-  @property
-  def plots(self):
-    return self.root / 'plots'
-
-  @property
-  def outputs(self):
-    return self.root / 'outputs'
-
-  @property
-  def exports(self):
-    return self.root / 'exports'
-
-  @property
-  def summary(self):
-    return self.root / 'summary.json'
-
-  def tree(self, **kwargs):
-    print_tree(self.root, **kwargs)
+from yann.params import HyperParams
+from yann.callbacks import get_callbacks, Logger
+from yann.callbacks.callbacks import Callbacks
+from yann.data import get_dataset_name, Classes
+from yann.data.io import save_json
+from yann.datasets import TransformDataset
+from yann.distributed import Dist
+from yann.export import export
+from yann.train.base import BaseTrainer
+from yann.train.paths import Paths
+from yann.utils import counter, timestr, hash_params
+from yann.utils.ids import memorable_id
 
 
 class Trainer(BaseTrainer):
-  model: torch.nn.Module
-  loss: Callable
-  optimizer: Optional[Optimizer]
+  """
+  def train():
+    for epoch in self.epochs:
+      for batch in self.batches:
+        self.step(batch)
+      self.validate()
 
-  lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler]
-  loader: DataLoader
-  classes: Optional[Classes]
-  sampler: Optional[Sampler]
-  params: Optional[HyperParams]
-  paths: Paths
-  grad_scaler: Optional[GradScaler]
+  def step():
+    self.forward()
+    self.update()
+
+  """
+  params: Optional[HyperParams] = None
+  model: Optional[torch.nn.Module] = None
+  loss: Optional[Callable] = None
+
+  optimizer: Optional[Optimizer] = None
+  lr_scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None
+  clip_grad: Optional = None
+
+  loader: Optional[DataLoader] = None
+  classes: Optional[Classes] = None
+  sampler: Optional[Sampler] = None
+
+  paths: Paths = None
+  callbacks: Optional[Callbacks] = None
+  log: Optional[Logger] = None
+
+  # automatic mixed precision
+  grad_scaler: Optional[GradScaler] = None
+
+  history = None
 
   DataLoader = DataLoader
 
@@ -134,7 +86,7 @@ class Trainer(BaseTrainer):
       val_loader=None,
       val_transform=None,
       classes=None,
-      parallel=False,
+      parallel=None,
       amp=False,
       grad_scaler=None,
       name=None,
@@ -145,76 +97,133 @@ class Trainer(BaseTrainer):
       params=None,
       pin_memory=True,
       step=None,
-      id=None
+      id=None,
+      dist=None,
+      benchmark=True,
+      jit='script',
   ):
-    """
-
-    Args:
-      model: model to train
-      dataset:
-      optimizer:
-      loss:
-      loader:
-      sampler:
-      num_workers:
-      transform:
-      transform_batch: transform function that augments a batch of data
-      lr_scheduler:
-      lr_batch_step: if true will call optimizer.step() after each batch,
-        otherwise will call it at the end of each epoch
-      callbacks:
-      device:
-      parameters:
-      batch_size:
-      val_dataset:
-      val_loader:
-      val_transform:
-      classes:
-      parallel:
-      name:
-      description:
-      root:
-      metrics:
-      collate:
-      params:
-      pin_memory:
-      step:
-      id:
-    """
     super().__init__()
-
     self.id = id or memorable_id()
-
     self.params = params
 
-    self.model = resolve.model(
-      model,
-      required=False,
-      validate=callable
-    )
-    if parallel:
-      self.model = torch.nn.DataParallel(self.model)
+    self.num_samples = 0
+    self.num_steps = 0
+    self.num_epochs = 0
 
-    self.loss = resolve.loss(
-      loss,
-      required=False,
-      validate=callable,
+    self.time_created = datetime.datetime.utcnow()
+
+    if benchmark:
+      yann.benchmark()
+
+    self.dist = dist or Dist()
+    self.dist.initialize()
+    if self.dist.is_enabled:
+      device = device or self.dist.device
+
+    device = default.device if device is None else device
+    self.device = torch.device(device) if isinstance(device, str) else device
+
+    self.model = resolve.model(model, required=False, validate=callable)
+
+    if jit:
+      self.model = torch.jit.script(self.model)
+    self.loss = resolve.loss(loss, required=False, validate=callable)
+
+    self.parallel = parallel
+    self._init_parallel(parallel)
+
+    self._init_optim(
+      parameters=parameters,
+      optimizer=optimizer,
+      lr_scheduler=lr_scheduler,
+      lr_batch_step=lr_batch_step
     )
 
-    if parameters == 'trainable' and self.model:
-      parameters = trainable(self.model.parameters())
+    self._init_data_loaders(
+      dataset=dataset,
+      classes=classes,
+      transform=transform,
+      transform_batch=transform_batch,
+      batch_size=batch_size,
+      sampler=sampler,
+      batch_sampler=batch_sampler,
 
-    self.optimizer = resolve.optimizer(
-      optimizer,
-      args=(parameters or self.model.parameters(),),
-      required=False,
-      validate=lambda x: hasattr(x, 'step')
+      loader=loader,
+      pin_memory=pin_memory,
+      num_workers=num_workers,
+      collate=collate,
+
+      val_dataset=val_dataset,
+      val_transform=val_transform,
+      val_loader=val_loader,
     )
 
-    self.dataset = resolve.dataset(
-      dataset,
-      required=False,
+    self._init_amp(amp=amp, grad_scaler=grad_scaler)
+    self._init_callbacks(callbacks=callbacks, metrics=metrics)
+
+    if step is not None:
+      self.override(self.step, step)
+
+    self.to(self.device)
+
+    self.name = name or (
+      f"{get_dataset_name(self.loader)}-{yann.get_model_name(self.model)}"
     )
+    self.description = description
+
+    self.paths = Paths(Path(root) / self.name / timestr(self.time_created))
+    self.paths.create()
+
+  def _init_callbacks(self, callbacks, metrics):
+    if not self.dist.is_main:
+      # NOTE: disable most callbacks if not on main
+      self.history = yann.callbacks.History(*(metrics or ()))
+      self.callbacks = Callbacks(self.history)
+      return
+
+    self.callbacks = Callbacks(get_callbacks() if callbacks is True else callbacks)
+
+    if 'history' not in self.callbacks:
+      metrics = (metrics,) if isinstance(metrics, str) else metrics
+      self.callbacks.history = yann.callbacks.History(*(metrics or ()))
+
+    self.history = self.callbacks.history
+    self.callbacks.move_to_start('history')
+
+  def _init_parallel(self, parallel):
+    if self.model is not None:
+      if parallel == 'dp':
+        if not isinstance(self.model, torch.nn.parallel.DataParallel):
+          self.model = torch.nn.DataParallel(self.model)
+      elif parallel == 'ddp' or parallel is None and self.dist.is_enabled:
+        if not isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
+          self.model.to(self.device)
+          self.model = torch.nn.parallel.DistributedDataParallel(
+            self.model,
+            device_ids=[self.dist.local_rank],
+            output_device=self.dist.local_rank,
+          )
+
+  def _init_data_loaders(
+      self,
+      dataset=None,
+      loader=None,
+      transform=None,
+      classes=None,
+      transform_batch=None,
+      sampler=None,
+      batch_sampler=None,
+      batch_size=None,
+      pin_memory=None,
+      collate=None,
+      num_workers=None,
+      prefetch_factor=2,
+      persistent_workers=True,
+      val_dataset=None,
+      val_transform=None,
+      val_loader=None,
+  ):
+    self.dataset = resolve.dataset(dataset, required=False)
 
     if classes:
       self.classes = (
@@ -231,40 +240,38 @@ class Trainer(BaseTrainer):
     self.transform = transform
 
     self.transform_batch = transform_batch
-
     self.batch_size = batch_size
 
-    self.amp = amp
-    if grad_scaler is False:
-      self.grad_scaler = None
-    else:
-      self.grad_scaler = grad_scaler or (GradScaler() if self.amp else None)
+    if not sampler and self.dist.is_enabled:
+      sampler = torch.utils.data.distributed.DistributedSampler(self.dataset)
 
     if loader is not None:
       self.loader = loader
-    else:
+    elif self.dataset is not None:
       if batch_sampler is not None:
         loader_signature = inspect.signature(self.DataLoader)
         if 'batch_sampler' not in loader_signature.parameters:
-          raise ValueError('batch_sampler provided but DataLoader does not support it, might need to upgrade pytorch to newer version')
+          raise ValueError(
+            'batch_sampler provided but DataLoader does not support it, might need to upgrade pytorch to newer version')
         self.loader = self.DataLoader(
-          self.dataset,
-          # batch_size=self.batch_size,
+          dataset=self.dataset,
           batch_sampler=batch_sampler,
           pin_memory=pin_memory,
-          # shuffle=False if sampler else True,
-          # sampler=sampler,
           num_workers=num_workers,
+          persistent_workers=persistent_workers,
+          prefetch_factor=prefetch_factor,
           **({'collate_fn': collate} if collate else {})
         )
       else:
         self.loader = self.DataLoader(
-          self.dataset,
+          dataset=self.dataset,
           batch_size=self.batch_size,
           pin_memory=pin_memory,
           shuffle=False if sampler else True,
           sampler=sampler,
           num_workers=num_workers,
+          persistent_workers=persistent_workers,
+          prefetch_factor=prefetch_factor,
           **({'collate_fn': collate} if collate else {})
         )
 
@@ -285,63 +292,39 @@ class Trainer(BaseTrainer):
       num_workers=num_workers
     ))
 
+  def _init_optim(
+      self,
+      parameters='trainable',
+      optimizer=None,
+      lr_scheduler=None,
+      lr_batch_step=None,
+      clip_grad=None
+  ):
+    if parameters == 'trainable' and self.model:
+      parameters = yann.trainable(self.model.parameters())
+
+    self.optimizer = resolve.optimizer(
+      optimizer,
+      args=(parameters or self.model.parameters(),),
+      required=False,
+      validate=lambda x: hasattr(x, 'step')
+    )
+
     self.lr_scheduler = resolve.lr_scheduler(
       lr_scheduler,
       kwargs=dict(optimizer=self.optimizer)
     )
     self.lr_batch_step = lr_batch_step
+    self.clip_grad = clip_grad
 
-    if step is not None:
-      self.override(self.step, step)
+  def _init_amp(self, amp, grad_scaler):
+    self.amp = amp
+    if grad_scaler is False:
+      self.grad_scaler = None
+    else:
+      self.grad_scaler = grad_scaler or (GradScaler() if self.amp else None)
 
-    self.num_samples = 0
-    self.num_steps = 0
-    self.num_epochs = 0
-
-    self.time_created = datetime.datetime.utcnow()
-
-    self.name = name or (
-      f"{get_dataset_name(self.loader)}-{get_model_name(self.model)}"
-    )
-    self.description = description
-
-    self.paths = Paths(pathlib.Path(root)  / self.name / timestr(self.time_created))
-    self.paths.create()
-
-    self.history = None
-    has_history = False
-    if callbacks:
-      if callbacks is True:
-        # if callbacks=True use the default set of callbacks
-        callbacks = get_callbacks()
-      for c in callbacks:
-        if isinstance(c, yann_callbacks.History):
-          self.history = c
-          has_history = True
-          break
-    metrics = (metrics,) if isinstance(metrics, str) else metrics
-    self.history = self.history or yann_callbacks.History(*(metrics or ()))
-
-    self.callbacks = callbacks or [
-      yann_callbacks.Logger()
-    ]
-
-    if not has_history:
-      self.callbacks.append(self.history)
-
-    # make sure history callback is called first
-    self.callbacks = sorted(
-      self.callbacks,
-      key=lambda x: 0 if x is self.history else 1)
-
-    self.function_callback = None
-
-    self._use_callbacks = True
-
-    device = default.device if device is None else device
-    if device:
-      self.device = torch.device(device) if isinstance(device, str) else device
-      self.to(self.device)
+    self.clip_grad = None
 
   @classmethod
   def from_params(cls, params, **kwargs):
@@ -390,19 +373,9 @@ class Trainer(BaseTrainer):
     )
 
   def on(self, event, callback=None):
-    if not self.function_callback:
-      self.function_callback = yann_callbacks.FunctionCallback()
-      self.callbacks.append(self.function_callback)
-
-    if callback:
-      self.function_callback.on(event, callback)
-      return self
-    else:
-      def decorated(func):
-        self.function_callback.on(event, func)
-        return func
-
-      return decorated
+    if self.callbacks is not None:
+      return self.callbacks.on(event, callback)
+    logging.warning('.on() callback registration ignored because callbacks are not defined')
 
   @property
   def training(self):
@@ -430,12 +403,9 @@ class Trainer(BaseTrainer):
         batch = self.transform_batch(*batch)
 
       if device:
-        yield self.num_steps, to(*batch, device=device)
+        yield to(*batch, device=device)
       else:
-        yield self.num_steps, batch
-
-      self.num_steps += 1
-      self.num_samples += len(batch[0])
+        yield batch
 
   def override(self, method, function=False):
     """
@@ -479,11 +449,7 @@ class Trainer(BaseTrainer):
     return outputs, loss
 
   def forward(self, inputs=None, targets=None):
-    if self.amp:
-      with autocast():
-        outputs = self.model(inputs)
-        loss = self.loss(outputs, targets)
-    else:
+    with autocast(enabled=self.amp):
       outputs = self.model(inputs)
       loss = self.loss(outputs, targets)
     return outputs, loss
@@ -497,9 +463,17 @@ class Trainer(BaseTrainer):
     if self.grad_scaler:
       self.grad_scaler.scale(loss).backward()
       self.grad_scaler.step(self.optimizer)
+
+      if self.clip_grad:
+        self.grad_scaler._unscale(self.optimizer)
+        self.clip_grad(self.model.parameters())
       self.grad_scaler.update()
     else:
       loss.backward()
+
+      if self.clip_grad:
+        self.clip_grad(self.model.parameters())
+
       self.optimizer.step()
 
   def validate(self, loader=None, device=None):
@@ -509,22 +483,23 @@ class Trainer(BaseTrainer):
     if self.training:
       self.eval_mode()
 
-    if self._use_callbacks:
-      self.on_validation_start()
+    if self.callbacks:
+      self.callbacks.on_validation_start(trainer=self)
 
     ts, os, loss = [], [], None
     if loader is not None:
-      with torch.no_grad():
+      with torch.inference_mode():
         for inputs, targets, outputs in evaluate(
             model=self.model,
             batches=loader,
             device=device
         ):
-          if self._use_callbacks:
-            self.on_validation_batch(
+          if self.callbacks:
+            self.callbacks.on_validation_batch(
               inputs=inputs,
               targets=targets,
-              outputs=outputs
+              outputs=outputs,
+              trainer=self
             )
           ts.append(targets)
           os.append(outputs)
@@ -534,11 +509,12 @@ class Trainer(BaseTrainer):
 
         loss = self.loss(os, ts)
 
-    if self._use_callbacks:
-      self.on_validation_end(
+    if self.callbacks:
+      self.callbacks.on_validation_end(
         targets=ts,
         outputs=os,
-        loss=loss
+        loss=loss,
+        trainer=self
       )
 
     return loss
@@ -546,17 +522,21 @@ class Trainer(BaseTrainer):
   def run(self, epochs=None):
     self._stop = False
 
-    if self._use_callbacks:
+    if self.callbacks:
       try:
-        self.on_train_start()
+        self.callbacks.on_train_start(trainer=self)
 
         for epoch_idx in self.epochs(num=epochs):
-          self.on_epoch_start(epoch=self.num_epochs)
-          for batch_idx, (inputs, targets) in self.batches():
-            self.on_batch_start(
-              batch=batch_idx,
+          self.callbacks.on_epoch_start(
+            epoch=self.num_epochs,
+            trainer=self
+          )
+          for inputs, targets in self.batches():
+            self.callbacks.on_step_start(
+              index=self.num_steps,
               inputs=inputs,
-              targets=targets
+              targets=targets,
+              trainer=self
             )
             try:
               outputs, loss = self.step(inputs=inputs, targets=targets)
@@ -564,20 +544,28 @@ class Trainer(BaseTrainer):
               self.stop()
               break
             except Exception as e:
-              self.on_batch_error(batch=batch_idx, error=e)
+              self.callbacks.on_step_error(
+                index=self.num_steps,
+                error=e,
+                trainer=self
+              )
               if self._stop: break
               raise e
 
-            self.on_batch_end(
-              batch=batch_idx,
+            self.callbacks.on_step_end(
+              index=self.num_steps,
               inputs=inputs,
               targets=targets,
               outputs=outputs,
-              loss=loss
+              loss=loss,
+              trainer=self
             )
 
             if self.lr_scheduler and self.lr_batch_step:
-              self._lr_scheduler_step(step=batch_idx)
+              self._lr_scheduler_step(step=self.num_steps)
+
+            self.num_steps += 1
+            self.num_samples += len(inputs)
 
             if self._stop: break
           if self._stop: break
@@ -590,32 +578,40 @@ class Trainer(BaseTrainer):
                 if val_loss is None else val_loss,
             )
 
-          self.on_epoch_end(epoch=epoch_idx)
+          self.callbacks.on_epoch_end(epoch=epoch_idx, trainer=self)
 
-        self.on_train_end()
+        self.callbacks.on_train_end(trainer=self)
+      except KeyboardInterrupt as e:
+        self.stop()
       except Exception as e:
-        self.on_error(e)
+        self.callbacks.on_error(e, trainer=self)
         raise e
     else:
       for epoch_idx in self.epochs(num=epochs):
-        for batch_idx, (inputs, targets) in self.batches():
+        for inputs, targets in self.batches():
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
           if self.lr_scheduler and self.lr_batch_step:
-            self.lr_scheduler.step(epoch=batch_idx)
+            self.lr_scheduler.step(epoch=self.num_steps)
+
+          self.num_steps += 1
+          self.num_samples += len(inputs)
 
         val_loss = self.validate() if self.val_loader else None
         self._lr_scheduler_step(
           step=epoch_idx,
-          metric=self.history.metrics.running_mean('loss') if val_loss is None else val_loss
+          metric=self.history.metrics.running_mean('loss')
+          if val_loss is None else val_loss
         )
 
   def _lr_scheduler_step(self, step=None, metric=None):
     if self.lr_scheduler:
+      args = dict()
       if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
-        self.lr_scheduler.step(metrics=metric, epoch=step)
-      else:
-        self.lr_scheduler.step(epoch=step)
+        args['metrics'] = metric
+      if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
+        args['epoch'] = step
+      self.lr_scheduler.step(**args)
 
   def __call__(self, *args, **kwargs):
     self.run(*args, **kwargs)
@@ -623,7 +619,7 @@ class Trainer(BaseTrainer):
   def stop(self, val=True):
     self._stop = val
 
-  def checkpoint(self, name=None) -> pathlib.Path:
+  def checkpoint(self, name=None) -> Path:
     state = self.state_dict()
     path = self.paths.checkpoints / (
       f"{name}.th" if name else

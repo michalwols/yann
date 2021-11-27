@@ -56,6 +56,16 @@ def test_train(tmpdir, device):
   assert export_path.is_dir()
 
 
+
+def test_interface():
+  train = Trainer()
+
+  train.callbacks
+  train.history
+  train.paths
+
+
+
 # @pytest.mark.slow
 # @pytest.mark.parametrize('device', devices)
 # def test_train_resolved(tmpdir, device):
