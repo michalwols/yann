@@ -100,7 +100,8 @@ class Trainer(BaseTrainer):
       id=None,
       dist=None,
       benchmark=True,
-      jit='script',
+      jit=False,
+      none_grad=True
   ):
     super().__init__()
     self.id = id or memorable_id()
@@ -132,6 +133,7 @@ class Trainer(BaseTrainer):
     self.parallel = parallel
     self._init_parallel(parallel)
 
+    self._none_grad = none_grad
     self._init_optim(
       parameters=parameters,
       optimizer=optimizer,
@@ -463,7 +465,7 @@ class Trainer(BaseTrainer):
     """
     Handles resetting gradients, running backward pass and optimizer step
     """
-    self.optimizer.zero_grad()
+    self.optimizer.zero_grad(set_to_none=self._none_grad)
 
     if self.grad_scaler:
       self.grad_scaler.scale(loss).backward()
