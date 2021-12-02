@@ -242,8 +242,13 @@ class Trainer(BaseTrainer):
     self.transform_batch = transform_batch
     self.batch_size = batch_size
 
+    self.sampler = sampler
     if not sampler and self.dist.is_enabled:
-      sampler = torch.utils.data.distributed.DistributedSampler(self.dataset)
+      self.sampler = torch.utils.data.distributed.DistributedSampler(
+        self.dataset,
+        num_replicas=self.dist.world_size,
+        rank=self.dist.rank
+      )
 
     if loader is not None:
       self.loader = loader
@@ -267,8 +272,8 @@ class Trainer(BaseTrainer):
           dataset=self.dataset,
           batch_size=self.batch_size,
           pin_memory=pin_memory,
-          shuffle=False if sampler else True,
-          sampler=sampler,
+          shuffle=False if self.sampler else True,
+          sampler=self.sampler,
           num_workers=num_workers,
           persistent_workers=persistent_workers,
           prefetch_factor=prefetch_factor,
@@ -531,6 +536,10 @@ class Trainer(BaseTrainer):
             epoch=self.num_epochs,
             trainer=self
           )
+
+          if self.sampler is not None and hasattr(self.sampler, 'set_epoch'):
+            self.sampler.set_epoch(epoch_idx)
+
           for inputs, targets in self.batches():
             self.callbacks.on_step_start(
               index=self.num_steps,
@@ -588,6 +597,10 @@ class Trainer(BaseTrainer):
         raise e
     else:
       for epoch_idx in self.epochs(num=epochs):
+
+        if self.sampler is not None and hasattr(self.sampler, 'set_epoch'):
+          self.sampler.set_epoch(epoch_idx)
+
         for inputs, targets in self.batches():
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
