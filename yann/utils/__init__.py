@@ -1,10 +1,13 @@
 import re
 import sys
+from typing import Union, Optional
 
 import numpy as np
 import torch
 from PIL import Image
 import datetime
+
+from .ids import memorable_id
 
 
 def timestr(d=None):
@@ -17,7 +20,7 @@ def camel_to_snake(text):
 
 
 def abbreviate(text):
-  return re.sub(r"([a-zA-Z])[a-z]*[^A-Za-z]*",r"\1", text).lower()
+  return re.sub(r"([a-zA-Z])[a-z]*[^A-Za-z]*", r"\1", text).lower()
 
 
 def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
@@ -186,8 +189,62 @@ def fully_qualified_name(x):
 
 
 def hash_params(module):
-    from hashlib import sha1
-    s = sha1()
-    for p in module.parameters():
-      s.update(to_numpy(p).tobytes())
-    return s.hexdigest()
+  from hashlib import sha1
+  s = sha1()
+  for p in module.parameters():
+    s.update(to_numpy(p).tobytes())
+  return s.hexdigest()
+
+
+def dynamic_import(qualified_name: str):
+  """
+  Dynamically import an object from python module
+  Args:
+    qualified_name: fully qualified name (ex: `torch.nn.Linear`)
+  """
+  import importlib
+  module_name, obj_name = qualified_name.rsplit('.', maxsplit=1)
+  module = importlib.import_module(module_name)
+  return getattr(module, obj_name)
+
+
+def source_file_import(
+    path: Union[str, 'pathlib.Path'],
+    module_name: Optional[str] = None
+) -> "types.ModuleType":
+  """
+  Import python module from a source file
+  Args:
+    path: path to file to import
+    module_name: name of the module, if none will use file name
+
+  Returns:
+    module
+  """
+  import importlib.util
+
+  if module_name is None:
+    from pathlib import Path
+    module_name = Path(path).stem.replace('-', '_')
+
+  spec = importlib.util.spec_from_file_location(module_name, str(path))
+  module = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(module)
+  return module
+
+
+def source_string_import(code: str, module_name: str) -> "types.ModuleType":
+  """
+  Import code from source code string
+  Args:
+    code: code string
+    module_name: name of module
+
+  Returns:
+    imported module
+  """
+  import importlib.util
+  spec = importlib.util.spec_from_loader(module_name, loader=None)
+  module = importlib.util.module_from_spec(spec)
+  exec(code, module.__dict__)
+  return module
