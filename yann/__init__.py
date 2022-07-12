@@ -364,13 +364,21 @@ def optim_step(optimizer, zero_grad=True):
   optimizer.step()
 
 
-def to(*items, **kwargs):
+def to(items, **kwargs):
   """call `.to()` on all items that have a `to()` method, skips ones that don't"""
-  return tuple(
-    x.to(**kwargs) if hasattr(x, 'to')
-    else x
-    for x in items
-  )
+  if hasattr(items, 'to'):
+    return items.to(**kwargs)
+  elif isinstance(items, dict):
+    return {k: to(v, **kwargs) for k, v in items.items()}
+  elif isinstance(items, tuple):
+    return tuple(to(x, **kwargs) for x in items)
+  elif isinstance(items, list):
+    return [to(x, **kwargs) for x in items]
+  elif isinstance(items, np.ndarray):
+    return to(torch.from_numpy(items), **kwargs)
+  elif isinstance(items, (int, float)):
+    return to(torch.as_tensor(items), **kwargs)
+  return items
 
 
 def get_device(module):
