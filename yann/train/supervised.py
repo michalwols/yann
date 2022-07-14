@@ -106,6 +106,7 @@ class Trainer(BaseTrainer):
     super().__init__()
     self.id = id or memorable_id()
     self.params = params
+    self.summary = {}
 
     self.num_samples = 0
     self.num_steps = 0
@@ -175,6 +176,8 @@ class Trainer(BaseTrainer):
 
     self.paths = Paths(Path(root) / self.name / timestr(self.time_created))
     self.paths.create()
+
+    self.update_summary()
 
   def _init_callbacks(self, callbacks, metrics):
     if not self.dist.is_main:
@@ -711,37 +714,15 @@ class Trainer(BaseTrainer):
     if skipped:
       logging.warning(f'skipped {skipped} when loading checkpoint')
 
-  def summary(self):
-    summary = {
-      'id': self.id,
-      'name': self.name,
-      'root': str(self.root),
-      'num_steps': self.num_steps,
-      'num_samples': self.num_samples,
-      'num_epochs': self.num_epochs,
-      'time_created': str(self.time_created),
-      'params': dict(self.params) if self.params else {},
-      'metrics': {
-        'train': {
-          k: ({'min': min(v), 'max': max(v)} if len(v) else {}) for k, v in self.history.metrics.items()
-        },
-        'validation': {
-          k: ({'min': min(v), 'max': max(v)} if len(v) else {}) for k, v in self.history.val_metrics.items()
-        }
-      }
-    }
-
-    summary['duration'] = None
-    if len(self.history.metrics.times) > 1:
-      try:
-        summary['duration'] = self.history.metrics.times[-1] - self.history.metrics.times[0]
-      except:
-        pass
-
-    return summary
+  def update_summary(self):
+    self.summary.update(dict(
+      id=self.id,
+      name=self.name,
+      path=self.paths.root,
+    ))
 
   def save_summary(self):
-    save_json(self.summary(), self.paths.summary)
+    save_json(self.summary, self.paths.summary)
     return self.paths.summary
 
   def __str__(self):
