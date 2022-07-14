@@ -1,22 +1,18 @@
-import inspect
-
 import datetime
+import inspect
 import logging
+import types
+from pathlib import Path
+from typing import Optional, Callable, Union
+
 import torch
 import torch.nn
 import types
 from pathlib import Path
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
-from torch.cuda.amp import autocast, GradScaler
-from typing import Optional, Callable
 
 import yann
-from yann import resolve, evaluate, to, default
-from yann.utils import fully_qualified_name
-from yann.params import HyperParams
-from yann.callbacks import get_callbacks, Logger
-from yann.callbacks.callbacks import Callbacks
 from yann.data import get_dataset_name, Classes
 from yann.data.io import save_json
 from yann.datasets import TransformDataset
@@ -24,8 +20,7 @@ from yann.distributed import Dist
 from yann.export import export
 from yann.train.base import BaseTrainer
 from yann.train.paths import Paths
-from yann.utils import counter, timestr, hash_params
-from yann.utils.ids import memorable_id
+from yann.utils import counter, timestr, hash_params, fully_qualified_name, memorable_id
 
 
 class Trainer(BaseTrainer):
@@ -41,7 +36,7 @@ class Trainer(BaseTrainer):
     self.update()
 
   """
-  params: Optional[HyperParams] = None
+  params: Optional['yann.params.HyperParams'] = None
   model: Optional[torch.nn.Module] = None
   loss: Optional[Callable] = None
 
@@ -54,19 +49,20 @@ class Trainer(BaseTrainer):
   sampler: Optional[Sampler] = None
 
   paths: Paths = None
-  callbacks: Optional[Callbacks] = None
-  log: Optional[Logger] = None
+  callbacks: Optional['yann.callbacks.Callbacks'] = None
+  log: Optional['yann.callbacks.Logger'] = None
 
   # automatic mixed precision
   grad_scaler: Optional[GradScaler] = None
 
   history = None
+  summary: dict
 
   DataLoader = DataLoader
 
   def __init__(
       self,
-      model=None,
+      model: Optional[Union[torch.nn.Module, str]] = None,
       dataset=None,
       optimizer=None,
       loss=None,
@@ -81,7 +77,7 @@ class Trainer(BaseTrainer):
       callbacks=None,
       device=None,
       parameters='trainable',
-      batch_size=16,
+      batch_size=None,
       val_dataset=None,
       val_loader=None,
       val_transform=None,
@@ -91,17 +87,22 @@ class Trainer(BaseTrainer):
       grad_scaler=None,
       name=None,
       description=None,
-      root='./experiments/train-runs/',
+      root='./runs/',
       metrics=None,
       collate=None,
-      params=None,
+      params: Optional['yann.params.HyperParams'] = None,
       pin_memory=True,
       step=None,
       id=None,
       dist=None,
       benchmark=True,
       jit=False,
-      none_grad=True
+      none_grad=True,
+      memory_format=torch.preserve_format,
+      # TODO:
+      # dtype=None,
+
+      # cuda_graph=False
   ):
     super().__init__()
     self.id = id or memorable_id()
@@ -122,14 +123,16 @@ class Trainer(BaseTrainer):
     if self.dist.is_enabled:
       device = device or self.dist.device
 
-    device = default.device if device is None else device
-    self.device = torch.device(device) if isinstance(device, str) else device
+    device = yann.default.device if device is None else device
 
-    self.model = resolve.model(model, required=False, validate=callable)
+    self.device = torch.device(device) if isinstance(device, str) else device
+    self.memory_format = memory_format
+
+    self.model = yann.resolve.model(model, required=False, validate=callable)
 
     if jit:
       self.model = torch.jit.script(self.model)
-    self.loss = resolve.loss(loss, required=False, validate=callable)
+    self.loss = yann.resolve.loss(loss, required=False, validate=callable)
 
     self.parallel = parallel
     self._init_parallel(parallel)
@@ -142,6 +145,7 @@ class Trainer(BaseTrainer):
       lr_batch_step=lr_batch_step
     )
 
+    batch_size = batch_size or yann.default.batch_size
     self._init_data_loaders(
       dataset=dataset,
       classes=classes,
@@ -167,22 +171,28 @@ class Trainer(BaseTrainer):
     if step is not None:
       self.override(self.step, step)
 
-    self.to(self.device)
+    self.to(device=self.device, memory_format=self.memory_format)
 
     self.name = name or (
       f"{get_dataset_name(self.loader)}-{yann.get_model_name(self.model)}"
     )
     self.description = description
 
-    self.paths = Paths(Path(root) / self.name / timestr(self.time_created))
+    self.paths = Paths(Path(root or yann.default.train_root) / self.name / timestr(self.time_created))
     self.paths.create()
 
     self.update_summary()
 
   def _init_callbacks(self, callbacks, metrics):
+    from yann.callbacks import get_callbacks
+    from yann.callbacks.callbacks import Callbacks
+
+    metrics = metrics or ()
     if not self.dist.is_main:
       # NOTE: disable most callbacks if not on main
-      self.history = yann.callbacks.History(*(metrics or ()))
+      self.history = yann.callbacks.History(**metrics)\
+        if isinstance(metrics, dict)\
+        else yann.callbacks.History(*metrics)
       self.callbacks = Callbacks(self.history)
       return
 
@@ -190,7 +200,9 @@ class Trainer(BaseTrainer):
 
     if 'history' not in self.callbacks:
       metrics = (metrics,) if isinstance(metrics, str) else metrics
-      self.callbacks.history = yann.callbacks.History(*(metrics or ()))
+      self.callbacks.history = yann.callbacks.History(**metrics)\
+        if isinstance(metrics, dict)\
+        else yann.callbacks.History(*metrics)
 
     self.history = self.callbacks.history
     self.callbacks.move_to_start('history')
@@ -228,7 +240,7 @@ class Trainer(BaseTrainer):
       val_transform=None,
       val_loader=None,
   ):
-    self.dataset = resolve.dataset(dataset, required=False)
+    self.dataset = yann.resolve.dataset(dataset, required=False)
 
     if classes:
       self.classes = (
@@ -285,7 +297,7 @@ class Trainer(BaseTrainer):
           **({'collate_fn': collate} if collate else {})
         )
 
-    self.val_dataset = resolve.dataset(
+    self.val_dataset = yann.resolve.dataset(
       val_dataset,
       required=False,
     )
@@ -313,14 +325,14 @@ class Trainer(BaseTrainer):
     if parameters == 'trainable' and self.model:
       parameters = yann.trainable(self.model.parameters())
 
-    self.optimizer = resolve.optimizer(
+    self.optimizer = yann.resolve.optimizer(
       optimizer,
       args=(parameters or self.model.parameters(),),
       required=False,
       validate=lambda x: hasattr(x, 'step')
     )
 
-    self.lr_scheduler = resolve.lr_scheduler(
+    self.lr_scheduler = yann.resolve.lr_scheduler(
       lr_scheduler,
       kwargs=dict(optimizer=self.optimizer)
     )
@@ -337,7 +349,21 @@ class Trainer(BaseTrainer):
     self.clip_grad = None
 
   @classmethod
-  def from_params(cls, params, **kwargs):
+  def from_params(cls, params: Union[yann.params.HyperParams, str], **kwargs):
+    """
+    Initialize trainer from
+    Args:
+      params: instance of params or fully qualified path to params
+        ex: Trainer.from_params('foo.params.LargeParams')
+      **kwargs:
+
+    Returns:
+
+    """
+    if isinstance(params, str):
+      params = yann.utils.dynamic_import(params)
+      if issubclass(params, yann.params.HyperParams):
+        params = params()
     return cls(**params, **kwargs, params=params)
 
   @property
@@ -372,15 +398,32 @@ class Trainer(BaseTrainer):
     logging.debug(f"setting '{key}' to {value}")
     super(Trainer, self).__setattr__(key, value)
 
-  def to(self, device=None):
-    self.device = device
-
-    to(
-      self.model,
-      self.loss,
-      self.optimizer,
-      device=self.device
+  def to(self, **kwargs):
+    """
+    Places model, loss and optimizer on device
+    """
+    self.device = kwargs.pop('device', None) or self.device
+    self.memory_format = kwargs.pop('memory_format', None) or self.memory_format
+    yann.to(
+      (self.model, self.loss, self.optimizer),
+      device=self.device,
+      memory_format=self.memory_format,
+      **kwargs
     )
+    return self
+
+  def place(self, batch, **kwargs):
+    """
+    Places batch on device
+    """
+    self.device = kwargs.pop('device', None) or self.device
+    self.memory_format = kwargs.pop('memory_format', None) or self.memory_format
+    return yann.to(
+        batch,
+        device=self.device,
+        memory_format=self.memory_format,
+        **kwargs
+      )
 
   def on(self, event, callback=None):
     if self.callbacks is not None:
@@ -406,16 +449,11 @@ class Trainer(BaseTrainer):
       self.num_epochs += 1
 
   def batches(self, device=None):
-    device = device or self.device
-
     for batch in self.loader:
       if self.transform_batch:
         batch = self.transform_batch(*batch)
 
-      if device:
-        yield to(*batch, device=device)
-      else:
-        yield batch
+      yield self.place(batch, device=device)
 
   def override(self, method, function=False):
     """
@@ -499,7 +537,7 @@ class Trainer(BaseTrainer):
     ts, os, loss = [], [], None
     if loader is not None:
       with torch.inference_mode():
-        for inputs, targets, outputs in evaluate(
+        for inputs, targets, outputs in yann.evaluate(
             model=self.model,
             batches=loader,
             device=device
