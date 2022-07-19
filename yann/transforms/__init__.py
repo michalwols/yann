@@ -7,6 +7,7 @@ import pathlib
 import torch
 import random
 from PIL import Image
+from timm.data.mixup import rand_bbox
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
 from torchvision import transforms
@@ -48,6 +49,7 @@ class Transformer:
 class ImageTransformer(Transformer):
   def __init__(
       self,
+      load=None,
       resize=None,
       rotate=None,
       crop=None,
@@ -58,9 +60,12 @@ class ImageTransformer(Transformer):
       color_jitter=None,
       interpolation=None,
       color_space=None,
-      load=None,
       transform=None,
-      to_tensor=None
+      to_tensor=None,
+      autoaugment=None,
+      randaugment=None,
+      trivialaugment=None,
+      erase=None
   ):
     interpolation = interpolation or Image.ANTIALIAS
     self.resize = resize and tvt.Resize(resize, interpolation=interpolation)
@@ -79,11 +84,25 @@ class ImageTransformer(Transformer):
 
     self.normalize = (mean or std) and tvt.Normalize(mean=mean, std=std)
 
+    self.erase = erase and (
+      tvt.RandomErasing(erase)
+      if isinstance(erase, float)
+      else tvt.RandomErasing(*erase)
+    )
+
+    self.autoagument = autoaugment and tvt.AutoAugment()
+    self.randaugment = randaugment and tvt.RandAugment()
+    self.trivialaugment = trivialaugment and tvt.TrivialAugmentWide()
+
+
     super().__init__(
       load=load or GetImage(color_space),
       transform=tvt.Compose(truthy([
         self.resize,
         transform,
+        self.autoagument,
+        self.randaugment,
+        self.trivialaugment,
         self.rotate,
         self.crop,
         self.mirror,
@@ -91,7 +110,8 @@ class ImageTransformer(Transformer):
       ])),
       to_tensor=to_tensor or tvt.Compose(truthy([
         tvt.ToTensor(),
-        self.normalize
+        self.normalize,
+        self.erase
       ]))
     )
 
@@ -217,24 +237,33 @@ def cutmix(inputs, targets, beta):
 
 
 
-def get_imagenet_transformers(size=224, resize=256, fixres=False):
+def get_imagenet_transformers(
+    size=224,
+    crop_scale=(.5, 1.2),
+    val_size=None,
+    resize=256,
+    fixres=False,
+    trivial=False,
+
+):
+  augment = transforms.Compose([
+      transforms.RandomResizedCrop(
+        size,
+        scale=crop_scale,
+      ),
+      transforms.TrivialAugmentWide(),
+      # transforms.ColorJitter(
+      #     .3, .3, .3
+      # ),
+      transforms.RandomHorizontalFlip(),
+    ])
+
   train_transform = Transformer(
     load=GetImage('RGB'),
-    transform=transforms.Compose([
-#       transforms.Resize(resize, interpolation=Image.ANTIALIAS),
-      transforms.RandomResizedCrop(
-          size,
-#           scale=(.4, 1),
-#           interpolation=Image.ANTIALIAS
-      ),
-      transforms.ColorJitter(
-          .3, .3, .3
-#           brightness=.4, contrast=.2, saturation=.1, hue=.05
-      ),
-      transforms.RandomHorizontalFlip(),
-    ]),
+    transform=augment,
     to_tensor=transforms.Compose([
       transforms.ToTensor(),
+      # transforms.RandomErasing(),
       transforms.Normalize(
           mean=[0.485, 0.456, 0.406],
           std=[0.229, 0.224, 0.225])
@@ -244,10 +273,15 @@ def get_imagenet_transformers(size=224, resize=256, fixres=False):
   test_transform = Transformer(
     load=train_transform.load,
     transform=transforms.Compose([
-      transforms.Resize(size, interpolation=Image.ANTIALIAS),
-      transforms.CenterCrop(size)
+      transforms.Resize(val_size or size, interpolation=Image.ANTIALIAS),
+      transforms.CenterCrop(val_size or size)
     ]),
-    to_tensor=train_transform.to_tensor
+    to_tensor=transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize(
+          mean=[0.485, 0.456, 0.406],
+          std=[0.229, 0.224, 0.225])
+    ])
   )
 
   return train_transform, test_transform
