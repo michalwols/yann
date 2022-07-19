@@ -5,7 +5,7 @@ __version__ = '0.0.40'
 import torch
 from torch import nn
 import numpy as np
-from .config.setup import registry
+from .config.setup import registry, default
 
 register = registry
 resolve = registry.resolve
@@ -69,22 +69,6 @@ from yann.data.loaders import loader
 #   pass
 
 
-class default:
-  root = Path('~/.yann/')
-
-  device = torch.device('cuda') \
-    if torch.cuda.is_available() else torch.device('cpu')
-
-  batch_size = None
-  num_workers = None
-  optimizer = None
-
-  callbacks = None
-
-  train_root = None
-  datasets_root = root / 'datasets'
-
-  checkpoint_name_format = ''
 
 
 def seed(val=1, deterministic=False):
@@ -189,6 +173,7 @@ def split_regularization_params(
     excluded_modules=(_BatchNorm,),
     excluded_names=('bias',),
     param_groups=True,
+    weight_decay=1e-4
 ):
   """
   filter out parameters which should not be regularized
@@ -206,7 +191,7 @@ def split_regularization_params(
           else:
             reg.append(param)
   if param_groups:
-    return [dict(params=reg), dict(params=no_reg, weight_decay=0)]
+    return [dict(params=reg, weight_decay=weight_decay), dict(params=no_reg, weight_decay=0)]
   else:
     return reg, no_reg
 
@@ -405,5 +390,8 @@ def get_model_name(model):
 
 
 
-import yann.train
+
 import yann.params
+import yann.metrics
+import yann.train
+import yann.callbacks

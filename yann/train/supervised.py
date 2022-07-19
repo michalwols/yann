@@ -7,8 +7,7 @@ from typing import Optional, Callable, Union
 
 import torch
 import torch.nn
-import types
-from pathlib import Path
+from torch.cuda.amp import autocast, GradScaler
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
 
@@ -99,6 +98,7 @@ class Trainer(BaseTrainer):
       jit=False,
       none_grad=True,
       memory_format=torch.preserve_format,
+      aot_autograd=False,
       # TODO:
       # dtype=None,
 
@@ -132,6 +132,13 @@ class Trainer(BaseTrainer):
 
     if jit:
       self.model = torch.jit.script(self.model)
+    if aot_autograd:
+      try:
+        from functorch.compile import memory_efficient_fusion
+      except ImportError:
+        raise ValueError('functorch must be installed for aot_autograd support')
+      self.model = memory_efficient_fusion(self.model)
+
     self.loss = yann.resolve.loss(loss, required=False, validate=callable)
 
     self.parallel = parallel
@@ -219,6 +226,7 @@ class Trainer(BaseTrainer):
             self.model,
             device_ids=[self.dist.local_rank],
             output_device=self.dist.local_rank,
+            find_unused_parameters=yann.default.ddp_find_unused_parameters
           )
 
   def _init_data_loaders(
@@ -756,7 +764,7 @@ class Trainer(BaseTrainer):
     self.summary.update(dict(
       id=self.id,
       name=self.name,
-      path=self.paths.root,
+      path=str(self.paths.root),
     ))
 
   def save_summary(self):

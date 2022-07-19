@@ -88,7 +88,7 @@ class Callbacks(Callback):
 
   def on(self, event, callback=None):
     if 'function_callback' not in self._callbacks:
-      self.function_callback = yann._callbacks.FunctionCallback()
+      self.function_callback = yann.callbacks.FunctionCallback()
 
     if callback:
       self.function_callback.on(event, callback)

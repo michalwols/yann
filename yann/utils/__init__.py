@@ -23,12 +23,25 @@ def abbreviate(text):
   return re.sub(r"([a-zA-Z])[a-z]*[^A-Za-z]*", r"\1", text).lower()
 
 
+def str2bool(v):
+  if isinstance(v, bool):
+    return v
+  if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    return True
+  elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    return False
+  else:
+    import argparse
+    raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
   import argparse
   from ..params import Field
-  parser = parser or argparse.ArgumentParser(description=description, epilog=epilog, **kwargs)
+  parser = parser or argparse.ArgumentParser(description=description,
+                                             epilog=epilog, **kwargs)
 
-  abbreviations = set()
+  abbreviations = {'h'}
 
   for k, v in x.items():
     names = []
@@ -39,10 +52,11 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
     names.append(f"--{camel_to_snake(k)}")
 
     if isinstance(v, dict):
+      T = v.get('type')
       parser.add_argument(
         *names,
         default=v.get('default'),
-        type=v.get('type'),
+        type=str2bool if T is bool else T,
         action=v.get('action'),
         help=v.get('help'),
         required=v.get('required'),
@@ -53,7 +67,7 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
       parser.add_argument(
         *names,
         default=v.default,
-        type=v.type,
+        type=str2bool if v.type is bool else v.type,
         help=f"{v.help or k} (default: {v.default})",
         required=v.required,
         choices=getattr(v, 'choices', None),

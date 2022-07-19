@@ -85,3 +85,7 @@ class TinyDigits(data.TensorDataset):
     )
 
 
+
+# from .voc import VOCMultilabel
+# from .coco import CocoMultilabel
+# from .imagenette import Imagenette, Imagewoof

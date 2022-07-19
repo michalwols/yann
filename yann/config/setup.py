@@ -1,8 +1,45 @@
 import logging
-
+from pathlib import Path
 import torch
 
 from .registry import Registry, pass_args, is_public_callable
+
+
+
+
+class default:
+  root = Path('~/.yann/')
+  torch_root = Path('~/.torch')
+
+  if torch.cuda.is_available():
+    device = torch.device('cuda')
+  elif hasattr(torch, 'backends') and torch.backends.mps.is_available():
+    device = torch.device('mps')
+  else:
+    device = torch.device('cpu')
+
+  batch_size = 32
+  num_workers = None
+  optimizer = None
+
+  callbacks = None
+
+  train_root = './runs/'
+
+  checkpoint_name_format = ''
+
+  ddp_find_unused_parameters = True
+
+  datasets_root = torch_root / 'datasets'
+
+  @classmethod
+  def dataset_root(cls, dataset):
+    if hasattr(dataset, 'root'):
+      return dataset.root
+    return str(cls.datasets_root / dataset.__name__)
+
+
+
 
 ## Configure Registry
 
@@ -12,22 +49,14 @@ registry = Registry()
 import torchvision.datasets
 
 from torch.utils.data import Dataset
+from ..datasets import imagenette, voc, coco
 
 registry.dataset.index(
-  torchvision.datasets,
+  [torchvision.datasets, imagenette, voc, coco],
   types=(Dataset,),
   init=lambda D, root=None, download=True, **kwargs: \
-    D(root=root or f'~/.torch/datasets/{D.__name__}',
-      download=download)
-)
-
-from ..datasets import imagenette
-registry.dataset.index(
-  imagenette,
-  types=(Dataset,),
-  init=lambda D, root=None, download=True, **kwargs: \
-    D(root=root or f'~/.torch/datasets/',
-      download=download)
+    D(root=str(root or default.dataset_root(D)),
+      download=download, **kwargs)
 )
 
 

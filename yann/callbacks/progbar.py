@@ -24,9 +24,16 @@ class ProgressBar(Callback):
         from tqdm import tqdm
     else:
       from tqdm import tqdm
+
+
+    if trainer:
+      total = (len(trainer.dataset) if self.samples else len(trainer.loader))
+    else:
+      total = None
+
     self.bar = tqdm(
       desc=f"Epoch {epoch}",
-      total=self.length or (len(trainer.dataset) if self.samples else len(trainer.loader)),
+      total=self.length or total,
       unit='samples' if self.samples else 'batches'
     )
 

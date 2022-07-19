@@ -1,3 +1,4 @@
+import typing
 from collections import defaultdict, OrderedDict
 
 from functools import partial
@@ -26,6 +27,7 @@ def is_public_callable(x):
       and not x.__name__.startswith('_')
       and callable(x)
   )
+
 
 class default:
   init = pass_args
@@ -107,8 +109,10 @@ class Resolver:
 
     return x
 
-  def __call__(self, x, *_args, required=False, validate=None,
-               instance=True, types=None, args=None, kwargs=None, init=None, **_kwargs):
+  def __call__(
+      self, x, *_args, required=False, validate=None,
+      instance=True, types=None, args=None, kwargs=None, init=None,
+      **_kwargs, ):
     return self.resolve(
       x,
       required=required,
@@ -196,7 +200,7 @@ class Registry:
     if name in self.__dict__:
       return self.__dict__[name]
     # allow defining new registries on attribute lookup
-    if name not in self._subregistries:
+    if name not in self._subregistries and not name.startswith('_'):
       self._subregistries[name] = Registry(name=name)
     return self._subregistries[name]
 
@@ -246,7 +250,7 @@ class Registry:
 
   def index(
       self,
-      module,
+      modules,
       types=None,
       get_names=None,
       include=None,
@@ -266,28 +270,30 @@ class Registry:
     Returns:
 
     """
-    for item in module.__dict__.values():
-      if isinstance(item, (int, str)):
-        continue
-      if types:
-        if not (
-            isinstance(item, types) or
-            (isinstance(item, type)) and issubclass(item, types)):
+    if not isinstance(modules, typing.Iterable):
+      modules = [modules]
+    for module in modules:
+      for item in module.__dict__.values():
+        if isinstance(item, (int, str)):
+          continue
+        if types:
+          if not (
+              isinstance(item, types) or
+              (isinstance(item, type)) and issubclass(item, types)):
+            continue
+
+        if include and not include(item):
           continue
 
-      if include and not include(item):
-        continue
+        if exclude and exclude(item):
+          continue
 
-      if exclude and exclude(item):
-        continue
+        if not include_private and not is_public(item):
+          continue
 
-      if not include_private and not is_public(item):
-        continue
+        names = get_names(item) if get_names else default.get_names(item)
 
-
-      names = get_names(item) if get_names else default.get_names(item)
-
-      self.register(item, name=names, init=init)
+        self.register(item, name=names, init=init)
 
   def register_subclasses(self, cls: type, init=None):
     self.register(cls, init=init)
@@ -300,10 +306,12 @@ class Registry:
 
   def print_tree(self, contents=True, indent=0):
     if not indent:
-      print(f'registry{" (Private - not resolvable from higher scopes)" if self.is_private else ""}')
+      print(
+        f'registry{" (Private - not resolvable from higher scopes)" if self.is_private else ""}')
       indent += 2
     for name, registry in self._subregistries.items():
-      print(f"{' ' * indent}.{name} {' (Private - not resolvable from higher scopes)' if registry.is_private else ''}")
+      print(
+        f"{' ' * indent}.{name} {' (Private - not resolvable from higher scopes)' if registry.is_private else ''}")
       registry.print_tree(indent=indent + 2, contents=contents)
 
     if contents:
@@ -312,8 +320,7 @@ class Registry:
           details = str(record.x)
         else:
           details = f"{record.x.__module__}.{record.x.__name__ if hasattr(record.x, '__name__') else record.x}"
-        print(f"{' ' * (indent + 2) }- {name}\t\t({details})")
-
+        print(f"{' ' * (indent + 2)}- {name}\t\t({details})")
 
   def __str__(self):
     return f"<Registry '{self.name}' ({len(self)} entries)>"
