@@ -1,6 +1,9 @@
+import typing
 from contextlib import contextmanager
 
 __version__ = '0.0.40'
+
+from typing import Union
 
 import torch
 from torch import nn
@@ -20,7 +23,7 @@ from yann.data.utils import pad, pad_to_largest
 # from yann.data import datasets
 from yann.viz import show, plot
 from yann.utils.timer import time
-from yann.utils.profile import profile
+from yann.utils.profile import profile, param_count
 
 from yann.testing import Checker
 from yann.data.loaders import loader
@@ -69,6 +72,7 @@ from yann.data.loaders import loader
 #   pass
 
 
+context = object()
 
 
 def seed(val=1, deterministic=False):
@@ -385,10 +389,92 @@ def get_model_name(model):
   return model.__class__.__name__
 
 
+def load_state_dict(
+    x,
+    state_dict: Union[str, 'pathlib.Path', dict],
+    strict: bool = True
+):
+  if not isinstance(state_dict, dict):
+    state_dict = yann.load(state_dict)
+
+  return x.load_state_dict(state_dict, strict=strict)
 
 
 
+def grad_norm(parameters, norm_type: float = 2.0):
+  """
 
+  Adapted from https://pytorch.org/docs/stable/_modules/torch/nn/utils/clip_grad.html
+  Args:
+    parameters:
+    norm_type:
+
+  Returns:
+
+  """
+  if isinstance(parameters, nn.Module):
+    parameters = parameters.parameters()
+  if isinstance(parameters, torch.Tensor):
+    parameters = [parameters]
+  parameters = [p for p in parameters if p.grad is not None]
+  parameters = list(parameters)
+
+  norm_type = float(norm_type)
+  if len(parameters) == 0:
+    return torch.tensor(0.)
+  device = parameters[0].grad.device
+  from torch._six import inf
+  if norm_type == inf:
+    norms = [p.grad.detach().abs().max().to(device) for p in parameters]
+    norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
+  else:
+    norm = torch.norm(
+      torch.stack([
+        torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters
+      ]),
+      norm_type
+    )
+  return norm
+
+
+def param_norm(parameters, norm_type: float = 2.0):
+  if isinstance(parameters, nn.Module):
+    parameters = parameters.parameters()
+  if isinstance(parameters, torch.Tensor):
+    parameters = [parameters]
+
+  parameters = list(parameters)
+  norm_type = float(norm_type)
+  if len(parameters) == 0:
+    return torch.tensor(0.)
+  device = parameters[0].device
+  from torch._six import inf
+  if norm_type == inf:
+    norms = [p.detach().abs().max().to(device) for p in parameters]
+    norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
+  else:
+    norm = torch.norm(
+      torch.stack([
+        torch.norm(p.detach(), norm_type).to(device) for p in parameters
+      ]),
+      norm_type
+    )
+  return norm
+
+
+def nested_lookup(obj, key):
+  keys = key.split('.')
+
+  for k in keys:
+    if isinstance(obj, typing.Mapping):
+      obj = obj[k]
+    elif isinstance(obj, typing.Sequence):
+      obj = obj[int(k)]
+    elif hasattr(obj, k):
+      obj = getattr(obj, k)
+    else:
+      raise KeyError(f'{key} not found')
+  return obj
 
 
 import yann.params

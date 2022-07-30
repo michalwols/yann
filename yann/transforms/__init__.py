@@ -207,6 +207,14 @@ def mixup(inputs, targets, alpha=1):
   )
 
 
+class Mixup:
+  def __init__(self, alpha=1):
+    self.alpha = alpha
+
+  def __call__(self, inputs, targets):
+    return mixup(inputs=inputs, targets=targets, alpha=self.alpha)
+
+
 def cutout(img, percent=.3, value=0):
   pil_img = False
   if isinstance(img, Image.Image):

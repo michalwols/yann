@@ -37,7 +37,7 @@ class AsymmetricLoss(nn.Module):
     self.calculate_focal_loss_gradients = True
 
 
-  def forward(self, inputs: Logits, targets: MultiLabelOneHot):
+  def forward(self, inputs: Logits, targets: MultiLabelOneHot, reduction=None):
     pos_probs = torch.sigmoid(inputs)
     neg_probs = 1 - pos_probs
 
@@ -60,11 +60,11 @@ class AsymmetricLoss(nn.Module):
         weights = torch.pow(1 - pts, decays)
       losses *= weights
 
-    return _reduce(-losses, reduction=self.reduction)
+    return _reduce(-losses, reduction=reduction or self.reduction)
 
 
 class AsymmetricLossOptimized(AsymmetricLoss):
-  def forward(self, inputs: Logits, targets: MultiLabelOneHot):
+  def forward(self, inputs: Logits, targets: MultiLabelOneHot, reduction=None):
     self.targets = targets
     self.neg_targets = (1 - self.targets)
 
@@ -87,4 +87,4 @@ class AsymmetricLossOptimized(AsymmetricLoss):
         )
       self.losses *= weights
 
-    return _reduce(-self.losses, reduction=self.reduction)
+    return _reduce(-self.losses, reduction=reduction or self.reduction)

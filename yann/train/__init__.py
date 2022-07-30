@@ -6,6 +6,7 @@ from .supervised import Trainer
 from ..callbacks import Callback
 
 
+
 def step(model, inputs, targets, optimizer, loss, callback: Callback = None):
   model.train()
   optimizer.zero_grad()
@@ -33,3 +34,6 @@ def collect_summaries(root='.', name='summary.json', pandas=True):
     return pd.DataFrame([flatten(x) for x in s])
   else:
     return s
+
+
+import yann.train.track

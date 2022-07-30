@@ -13,6 +13,13 @@ from ..evaluation import evaluate_metrics
 class History(Callback):
   def __init__(self, *metrics, **named_metrics):
     super(History, self).__init__()
+    if len(metrics) == 1 and not named_metrics:
+      if isinstance(metrics[0], dict):
+        named_metrics = metrics[0]
+        metrics = []
+      elif isinstance(metrics[0], (list, tuple, set)):
+        metrics = metrics[0]
+
     self.metric_funcs = {
       **named_metrics,
     }

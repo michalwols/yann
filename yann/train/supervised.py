@@ -22,7 +22,13 @@ from yann.train.paths import Paths
 from yann.utils import counter, timestr, hash_params, fully_qualified_name, memorable_id
 
 
-class Trainer(BaseTrainer):
+class TrainState:
+  num_steps: int
+  num_epochs: int
+  num_samples: int
+
+
+class Trainer(TrainState, BaseTrainer):
   """
   def train():
     for epoch in self.epochs:
@@ -56,6 +62,10 @@ class Trainer(BaseTrainer):
 
   history = None
   summary: dict
+
+  _id_key = None
+  _input_key = 0
+  _target_key = 1
 
   DataLoader = DataLoader
 
@@ -99,12 +109,16 @@ class Trainer(BaseTrainer):
       none_grad=True,
       memory_format=torch.preserve_format,
       aot_autograd=False,
-      # TODO:
-      # dtype=None,
-
+      dtype=None,
+      place: Optional[Union[Callable, dict, tuple]]=None,
+      clip_grad=None
       # cuda_graph=False
   ):
     super().__init__()
+
+    # TODO: should this be supported?
+    # yann.context.trainer = self
+
     self.id = id or memorable_id()
     self.params = params
     self.summary = {}
@@ -127,6 +141,7 @@ class Trainer(BaseTrainer):
 
     self.device = torch.device(device) if isinstance(device, str) else device
     self.memory_format = memory_format
+    self.dtype = dtype
 
     self.model = yann.resolve.model(model, required=False, validate=callable)
 
@@ -149,7 +164,8 @@ class Trainer(BaseTrainer):
       parameters=parameters,
       optimizer=optimizer,
       lr_scheduler=lr_scheduler,
-      lr_batch_step=lr_batch_step
+      lr_batch_step=lr_batch_step,
+      clip_grad=clip_grad
     )
 
     batch_size = batch_size or yann.default.batch_size
@@ -177,6 +193,13 @@ class Trainer(BaseTrainer):
 
     if step is not None:
       self.override(self.step, step)
+
+    if place is not None:
+      if isinstance(place, Callable):
+        self.place = place
+      else:
+        from yann.data.place import Place
+        self.place = Place(place)
 
     self.to(device=self.device, memory_format=self.memory_format)
 
@@ -219,7 +242,8 @@ class Trainer(BaseTrainer):
       if parallel == 'dp':
         if not isinstance(self.model, torch.nn.parallel.DataParallel):
           self.model = torch.nn.DataParallel(self.model)
-      elif parallel == 'ddp' or parallel is None and self.dist.is_enabled:
+      elif parallel == 'ddp' or (parallel is None and self.dist.is_enabled):
+        self.parallel = 'ddp'
         if not isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
           self.model.to(self.device)
           self.model = torch.nn.parallel.DistributedDataParallel(
@@ -354,8 +378,6 @@ class Trainer(BaseTrainer):
     else:
       self.grad_scaler = grad_scaler or (GradScaler() if self.amp else None)
 
-    self.clip_grad = None
-
   @classmethod
   def from_params(cls, params: Union[yann.params.HyperParams, str], **kwargs):
     """
@@ -373,6 +395,11 @@ class Trainer(BaseTrainer):
       if issubclass(params, yann.params.HyperParams):
         params = params()
     return cls(**params, **kwargs, params=params)
+
+  @classmethod
+  def from_checkpoint(cls, path):
+    # TODO
+    raise NotImplementedError()
 
   @property
   def root(self):
@@ -416,6 +443,7 @@ class Trainer(BaseTrainer):
       (self.model, self.loss, self.optimizer),
       device=self.device,
       memory_format=self.memory_format,
+      dtype=self.dtype,
       **kwargs
     )
     return self
@@ -426,6 +454,21 @@ class Trainer(BaseTrainer):
     """
     self.device = kwargs.pop('device', None) or self.device
     self.memory_format = kwargs.pop('memory_format', None) or self.memory_format
+
+    # FIXME: find better way to handle channels last for specific entries in batch
+    # possibly let memory_format take a dict or list to match batch
+    if self.memory_format == torch.channels_last:
+      if self._input_key is not None:
+        return (
+          yann.to(
+            batch[self._input_key],
+            device=self.device,
+            memory_format=self.memory_format,
+            **kwargs
+          ),
+          *yann.to(batch[1:], device=self.device, **kwargs)
+        )
+
     return yann.to(
         batch,
         device=self.device,
@@ -521,7 +564,7 @@ class Trainer(BaseTrainer):
       self.grad_scaler.step(self.optimizer)
 
       if self.clip_grad:
-        self.grad_scaler._unscale(self.optimizer)
+        self.grad_scaler.unscale_(self.optimizer)
         self.clip_grad(self.model.parameters())
       self.grad_scaler.update()
     else:
@@ -690,12 +733,21 @@ class Trainer(BaseTrainer):
       f"{timestr()}-epoch-{self.num_epochs:03d}-steps-{self.num_steps:05d}.th"
     )
     torch.save(state, str(path))
+    print(f'Saved checkpoint at {path}')
     return path
 
-  def load_checkpoint(self, path, metadata=True, map_location=None):
+  def load_checkpoint(
+      self,
+      path,
+      metadata=True,
+      map_location=None,
+      strict: bool = True,
+      keys=None
+  ):
     # TODO: add 'latest', 'best' support
-    data = torch.load(path)
-    self.load_state_dict(data, metadata=metadata, map_location=map_location)
+    logging.info(f'Attempting to load checkpoint {path}')
+    data = torch.load(path, map_location=map_location)
+    self.load_state_dict(data, metadata=metadata, strict=strict, keys=keys)
 
   def export(self, path=None, trace=False, meta=None, postprocess=None):
     path = path or self.paths.exports / timestr()
@@ -740,22 +792,35 @@ class Trainer(BaseTrainer):
 
     return data
 
-  def load_state_dict(self, data, metadata=True, map_location=None):
+  def load_state_dict(self, data, metadata=True, strict: bool = True, keys=None):
     """
     TODO: add a way to specify which parts should be loaded (ex: model only)
     """
     skipped = set()
+
+    from inspect import getfullargspec
+
     for k, v in data.items():
+      if keys and k not in keys: continue
       if 'state_dict' in v and hasattr(self, k):
-        getattr(self, k).load_state_dict(v['state_dict'], map_location=map_location)
-        logging.debug(f"loaded {k}")
+
+        entry = getattr(self, k)
+        if 'strict' in getfullargspec(entry.load_state_dict).args:
+          entry.load_state_dict(v['state_dict'], strict=strict)
+        else:
+          entry.load_state_dict(v['state_dict'])
+        logging.info(f"loaded {k}")
       else:
+        logging.info(f"skipped loading {k}")
         skipped.add(k)
 
     if metadata and 'metadata' in data:
       skipped.discard('metadata')
       for k, v in data['metadata'].items():
-        setattr(self, k, v)
+        try:
+          setattr(self, k, v)
+        except ValueError:
+          logging.warning(f'failed to set {k}')
 
     if skipped:
       logging.warning(f'skipped {skipped} when loading checkpoint')

@@ -13,9 +13,12 @@ def _reduce(x, reduce=True, reduction=None):
     return x.mean()
   if reduction == 'sum':
     return x.sum()
+  if reduction == 'batch_mean':
+    return x.sum() / x.shape[0]
   if reduction is None or reduction == 'none':
     return x
   raise ValueError(f'Unsupported reduction')
+
 
 def soft_target_cross_entropy(
     inputs,
@@ -182,6 +185,7 @@ class WeightedLoss(_WeightedLoss):
     loss = self.weight * self.loss(*input, **kwargs)
     return _reduce(loss, reduction=self.reduction, reduce=self.reduce)
 
+
 class CombinedLoss(_Loss):
   def __init__(self, losses, weights, *args, **kwargs):
     super(CombinedLoss, self).__init__(*args, **kwargs)
@@ -199,3 +203,65 @@ MultiTaskLoss = CombinedLoss
 
 # class MultiTaskLoss(_Loss):
 #   pass
+
+
+class KeepK(_Loss):
+  def __init__(self, loss, top=None, bottom=None, reduce=True, reduction='mean', **kwargs):
+    super().__init__(reduce=reduce, reduction=reduction, **kwargs)
+    self.loss = loss
+    if hasattr(self.loss, 'reduction'):
+      self.loss.reduction = 'none'
+    if hasattr(self.loss, 'reduce'):
+      self.loss.reduce = False
+
+    if top and bottom:
+      raise ValueError("Only one of 'top' and 'bottom' should be provided")
+
+    self.top_k = top
+    self.bottom_k = bottom
+
+  def forward(self, *input, **kwargs):
+    losses = self.loss(*input, **kwargs)
+
+    indices = None
+    with torch.inference_mode():
+      if self.top_k is not None:
+        _, indices = torch.topk(losses, k=self.top_k)
+      elif self.bottom_k is not None:
+        _, indices = torch.topk(losses, k=self.bottom_k, largest=False)
+
+    if indices is not None:
+      losses = losses[indices]
+
+    return _reduce(losses, reduction=self.reduction, reduce=self.reduce)
+
+
+
+class KeepRange(_Loss):
+  def __init__(self, loss, min=None, max=None, reduce=True, reduction='mean', **kwargs):
+    super().__init__(reduce=reduce, reduction=reduction, **kwargs)
+    self.loss = loss
+    if hasattr(self.loss, 'reduction'):
+      self.loss.reduction = 'none'
+    if hasattr(self.loss, 'reduce'):
+      self.loss.reduce = False
+
+    self.min = min
+    self.max = max
+
+  def forward(self, *input, **kwargs):
+    losses = self.loss(*input, **kwargs)
+
+    mask = None
+    with torch.inference_mode():
+      if self.min is not None:
+        mask = losses >= self.min
+      if self.max is not None:
+        if mask is None:
+          mask = losses <= self.max
+        else:
+          mask *= losses <= self.max
+    if mask is not None:
+      losses = losses[mask]
+
+    return _reduce(losses, reduction=self.reduction, reduce=self.reduce)

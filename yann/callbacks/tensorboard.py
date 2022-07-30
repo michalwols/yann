@@ -58,6 +58,11 @@ class Tensorboard(Callback):
     if self.writer is None:
       self._init_writer()
 
+    try:
+      self.writer.add_hparams(dict(self.trainer.params), {})
+    except Exception as e:
+      print(f'failed to write tensorboard hparams: {e}')
+
   def on_train_end(self, trainer=None):
     if self.trainer and self.trainer.params and self.trainer.history.val_metrics:
       try:

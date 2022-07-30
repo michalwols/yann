@@ -4,6 +4,7 @@ Adapted from https://github.com/rwightman/pytorch-image-models/blob/master/timm/
 import torch
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 
+
 def unitwise_norm(x: torch.Tensor, p=2.0):
   if x.ndim <= 1:
     return x.norm(p)
@@ -33,7 +34,7 @@ def clip_grad_adaptive_(parameters, value=.01, norm_type=2.0, eps=1e-3):
     param.grad.detach().copy_(new_grads)
 
 
-def clip_grad_(parameters, value, norm_type=None, mode='adaptive'):
+def clip_grad_(parameters, value, norm_type=2.0, mode='adaptive'):
   if mode == 'adaptive':
     return clip_grad_adaptive_(
       parameters=parameters,
@@ -53,3 +54,31 @@ def clip_grad_(parameters, value, norm_type=None, mode='adaptive'):
     )
   else:
     raise ValueError(f'Unsupported mode={mode}, must be adaptive, norm or value')
+
+
+class GradClipper:
+  def __init__(self, value, norm_type=2.0, mode='adaptive'):
+    """
+
+    Args:
+      value:
+      norm_type:
+      mode: 'adaptive' | 'norm' | 'value'
+    """
+    self.value = value
+    self.norm_type = norm_type
+    self.mode = mode
+
+  def __call__(self, parameters):
+    return clip_grad_(
+      parameters=parameters,
+      value=self.value,
+      norm_type=self.norm_type,
+      mode=self.mode
+    )
+
+  def state_dict(self):
+    return self.__dict__
+
+  def load_state_dict(self, dict):
+    self.__dict__.update(dict)

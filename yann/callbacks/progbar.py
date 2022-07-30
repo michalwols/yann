@@ -27,7 +27,10 @@ class ProgressBar(Callback):
 
 
     if trainer:
-      total = (len(trainer.dataset) if self.samples else len(trainer.loader))
+      try:
+        total = (len(trainer.dataset) if self.samples else len(trainer.loader))
+      except:
+        total = None
     else:
       total = None
 

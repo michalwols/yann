@@ -1,42 +1,7 @@
-import logging
-from pathlib import Path
 import torch
 
+from .defaults import default
 from .registry import Registry, pass_args, is_public_callable
-
-
-
-
-class default:
-  root = Path('~/.yann/')
-  torch_root = Path('~/.torch')
-
-  if torch.cuda.is_available():
-    device = torch.device('cuda')
-  elif hasattr(torch, 'backends') and torch.backends.mps.is_available():
-    device = torch.device('mps')
-  else:
-    device = torch.device('cpu')
-
-  batch_size = 32
-  num_workers = None
-  optimizer = None
-
-  callbacks = None
-
-  train_root = './runs/'
-
-  checkpoint_name_format = ''
-
-  ddp_find_unused_parameters = True
-
-  datasets_root = torch_root / 'datasets'
-
-  @classmethod
-  def dataset_root(cls, dataset):
-    if hasattr(dataset, 'root'):
-      return dataset.root
-    return str(cls.datasets_root / dataset.__name__)
 
 
 
@@ -49,10 +14,10 @@ registry = Registry()
 import torchvision.datasets
 
 from torch.utils.data import Dataset
-from ..datasets import imagenette, voc, coco
+from ..datasets import imagenette, voc, coco, food101
 
 registry.dataset.index(
-  [torchvision.datasets, imagenette, voc, coco],
+  [torchvision.datasets, imagenette, voc, coco, food101],
   types=(Dataset,),
   init=lambda D, root=None, download=True, **kwargs: \
     D(root=str(root or default.dataset_root(D)),
