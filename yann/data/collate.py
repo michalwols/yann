@@ -63,3 +63,16 @@ def image_collate(batch, memory_format=torch.contiguous_format):
     nump_array = np.rollaxis(nump_array, 2)
     tensor[i] += torch.from_numpy(nump_array)
   return tensor, targets
+
+
+
+class KeyCollate:
+  def __init__(self, *keys):
+    self.keys = keys
+
+  def __call__(self, samples):
+    return tuple(
+      torch.stack(
+        [s[k] for s in samples]
+      ) for k in self.keys
+    )
