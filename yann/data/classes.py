@@ -62,22 +62,23 @@ class Classes(TargetTransformer):
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
     self.default_encoding = default_encoding
 
-  def weights(self, list=True):
+  def weights(self, list=True, mode='multiclass', normalize=True):
     if self.counts:
-      total = sum(self.counts.values())
+      weights = get_class_weights(self.counts, mode=mode, normalize=normalize)
       if list:
-        return [total / self.counts[n] for n in self.names]
+        return [weights[n] for n in self.names]
       else:
-        return {n: total / c for n, c in self.counts.items()}
-    raise NotImplementedError(
-      'Weights can not be determined unless `counts` are set'
-    )
+        return weights
+    else:
+      raise NotImplementedError(
+        'Weights can not be determined unless `counts` are set'
+      )
 
   @classmethod
   def from_labels(cls, labels, **kwargs):
     counts = Counter()
     for l in labels:
-      if isinstance(l, str):
+      if isinstance(l, (str, int)):
         counts[l] += 1
       else:
         counts.update(l)
@@ -172,6 +173,10 @@ class Classes(TargetTransformer):
     indices = np.argsort(scores)
     return [(self.names[i], scores[i]) for i in indices][::-1]
 
+  # def truncate(self, min_count=None, topk=None, token='_OTHER_'):
+  #   if self.counts is None:
+  #     raise NotImplementedError("truncate not supported without counts")
+  #   pass
 
 def smooth(y, eps=.1, num_classes=None):
   if not num_classes:
@@ -180,3 +185,41 @@ def smooth(y, eps=.1, num_classes=None):
     else:
       num_classes = y.shape[1]
   return y * (1 - eps) + eps * (1.0 / num_classes)
+
+
+def get_class_weights(class_counts: dict, mode='multiclass', normalize=True, num_samples=None):
+  """
+  Args:
+    class_counts: dict mapping from class to count
+    mode: 'multiclass' | 'multilabel' | 'binary'
+    normalize: if true will make sum of weights equal number of classes
+    num_samples: count of samples in dataset, needed
+  Returns:
+    weights (dict): mapping from class to weight value
+  """
+  if mode == 'multiclass':
+    num_samples = num_samples or sum(class_counts.values())
+    weights = {
+      k: num_samples / count for k, count in class_counts.items()
+    }
+    if normalize:
+      scale = len(weights) / sum(weights.values())
+      return {k: w * scale for k, w in weights.items()}
+    else:
+      return weights
+  elif mode in ('binary', 'multilabel'):
+    # NOTE: a bit of a hack, assuming num pos labels == num_samples
+    num_samples = num_samples or sum(class_counts.values())
+    weights = {
+      k: (num_samples - pos_count) / pos_count for k, pos_count in class_counts.items()
+    }
+    if normalize:
+      scale = len(weights) / sum(weights.values())
+      return {k: w * scale for k, w in weights.items()}
+    else:
+      return weights
+  else:
+    raise ValueError(
+      f'''Unsupported mode, got "{mode}", expected one of '''
+      '''multiclass, multilabel, binary'''
+    )
