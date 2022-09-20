@@ -135,6 +135,17 @@ def scaffold():
   raise NotImplementedError()
 
 
+
+
+@cli.command()
+@click.argument('src')
+@click.argument('dst')
+def convert(src: str, dst: str):
+  import yann
+  data = yann.load(src)
+  print(f'loaded {type(data)}')
+  yann.save(data, dst)
+
 def main():
   cli()
 
