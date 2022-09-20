@@ -47,7 +47,19 @@ class Paths:
 
   @property
   def summary(self):
-    return self.root / 'summary.json'
+    return self.root / 'summary.yaml'
+
+  @property
+  def profile(self):
+      return self.root / 'profile'
+
+  @property
+  def git_diff(self):
+    return self.root / 'git.diff'
+
+  @property
+  def requirements(self):
+    return self.root / 'requirements.txt'
 
   def tree(self, **kwargs):
     print_tree(self.root, **kwargs)
