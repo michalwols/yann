@@ -1,3 +1,4 @@
+import logging
 import os
 from math import cos, pi
 import numpy as np
@@ -85,11 +86,12 @@ class LRRangeTest(Callback):
       self,
       start_lr=.00001,
       end_lr=1,
+      steps=500,
       step=None,
-      steps=None,
-      log_freq=None,
-      plot_freq=None,
-      divergence_multiplier=4
+      log_freq=10,
+      plot_freq=100,
+      divergence_multiplier=4,
+      plot_path=None,
   ):
     super(LRRangeTest, self).__init__()
     self.checkpoint_path = None
@@ -109,8 +111,10 @@ class LRRangeTest(Callback):
     self.lrs = []
     self.losses = []
 
+    self.plot_path = plot_path
     self.plot_freq = plot_freq
     self.log_freq = log_freq
+
 
     self.divergence_multiplier = divergence_multiplier
 
@@ -125,8 +129,6 @@ class LRRangeTest(Callback):
     )
 
   def on_train_start(self, trainer=None):
-    self.checkpoint_path = trainer.checkpoint(name='lr-range-test')
-
     self.lrs = [self.start_lr]
     set_param(trainer.optimizer, 'lr', self.lrs[-1])
 
@@ -148,6 +150,7 @@ class LRRangeTest(Callback):
       self.min_loss = self.avg_loss
     elif (self.avg_loss > self.divergence_multiplier * self.min_loss) and \
         len(self.lrs) > 50:
+      logging.info('Loss diverged, stopping LR Range Test')
       trainer.stop()
       return
     elif self.avg_loss < self.min_loss:
@@ -160,19 +163,17 @@ class LRRangeTest(Callback):
     self.lrs.append(self.lrs[-1] + self.step)
     set_param(trainer.optimizer, 'lr', self.lrs[-1])
 
-  def restore(self, trainer):
-    trainer.load_checkpoint(self.checkpoint_path)
-    os.remove(self.checkpoint_path)
-
-  def on_train_end(self, trainer=None):
-    self.restore(trainer)
-
-  def on_error(self, error, trainer=None):
-    self.restore(trainer)
 
   def plot(self, **kwargs):
-    plot_line(x=self.lrs, y=self.losses, xlabel='learning rate', ylabel='loss',
-              **kwargs)
+    plot_line(
+      x=self.lrs,
+      y=self.losses,
+      xlabel='learning rate',
+      ylabel='loss',
+      save=self.plot_path,
+      show=not self.plot_path,
+      **kwargs
+    )
 
 
 class CyclicalLR(Callback):

@@ -2,6 +2,11 @@ from collections import defaultdict
 
 
 class Callback:
+  enabled = True
+
+  def disable(self):
+    self.enabled = False
+
   def on_train_start(self, trainer=None):
     pass
 

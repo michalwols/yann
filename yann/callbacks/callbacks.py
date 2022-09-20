@@ -19,9 +19,11 @@ class Events:
 def callback(method):
   def wrapped_method(self, *args, **kwargs):
     ret = method(self, *args, **kwargs)
-    for c in self:
-      if hasattr(c, method.__name__):
-        getattr(c, method.__name__)(*args, **kwargs)
+    for callback_ in self:
+      if hasattr(callback_, 'enabled') and not callback_.enabled:
+        continue
+      if hasattr(callback_, method.__name__):
+        getattr(callback_, method.__name__)(*args, **kwargs)
     return ret
 
   return wrapped_method
