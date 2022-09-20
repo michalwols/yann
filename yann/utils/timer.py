@@ -1,5 +1,5 @@
 from collections import OrderedDict, defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, ContextDecorator
 
 from datetime import datetime
 import torch.cuda
@@ -9,7 +9,7 @@ from ..viz.plot import plot_timeline
 def time(name=None, sync=False):
   return Task(name=name, sync=sync, log=True)
 
-class Task:
+class Task(ContextDecorator):
   __slots__ = ('name', 'start_time', 'end_time', 'meta', 'sync', 'log')
 
   def __init__(self, name=None, start=None, end=None, meta=None, sync=False, log=False):
@@ -104,3 +104,4 @@ class Timer:
 
   def plot(self):
     plot_timeline(self.tasks)
+

@@ -8,7 +8,7 @@ from .timer import Timer
 # - https://pytorch.org/docs/stable/bottleneck.html
 
 def param_count(model):
-  return sum(p.numel() for p in model.parameters())
+  return sum(p.numel() for p in (model.parameters() if isinstance(model, torch.nn.Module) else model))
 
 
 def profile_module(
