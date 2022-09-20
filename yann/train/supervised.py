@@ -13,14 +13,14 @@ from torch.utils.data import Sampler, DataLoader
 
 import yann
 from yann.data import get_dataset_name, Classes
-from yann.data.io import save_json
 from yann.datasets import TransformDataset
 from yann.distributed import Dist
 from yann.export import export
 from yann.train.base import BaseTrainer
 from yann.train.paths import Paths
 from yann.utils import counter, timestr, hash_params, fully_qualified_name, memorable_id
-
+from yann.utils.timer import time
+from yann.utils.bash import git_hash, git_diff, pip_freeze
 
 class TrainState:
   num_steps: int
@@ -69,6 +69,7 @@ class Trainer(TrainState, BaseTrainer):
 
   DataLoader = DataLoader
 
+  @time('Initialize Trainer')
   def __init__(
       self,
       model: Optional[Union[torch.nn.Module, str]] = None,
@@ -211,7 +212,12 @@ class Trainer(TrainState, BaseTrainer):
     self.paths = Paths(Path(root or yann.default.train_root) / self.name / timestr(self.time_created))
     self.paths.create()
 
+    if self.dist.is_main:
+      yann.save.txt(git_diff(), self.paths.git_diff)
+      yann.save.txt(pip_freeze(), self.paths.requirements)
+
     self.update_summary()
+    self.save_summary()
 
   def _init_callbacks(self, callbacks, metrics):
     from yann.callbacks import get_callbacks
@@ -253,6 +259,7 @@ class Trainer(TrainState, BaseTrainer):
             find_unused_parameters=yann.default.ddp_find_unused_parameters
           )
 
+  @time('Initialize Data Loading')
   def _init_data_loaders(
       self,
       dataset=None,
@@ -312,7 +319,7 @@ class Trainer(TrainState, BaseTrainer):
           batch_sampler=batch_sampler,
           pin_memory=pin_memory,
           num_workers=num_workers,
-          persistent_workers=persistent_workers,
+          persistent_workers=persistent_workers and num_workers > 0,
           prefetch_factor=prefetch_factor,
           **({'collate_fn': collate} if collate else {})
         )
@@ -324,7 +331,7 @@ class Trainer(TrainState, BaseTrainer):
           shuffle=False if self.sampler else True,
           sampler=self.sampler,
           num_workers=num_workers,
-          persistent_workers=persistent_workers,
+          persistent_workers=persistent_workers and num_workers > 0,
           prefetch_factor=prefetch_factor,
           **({'collate_fn': collate} if collate else {})
         )
@@ -550,13 +557,19 @@ class Trainer(TrainState, BaseTrainer):
   def forward(self, inputs=None, targets=None):
     with autocast(enabled=self.amp):
       outputs = self.model(inputs)
-      loss = self.loss(outputs, targets)
-    return outputs, loss
+      if self.loss:
+        loss = self.loss(outputs, targets)
+        return outputs, loss
+      else:
+        return outputs, outputs  # FIXME: return None?
 
   def update(self, loss=None, inputs=None, targets=None, outputs=None):
     """
     Handles resetting gradients, running backward pass and optimizer step
     """
+
+    # TODO: add gradient accumulation
+
     self.optimizer.zero_grad(set_to_none=self._none_grad)
 
     if self.grad_scaler:
@@ -689,6 +702,9 @@ class Trainer(TrainState, BaseTrainer):
       except Exception as e:
         self.callbacks.on_error(e, trainer=self)
         raise e
+      finally:
+        self.update_summary()
+        self.save_summary()
     else:
       for epoch_idx in self.epochs(num=epochs):
 
@@ -710,14 +726,16 @@ class Trainer(TrainState, BaseTrainer):
           metric=self.history.metrics.running_mean('loss')
           if val_loss is None else val_loss
         )
+      self.update_summary()
+      self.save_summary()
 
   def _lr_scheduler_step(self, step=None, metric=None):
     if self.lr_scheduler:
       args = dict()
       if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
         args['metrics'] = metric
-      if 'metrics' in self.lr_scheduler.step.__code__.co_varnames:
-        args['epoch'] = step
+      # if 'epoch' in self.lr_scheduler.step.__code__.co_varnames:
+      #   args['epoch'] = step
       self.lr_scheduler.step(**args)
 
   def __call__(self, *args, **kwargs):
@@ -825,15 +843,61 @@ class Trainer(TrainState, BaseTrainer):
     if skipped:
       logging.warning(f'skipped {skipped} when loading checkpoint')
 
+  def _get_env(self):
+    import sys
+    import os
+    import socket
+    return dict(
+      cwd=os.getcwd(),
+      arguments=sys.argv,
+      git_hash=git_hash(),
+      python=dict(
+        executable=sys.executable,
+        version=sys.version,
+        path=sys.path
+      ),
+      torch_version=torch.__version__,
+      yann_version=yann.__version__,
+      hostname=socket.gethostname()
+    )
+
   def update_summary(self):
+
     self.summary.update(dict(
       id=self.id,
       name=self.name,
       path=str(self.paths.root),
+      num_steps=self.num_steps,
+      num_samples=self.num_samples,
+      num_epochs=self.num_epochs,
+      batch_size=self.batch_size,
+      device=str(self.device),
+      time_created=self.time_created,
+      params=self.params,
     ))
 
+    if 'env' not in self.summary:
+      self.summary['env'] = self._get_env()
+
+    if self.dataset:
+      if 'dataset' not in self.summary:
+        self.summary['dataset'] = {}
+      self.summary['dataset'].update(dict(
+        name=get_dataset_name(self.dataset),
+        size=len(self.dataset),
+        num_classes=len(self.dataset.classes) if hasattr(self.dataset, 'classes') else None
+      ))
+    if self.model:
+      if 'model' not in self.summary:
+        self.summary['model'] = {}
+      self.summary['model'].update(dict(
+        name=yann.get_model_name(self.model),
+        param_count=yann.param_count(self.model),
+        trainable_param_count=yann.param_count(yann.trainable(self.model.parameters()))
+      ))
+
   def save_summary(self):
-    save_json(self.summary, self.paths.summary)
+    yann.save(self.summary, self.paths.summary)
     return self.paths.summary
 
   def __str__(self):
@@ -895,3 +959,9 @@ samples: {self.num_samples}
       f"\n  device={self.device}"
       "\n)"
     )
+
+  def __getstate__(self):
+    return self.__dict__
+
+  def __setstate__(self, state):
+    self.__dict__.update(state)
