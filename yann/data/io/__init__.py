@@ -48,7 +48,7 @@ class Loader:
   def yaml(self, path, **kwargs):
     import yaml
     with open(path, 'r') as f:
-      return yaml.load(f)
+      return yaml.load(f, yaml.SafeLoader)
 
   def image(self, path, **kwargs):
     import PIL.Image
@@ -124,8 +124,6 @@ class Saver:
       pq.write_table(x, path, **kwargs)
     else:
       raise ValueError(f'Unsupported type {type(x)} expected pandas.Dataframe or pyarrow.Table')
-
-
 
   def pickle(self, x, path, **kwargs):
     return save_pickle(x, path, **kwargs)
