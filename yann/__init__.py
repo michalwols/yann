@@ -8,6 +8,7 @@ from typing import Union
 import torch
 from torch import nn
 import numpy as np
+
 from .config.setup import registry, default
 
 register = registry
@@ -15,7 +16,7 @@ resolve = registry.resolve
 
 from pathlib import Path
 
-from yann.utils import to_numpy, repeat, counter
+from yann.utils import to_numpy, repeat, counter, is_notebook, timeout
 from yann.data import batches, shuffle, chunk
 from yann.data.io import load, save
 from yann.data.io.download import download
@@ -75,6 +76,15 @@ from yann.data.loaders import loader
 context = object()
 
 
+memory_formats = dict(
+  contiguous_format=torch.contiguous_format,
+  channels_last=torch.channels_last,
+  preserve_format=torch.preserve_format
+)
+
+
+
+
 def seed(val=1, deterministic=False):
   import numpy as np
   import torch
@@ -93,7 +103,7 @@ def seed(val=1, deterministic=False):
   return val
 
 
-def get_item(x):
+def get_item(x: Union[torch.Tensor, np.ndarray]):
   if torch.is_tensor(x):
     if x.is_cuda:
       x = x.cpu()
@@ -481,3 +491,4 @@ import yann.params
 import yann.metrics
 import yann.train
 import yann.callbacks
+import yann.optim

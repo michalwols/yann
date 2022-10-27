@@ -1,14 +1,38 @@
+import argparse
 import re
 import sys
-from typing import Union, Optional
-
+from typing import Union, Optional, Dict, Any, TYPE_CHECKING
+import typing
+from contextlib import contextmanager
 import numpy as np
 import torch
 from PIL import Image
 import datetime
 
+if TYPE_CHECKING:
+  import yann
+
 from .ids import memorable_id
 
+
+def env_info():
+  import sys
+  import os
+  import socket
+  from .bash import git_hash
+  return dict(
+    cwd=os.getcwd(),
+    arguments=sys.argv,
+    git_hash=git_hash(),
+    python=dict(
+      executable=sys.executable,
+      version=sys.version,
+      path=sys.path
+    ),
+    torch_version=torch.__version__,
+    yann_version=yann.__version__,
+    hostname=socket.gethostname()
+  )
 
 def timestr(d=None):
   return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
@@ -35,15 +59,51 @@ def str2bool(v):
     raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
-  import argparse
+
+def supports_primitive_types(t: type, types=(bool, str, int, float)):
+  if hasattr(t, '__args__'):  # handle typing.Union, typing.Optional
+    if not any(x in t.__args__ for x in types):
+      return False
+  elif t not in types:
+    return False
+
+  return True
+
+def get_primitive_type(t: type, types=(bool, str, int, float)):
+  if t in types:
+    return t
+  if hasattr(t, '__args__'):  # handle typing.Union
+    for x in types:
+      if x in t.__args__:
+        return x
+
+def get_arg_parser(
+    x: Union[Dict[str, Dict[str, Any],], Dict[str, 'yann.params.Field']],
+    description=None,
+    epilog=None,
+    parser: Optional[argparse.ArgumentParser]=None,
+    **kwargs
+):
   from ..params import Field
-  parser = parser or argparse.ArgumentParser(description=description,
-                                             epilog=epilog, **kwargs)
+  parser = parser or argparse.ArgumentParser(
+    description=description,
+    epilog=epilog,
+    **kwargs
+  )
 
   abbreviations = {'h'}
 
+  v: Union[Dict, Field]
   for k, v in x.items():
+    # TODO: add support for typing.Literal and typing.Sequence
+
+    T = v.get('type') if isinstance(v, dict) else v.type
+
+    if not supports_primitive_types(T):
+      continue  # skip complex types that are not handled by argparse
+
+    prim_type: type = get_primitive_type(T)
+
     names = []
     abbreviated = abbreviate(k)
     if abbreviated not in abbreviations:
@@ -52,11 +112,10 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
     names.append(f"--{camel_to_snake(k)}")
 
     if isinstance(v, dict):
-      T = v.get('type')
       parser.add_argument(
         *names,
         default=v.get('default'),
-        type=str2bool if T is bool else T,
+        type=str2bool if prim_type is bool else prim_type,
         action=v.get('action'),
         help=v.get('help'),
         required=v.get('required'),
@@ -67,8 +126,8 @@ def get_arg_parser(x, description=None, epilog=None, parser=None, **kwargs):
       parser.add_argument(
         *names,
         default=v.default,
-        type=str2bool if v.type is bool else v.type,
-        help=f"{v.help or k} (default: {v.default})",
+        type=str2bool if prim_type is bool else prim_type,
+        help=f"{v.help or k} (default: {v.default}, type: {prim_type.__name__})",
         required=v.required,
         choices=getattr(v, 'choices', None),
       )
@@ -90,7 +149,7 @@ def almost_equal(t1, t2, prec=1e-12):
   return torch.all(torch.lt(torch.abs(torch.add(t1, -t2)), prec))
 
 
-def equal(t1, t2):
+def equal(t1: torch.Tensor, t2: torch.Tensor):
   return torch.all(t1 == t2)
 
 
@@ -262,3 +321,31 @@ def source_string_import(code: str, module_name: str) -> "types.ModuleType":
   module = importlib.util.module_from_spec(spec)
   exec(code, module.__dict__)
   return module
+
+
+def is_notebook() -> bool:
+  try:
+    shell = get_ipython().__class__.__name__
+    if shell == 'ZMQInteractiveShell':
+      return True
+    elif shell == 'TerminalInteractiveShell':
+      return False
+    else:
+      return False
+  except NameError:
+    return False
+
+
+
+@contextmanager
+def timeout(seconds, message='Exceeded time'):
+  import signal
+  def error():
+    raise TimeoutError(message)
+
+  signal.signal(signal.SIGALRM, error())
+  signal.alarm(seconds)
+  try:
+    yield
+  finally:
+    signal.alarm(0)
