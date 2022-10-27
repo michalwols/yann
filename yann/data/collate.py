@@ -24,7 +24,10 @@ class PadCollate:
 
 class FilterCollate:
   def __init__(
-    self, filter=None, collate=default_collate, value=None
+    self,
+      filter=None,
+      value=None,
+      collate=default_collate,
   ):
     self.filter = filter or (
       lambda items: [it for it in items if it is not value]

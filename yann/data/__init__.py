@@ -4,7 +4,7 @@ import types
 from .classes import Classes
 from .loaders import TransformLoader
 from .transform import Transformer
-
+from . import place
 
 def get_name(x):
   if hasattr(x, 'name'):

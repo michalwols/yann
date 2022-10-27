@@ -35,6 +35,7 @@ class BalancedTargetSampler(Sampler):
 
   def __iter__(self):
     for n in range(len(self)):
+      # FIXME: use np.random to speed this up
       t = random.choice(self.targets)
       yield random.choice(self.target_to_indices[t])
 
