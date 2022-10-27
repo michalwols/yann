@@ -1,5 +1,11 @@
 from itertools import zip_longest
 import logging
+from typing import Union
+import typing
+
+import math
+import numpy as np
+import torch
 
 
 class DatasetWrapper:
@@ -16,7 +22,14 @@ class DatasetWrapper:
     # proxy attribute lookups to the wrapped dataset so the
     # wrappers can transparently wrap datasets without breaking
     # code that expects a plain dataset
-    return super().__getattr__(self.dataset, item)
+    return getattr(self.dataset, item)
+
+  # NOTE: need get and set state to avoid issues when pickling for multiprocessing
+  def __getstate__(self):
+    return self.__dict__
+
+  def __setstate__(self, state):
+    self.__dict__.update(state)
 
 
 class IncludeIndex(DatasetWrapper):
@@ -47,8 +60,56 @@ class Sliceable(DatasetWrapper):
     return self.dataset[x]
 
 
+class Subset(DatasetWrapper):
+  @typing.overload
+  def __init__(self, dataset: typing.Mapping, indices: Union[np.ndarray, torch.Tensor]):
+    ...
+
+  @typing.overload
+  def __init__(self, dataset: typing.Mapping, end: Union[float, int]):
+    ...
+
+  @typing.overload
+  def __init__(self, dataset: typing.Mapping, start: Union[float, int], end: Union[float, int]):
+    ...
+
+  def __init__(self, dataset, *args):
+    super(Subset, self).__init__(dataset)
+
+    self.start = None
+    self.end = None
+    self.indices = None
+
+    if len(args) == 1:
+      if isinstance(args[0], int):
+        self.start = 0
+        self.end = args[0] if not (0 < args[0] < 1) else math.floor(len(dataset) * args[0])
+      elif isinstance(args[0], Union[np.ndarray, torch.Tensor]):
+        self.indices = args[0]
+    elif len(args) == 2:
+      if 0 < args[1] <= 1:
+        self.start = math.floor(len(dataset) * args[0])
+        self.end = math.floor(len(dataset) * args[1])
+      else:
+        self.start, self.end = args
+
+  def __len__(self):
+    if self.indices is not None:
+      return self.indices
+    else:
+      return self.end - self.start
+
+  def __getitem__(self, index):
+    if index >= len(self):
+      raise IndexError(f'Index out of bounds {index}')
+    if self.indices is not None:
+      return self.dataset[self.indices[index]]
+    else:
+      return self.dataset[self.start + index]
+
+
 class Slice(DatasetWrapper):
-  def __init__(self, dataset, start=None, end=None):
+  def __init__(self, dataset, start=0, end=None):
     super(Slice, self).__init__(dataset)
 
     self.start = start
@@ -176,3 +237,4 @@ class VariableLength(DatasetWrapper):
 
   def __getitem__(self, idx):
     return self.dataset[idx % len(self.dataset)]
+

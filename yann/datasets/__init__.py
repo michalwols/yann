@@ -5,7 +5,7 @@ from typing import Union, Iterable, Any
 import torch
 from torch.utils import data
 
-from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex, IndexedView
+from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex, IndexedView, Subset
 from ..data.classes import Classes
 
 
@@ -89,3 +89,4 @@ class TinyDigits(data.TensorDataset):
 # from .voc import VOCMultilabel
 # from .coco import CocoMultilabel
 # from .imagenette import Imagenette, Imagewoof
+
