@@ -33,25 +33,45 @@
 from abc import ABCMeta
 from collections import OrderedDict
 from copy import deepcopy
+from typing import Dict
+import typing
+import logging
 from .utils import get_arg_parser
 
+
+log = logging.getLogger(__name__)
+
+class ValidationError(ValueError):
+  pass
 
 class Field:
   def __init__(
     self,
+    *,
+    name=None,
     help=None,
     type=None,
     required=False,
     default=None,
+    choices=None
   ):
+    self.name = name
     self.help = help
     self.type = type
     self.required = required
     self.default = default
+    self.choices = choices
 
   def validate(self, val):
-    if self.type:
-      assert isinstance(val, self.type)
+    try:
+      if self.type and not isinstance(val, self.type):
+        raise ValidationError(
+          f'Failed to validate {self.name}, the type ({type(val)} does is not a subclass of {self.type}')
+    except TypeError as e:
+      log.debug(f'skipping type validation due to unresolved forwardref for {self.name} and expected type {self.type}')
+    if self.choices:
+      assert val in self.choices
+
 
   def __repr__(self):
     return f"{self.__class__.__name__}(type={self.type}, default={self.default})"
@@ -62,12 +82,7 @@ class Field:
 
 class Choice(Field):
   def __init__(self, choices=None, **kwargs):
-    super().__init__(**kwargs)
-    self.choices = choices
-
-  def validate(self, val):
-    super().validate(val)
-    assert val in self.choices
+    super().__init__(choices=choices, **kwargs)
 
 
 class Range(Field):
@@ -82,6 +97,8 @@ class Range(Field):
 
 
 class HyperParamsBase:
+  __fields__: Dict[str, Field]
+
   def __init__(self, **args):
     self._change_callbacks = []
 
@@ -178,9 +195,6 @@ class HyperParamsBase:
   def __contains__(self, key):
     return key in self.__fields__
 
-  def __len__(self):
-    return len(self.keys())
-
   def __hash__(self):
     return hash(tuple(sorted(self.items())))
 
@@ -219,8 +233,6 @@ class HyperParamsBase:
 
     return cls(**d)
 
-  def __eq__(self, other):
-    return hash(self) == hash(other)
 
 
 class MetaHyperParams(ABCMeta):
@@ -229,7 +241,11 @@ class MetaHyperParams(ABCMeta):
 
     for base in reversed(bases):
       if issubclass(base, HyperParamsBase) and base != HyperParamsBase:
-        fields.update(deepcopy(base.__fields__))
+        fields.update(
+          # deepcopy(
+            base.__fields__
+          # )
+        )
 
     # existing_attributes = set(dir(HyperParamsBase)) | set(fields)
 
@@ -250,9 +266,11 @@ class MetaHyperParams(ABCMeta):
 
     for name, value in new_attributes.items():
       if name in fields:
+        # already defined annotation, need to set default
         fields[name].default = value
       else:
-        fields[name] = Field(default=value, type=type(value))
+        # new attribute without type annotation
+        fields[name] = Field(name=name, default=value, type=type(value))
 
     return super().__new__(
       metaclass,
@@ -266,7 +284,16 @@ class MetaHyperParams(ABCMeta):
 
 
 class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
-  pass
+  def __getstate__(self):
+    return self.__dict__
+
+  def __setstate__(self, state):
+    self.__dict__.update(state)
+
+  def __reduce__(self):
+    return (self.__class__, )
 
 
 
+def to_argparse(params: HyperParams, **kwargs):
+  return get_arg_parser(params.__fields__, **kwargs)
