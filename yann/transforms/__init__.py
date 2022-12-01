@@ -1,6 +1,6 @@
 import base64
 import os
-
+from typing import Protocol, Any
 import io
 import numpy as np
 import pathlib
@@ -15,7 +15,26 @@ from torchvision import transforms
 from ..utils import truthy
 
 
-class Transformer:
+class Transform(Protocol):
+  def __call__(self):
+    pass
+
+
+class FittableTransform(Transform):
+  def fit(self, x: Any):
+    ...
+
+  def transform(self, x: Any) -> Any:
+    ...
+
+  def fit_transform(self, x: Any) -> Any:
+    ...
+
+
+
+
+
+class Transforms:
   def __init__(self, load=None, transform=None, to_tensor=None):
     self.load = load
     self.transform = transform
@@ -46,7 +65,14 @@ class Transformer:
       ")")
 
 
-class ImageTransformer(Transformer):
+
+
+
+ # for backwards compatibility after rename, to avoid confusion with "Transformers"
+Transformer = Transforms
+
+
+class ImageTransforms(Transforms):
   def __init__(
       self,
       load=None,
@@ -122,7 +148,11 @@ class ImageTransformer(Transformer):
     pass
 
 
-class DictTransformer:
+ # for backwards compatibility after rename, to avoid confusion with "Transformers"
+ImageTransformer = ImageTransforms
+
+
+class DictTransforms:
   def __init__(self, **transforms):
     self.transforms = transforms
 
@@ -133,7 +163,7 @@ class DictTransformer:
     }
 
 
-class BatchTransformer:
+class BatchTransforms:
   def __init__(self, transform):
     self.transform = transform
 
@@ -245,7 +275,7 @@ def cutmix(inputs, targets, beta):
 
 
 
-def get_imagenet_transformers(
+def get_imagenet_transforms(
     size=224,
     crop_scale=(.5, 1.2),
     val_size=None,
@@ -266,7 +296,7 @@ def get_imagenet_transformers(
       transforms.RandomHorizontalFlip(),
     ])
 
-  train_transform = Transformer(
+  train_transform = Transforms(
     load=GetImage('RGB'),
     transform=augment,
     to_tensor=transforms.Compose([
@@ -278,7 +308,7 @@ def get_imagenet_transformers(
     ])
   )
 
-  test_transform = Transformer(
+  test_transform = Transforms(
     load=train_transform.load,
     transform=transforms.Compose([
       transforms.Resize(val_size or size, interpolation=Image.ANTIALIAS),

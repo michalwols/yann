@@ -33,6 +33,7 @@
 from abc import ABCMeta
 from collections import OrderedDict
 from copy import deepcopy
+from functools import wraps
 from typing import Dict
 import typing
 import logging
@@ -129,19 +130,26 @@ class HyperParamsBase:
       params.validate()
 
     return params
+  #
+  # @classmethod
+  # def from_env(cls, prefix=''):
+  #   raise NotImplementedError()
+  #
+  # @classmethod
+  # def from_constants(cls):
+  #   pass
 
   @classmethod
-  def from_env(cls, prefix=''):
-    raise NotImplementedError()
-
-  @classmethod
-  def from_constants(cls):
-    pass
-
-  @classmethod
-  def load(cls, path):
+  def load(cls, uri):
     import yann
-    data = yann.load(path)
+
+    try:
+      data = yann.load(uri)
+    except:
+      try:
+        data = yann.utils.dynamic_import(uri)
+      except:
+        raise ValueError('uri must be a file or fully qualified python path')
     return cls(**data)
 
   def save(self, path):
@@ -297,3 +305,53 @@ class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
 
 def to_argparse(params: HyperParams, **kwargs):
   return get_arg_parser(params.__fields__, **kwargs)
+
+
+
+def bind(params, mapping=None):
+  def decorator(function):
+
+    import inspect
+    sig = inspect.signature(function)
+
+    _mapping = mapping or {}
+    for p in sig.parameters:
+      if p not in _mapping and p in params:
+        _mapping[p] = p
+    @wraps(function)
+    def bound(*args, **kwargs):
+
+      for k, p in _mapping.items():
+        if k in kwargs:
+          params[p] = kwargs[k]
+        else:
+          kwargs[k] = params[p]
+
+      return function(*args, **kwargs)
+
+    return bound
+
+  return decorator
+
+
+
+def from_signature(function, params: HyperParams = None):
+  import inspect
+  sig = inspect.signature(function)
+
+  params = params or HyperParams()
+  for k, p in sig.parameters.items():
+
+    default = p.default if p.default is not p.empty else None
+
+    params.__fields__[k] = Field(
+      name=p.name,
+      default=default,
+      type=p.annotation if p.annotation is not p.empty else (type(p.default) if p.default is not p.empty else None)
+    )
+    params[k] = default
+  return params
+
+
+def register():
+  pass

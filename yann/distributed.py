@@ -4,6 +4,9 @@ import os
 
 
 class Dist:
+  """
+  torch.distributed wrapper that also supports non distributed mode
+  """
   def __init__(self, backend='nccl', init_method='env://', world_size=None, rank=None):
     self.backend = backend
     self.init_method = init_method

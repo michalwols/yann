@@ -81,7 +81,34 @@ class Resolver:
       args=None,
       kwargs=None
   ):
+    """
+
+    Args:
+      x:
+      required:
+      validate:
+      instance:
+      types:
+      init:
+      args:
+      kwargs:
+
+    Returns:
+
+    """
     initial = x
+
+    if isinstance(x, tuple):
+      if len(x) == 2:
+        kwargs = kwargs or {}
+        kwargs.update(x[1])
+        x = x[0]
+      elif len(x) == 3:
+        x, a, k = x
+        args = (args or []) + a
+        kwargs = kwargs or {}
+        kwargs.update(k)
+
     if isinstance(x, str):
       record = self.registry[x]
       x = record.x

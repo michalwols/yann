@@ -1,4 +1,4 @@
-from yann.data.classes import Classes
+from yann.data.classes import Classes, get_class_weights
 
 
 
@@ -19,3 +19,12 @@ def test_classes():
 
   classes = Classes(counts={'a': 10, 'b': 20})
   assert classes.weights() == [30/10, 30/20]
+
+
+def test_class_weights():
+  counts = {
+    0: 4,
+    1: 5,
+    2: 10
+  }
+

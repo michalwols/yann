@@ -2,7 +2,7 @@
 from pathlib import Path
 from ..data.io import load_json
 from ..data import flatten
-from .supervised import Trainer
+from .trainer import Trainer
 
 from .functional import train, step
 

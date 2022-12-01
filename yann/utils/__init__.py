@@ -20,10 +20,18 @@ def env_info():
   import os
   import socket
   from .bash import git_hash
+  import yann
+
+
+  try:
+    gith = git_hash()
+  except:
+    gith = None
+
   return dict(
     cwd=os.getcwd(),
     arguments=sys.argv,
-    git_hash=git_hash(),
+    git_hash=gith,
     python=dict(
       executable=sys.executable,
       version=sys.version,
@@ -349,3 +357,17 @@ def timeout(seconds, message='Exceeded time'):
     yield
   finally:
     signal.alarm(0)
+
+
+def apply_known(function: typing.Callable, arguments: dict):
+  """
+  Checks function signature and only passes keys from `arguments`
+    that are defined in the signature
+  """
+  import inspect
+  sig = inspect.signature(function)
+  return function(
+    **{k: arguments[k]
+       for k in sig.parameters
+       if k in arguments
+       })

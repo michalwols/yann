@@ -23,7 +23,7 @@ class OptimizerState(Tracker):
     self.keys = keys
     self.prefix = prefix
 
-  def __call__(self, trainer: 'import yann.train.supervised.Trainer'):
+  def __call__(self, trainer: 'import yann.train.trainer.Trainer'):
     optim = self.optimizer or trainer.optimizer
     if not optim: return {}
 

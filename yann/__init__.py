@@ -82,7 +82,18 @@ memory_formats = dict(
   preserve_format=torch.preserve_format
 )
 
-
+def to_tensor(
+    x: Union[list, tuple, np.ndarray, torch.Tensor, 'PIL.Image.Image']
+) -> torch.Tensor:
+  if torch.is_tensor(x):
+    return x
+  if isinstance(x, np.ndarray):
+    return torch.from_numpy(x)
+  import PIL.Image
+  if isinstance(x, PIL.Image.Image):
+    from torchvision.transforms import functional as F
+    return F.to_tensor(x)
+  return torch.Tensor(x)
 
 
 def seed(val=1, deterministic=False):

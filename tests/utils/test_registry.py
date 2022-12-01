@@ -107,3 +107,16 @@ def test_yann_registry():
   assert len(yann.registry.optimizer)
 
   yann.resolve('MNIST', required=True)
+
+
+
+def test_tuple_arg():
+  import yann
+
+  @yann.register
+  class Foo:
+    def __init__(self, **kwargs):
+      self.kwargs = kwargs
+
+  foo = yann.resolve(('Foo', {'test': True}))
+  assert foo.kwargs['test'] == True

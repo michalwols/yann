@@ -1,15 +1,18 @@
+
 import datetime
 import inspect
 import logging
 import types
 from pathlib import Path
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Dict, Mapping, Sequence
 
 import torch
 import torch.nn
 from torch.cuda.amp import autocast, GradScaler
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
+from typing_extensions import Literal
+from typing_extensions import Unpack
 
 import yann
 from yann.data import get_dataset_name, Classes
@@ -18,18 +21,136 @@ from yann.distributed import Dist
 from yann.export import export
 from yann.train.base import BaseTrainer
 from yann.train.paths import Paths
-from yann.utils import counter, timestr, hash_params, fully_qualified_name, memorable_id
+from yann.utils import (
+  counter, timestr, hash_params, fully_qualified_name,
+  memorable_id, apply_known
+)
+from yann.utils.bash import git_diff, pip_freeze
 from yann.utils.timer import time
-from yann.utils.bash import git_hash, git_diff, pip_freeze
+
+log = logging.getLogger(__name__)
+
+
+class Keys:
+  """
+  keys for data batch
+  """
+  ids = None
+  inputs = 0
+  targets = 1
+
 
 class TrainState:
-  num_steps: int
-  num_epochs: int
-  num_samples: int
+  num_steps: int = 0
+  num_epochs: int = 0
+  num_samples: int = 0
+
+
+class Params(yann.params.HyperParams):
+  id: Union[str, int, None] = None
+  name: Union[str, None] = None
+  description: Optional[str] = None
+  project: Optional[str] = None
+  meta: Optional[Dict] = None
+
+  # root directory where training runs are stored
+  root: Union[str, Path, Paths] = './runs/'
+
+  model: Union[torch.nn.Module, str, None] = None
+
+  dataset: Union[torch.utils.data.Dataset, str, None] = None
+  subset: Optional[int] = None
+  batch_size: int = None
+  classes: Union[yann.data.Classes, Sequence[str], None] = None
+
+  optimizer: Union[torch.optim.Optimizer, str, None] = None
+  parameters: Union[torch.nn.ParameterList, Literal['trainable']] = 'trainable'
+  lr: Optional[float] = None
+  weight_decay: Optional[float] = None
+  momentum: Optional[float] = None
+  lr_scheduler: Union[torch.optim.lr_scheduler._LRScheduler, None] = None
+  lr_batch_step: bool = False
+  none_grad: bool = True
+
+  epochs: Optional[int] = None
+
+  # warmup
+  # min_lr
+  # max_lr
+
+  loss: Union[torch.nn.Module, str, None] = None
+
+  loader: Union[torch.utils.data.DataLoader, None] = None
+  num_workers: int = 8
+  collate: Union[Callable, None] = None
+  pin_memory: bool = True
+  sampler: Union[torch.utils.data.Sampler, None] = None
+  batch_sampler: Union[torch.utils.data.BatchSampler, None] = None
+  prefetch_factor: Optional[int] = 2
+  persistent_workers: Optional[bool] = True
+
+  transform: Union[
+    Callable,
+    Mapping[str, Callable],
+    Sequence[Callable],
+    None
+  ] = None
+  transform_batch: Union[Callable, None] = None
+
+  callbacks: Union[
+    Sequence['yann.callbacks.Callback'],
+    'yann.callbacks.Callbacks',
+    None
+  ] = None
+  device: Union[torch.device, str, None] = None
+  dtype: Optional[torch.dtype] = None
+
+
+  val_dataset: Union[torch.utils.data.Dataset, str, None] = None
+  val_subset: Optional[int] = None
+  val_loader: Union[torch.utils.data.DataLoader, None] = None
+  val_transform: Union[
+    Callable,
+    Mapping[str, Callable],
+    Sequence[Callable],
+    None
+  ] = None
+
+  metrics: Union[
+    Dict[str, Callable],
+    Sequence[Callable],
+    Sequence[str],
+    None
+  ] = None
+
+  dist: Optional[Dist] = None
+  parallel: Union[None, Literal['dp', 'ddp']] = None
+
+  amp: bool = False
+  grad_scaler: Optional[torch.cuda.amp.GradScaler] = None
+
+  benchmark: bool = True
+  jit: bool = False
+  memory_format: Optional[str] = 'preserve_format'
+  aot_autograd: bool = False
+  cuda_graph: bool = False
+
+  step: Optional[Callable] = None
+  place: Optional[Union[Callable, dict, tuple, yann.data.place.Place]] = None
+  clip_grad: Union[Callable, 'yann.optim.clip.GradClipper', dict] = None
+  seed: Optional[int] = None
+
+
+  from_checkpoint: Optional[str] = None
 
 
 class Trainer(TrainState, BaseTrainer):
   """
+  A training loop wrapper class that provides convenient initialization,
+  loading and checkpointing
+
+
+
   def train():
     for epoch in self.epochs:
       for batch in self.batches:
@@ -41,7 +162,9 @@ class Trainer(TrainState, BaseTrainer):
     self.update()
 
   """
-  params: Optional['yann.params.HyperParams'] = None
+  Params = Params
+
+  params: Params
   model: Optional[torch.nn.Module] = None
   loss: Optional[Callable] = None
 
@@ -60,196 +183,273 @@ class Trainer(TrainState, BaseTrainer):
   # automatic mixed precision
   grad_scaler: Optional[GradScaler] = None
 
-  history = None
+  history: 'yann.callbacks.History' = None
+
+
+  # Dict with training run summary information
   summary: dict
 
-  _id_key = None
-  _input_key = 0
-  _target_key = 1
+  keys = Keys()
 
   DataLoader = DataLoader
 
   @time('Initialize Trainer')
   def __init__(
       self,
-      model: Optional[Union[torch.nn.Module, str]] = None,
-      dataset=None,
-      optimizer=None,
-      loss=None,
-      loader=None,
-      sampler=None,
-      batch_sampler=None,
-      num_workers=8,
-      transform=None,
-      transform_batch=None,
-      lr_scheduler=None,
-      lr_batch_step=False,
-      callbacks=None,
-      device=None,
-      parameters='trainable',
-      batch_size=None,
-      val_dataset=None,
-      val_loader=None,
-      val_transform=None,
-      classes=None,
-      parallel=None,
-      amp=False,
-      grad_scaler=None,
-      name=None,
-      description=None,
-      root='./runs/',
-      metrics=None,
-      collate=None,
-      params: Optional['yann.params.HyperParams'] = None,
-      pin_memory=True,
-      step=None,
-      id=None,
-      dist=None,
-      benchmark=True,
-      jit=False,
-      none_grad=True,
-      memory_format=torch.preserve_format,
-      aot_autograd=False,
-      dtype=None,
-      place: Optional[Union[Callable, dict, tuple]]=None,
-      clip_grad=None
-      # cuda_graph=False
+
+      # Metadata
+      id: Union[str, int, None] = None,
+      name: Union[str, None] = None,
+      description: Optional[str] = None,
+      project: Optional[str] = None,
+      meta: Optional[Dict] = None,
+
+
+      model: Union[torch.nn.Module, str, None] = None,
+      dataset: Union[torch.utils.data.Dataset, str, None] = None,
+      optimizer: Union[torch.optim.Optimizer, str, None] = None,
+      loss: Union[torch.nn.Module, str, None] = None,
+
+
+      # root directory where training runs are stored
+      root: Union[str, Path, Paths] = None,
+
+      subset: Optional[int] = None,
+      batch_size: int = None,
+      classes: Union[yann.data.Classes, Sequence[str], None] = None,
+
+      parameters: Union[torch.nn.ParameterList, Literal['trainable']] = None,
+      lr: Optional[float] = None,
+      weight_decay: Optional[float] = None,
+      momentum: Optional[float] = None,
+      lr_scheduler: Union[torch.optim.lr_scheduler._LRScheduler, None] = None,
+      lr_batch_step: bool = None,
+      none_grad: bool = None,
+
+      epochs: Optional[int] = None,
+
+      loader: Union[torch.utils.data.DataLoader, None] = None,
+      num_workers: int = None,
+      collate: Union[Callable, None] = None,
+      pin_memory: bool = None,
+      sampler: Union[torch.utils.data.Sampler, None] = None,
+      batch_sampler: Union[torch.utils.data.BatchSampler, None] = None,
+      prefetch_factor: Optional[int] = None,
+      persistent_workers: Optional[bool] = None,
+
+      transform: Union[
+        Callable,
+        Mapping[str, Callable],
+        Sequence[Callable],
+        None
+      ] = None,
+      transform_batch: Union[Callable, None] = None,
+
+      callbacks: Union[
+        Sequence['yann.callbacks.Callback'],
+        'yann.callbacks.Callbacks',
+        None
+      ] = None,
+      device: Union[torch.device, str, None] = None,
+      dtype: Optional[torch.dtype] = None,
+
+      val_dataset: Union[torch.utils.data.Dataset, str, None] = None,
+      val_subset: Optional[int] = None,
+      val_loader: Union[torch.utils.data.DataLoader, None] = None,
+      val_transform: Union[
+        Callable,
+        Mapping[str, Callable],
+        Sequence[Callable],
+        None
+      ] = None,
+
+      metrics: Union[
+        Dict[str, Callable],
+        Sequence[Callable],
+        Sequence[str],
+        None
+      ] = None,
+
+      dist: Optional[Dist] = None,
+      parallel: Union[None, Literal['dp', 'ddp']] = None,
+
+      amp: bool = None,
+      grad_scaler: Optional[torch.cuda.amp.GradScaler] = None,
+
+      benchmark: bool = None,
+      jit: bool = None,
+      memory_format: Optional[str] = None,
+      aot_autograd: bool = None,
+      cuda_graph: bool = None,
+
+      step: Optional[Callable] = None,
+      place: Optional[Union[Callable, dict, tuple, yann.data.place.Place]] = None,
+      clip_grad: Union[Callable, 'yann.optim.clip.GradClipper', dict] = None,
+      seed: Optional[int] = None,
+      keys: Keys = None,
+
+      from_checkpoint: Optional[str] = None,
+
+      params: Union[Params, str, None] = None,
   ):
     super().__init__()
 
-    # TODO: should this be supported?
-    # yann.context.trainer = self
+    kwargs = {**locals()}
+    kwargs.pop('self')
+    kwargs.pop('params')
+    kwargs.pop('__class__')
 
-    self.id = id or memorable_id()
-    self.params = params
+    if params is not None:
+      if isinstance(params, str):
+        params = self.Params.load(params)
+      if isinstance(params, type) and issubclass(params, self.Params):
+        params = params()
+      self.params = params
+    else:
+      self.params = self.Params()
+
+    for k, v in kwargs.items():
+      if v is None:
+        # read defaults from params
+        kwargs[k] = self.params[k]
+      elif isinstance(v, (int, float, bool, str)) and self.params[k] != v:
+        # overwrite passed value if primitive
+        # assumes that non primitive types were instantiated from
+        self.params[k] = v
+      elif v is not None and self.params[k] is None:
+        self.params[k] = repr(v)  # FIXME: maybe set actual value and leave serialization logic to serializer
+
+    if kwargs['seed'] is not None:
+      yann.seed(kwargs['seed'])
+
+    self.params.id = self.id = self.params.id or memorable_id()
     self.summary = {}
-
-    self.num_samples = 0
-    self.num_steps = 0
-    self.num_epochs = 0
 
     self.time_created = datetime.datetime.utcnow()
 
-    if benchmark:
+    if kwargs['benchmark']:
       yann.benchmark()
 
-    self.dist = dist or Dist()
+    self.dist = kwargs['dist'] or Dist()
     self.dist.initialize()
+
+    device = kwargs['device']
     if self.dist.is_enabled:
       device = device or self.dist.device
 
     device = yann.default.device if device is None else device
-
     self.device = torch.device(device) if isinstance(device, str) else device
-    self.memory_format = memory_format
-    self.dtype = dtype
 
-    self.model = yann.resolve.model(model, required=False, validate=callable)
+    self.memory_format = yann.memory_formats.get(
+      kwargs['memory_format'],
+      kwargs['memory_format']
+    )
+    self.dtype = kwargs['dtype']
 
-    if jit:
+
+    self.model = yann.resolve.model(
+      kwargs['model'],
+      required=False,
+      validate=callable
+    )
+
+    if kwargs['jit']:
       self.model = torch.jit.script(self.model)
-    if aot_autograd:
+    if kwargs['aot_autograd']:
       try:
         from functorch.compile import memory_efficient_fusion
       except ImportError:
         raise ValueError('functorch must be installed for aot_autograd support')
       self.model = memory_efficient_fusion(self.model)
 
-    self.loss = yann.resolve.loss(loss, required=False, validate=callable)
-
-    self.parallel = parallel
-    self._init_parallel(parallel)
-
-    self._none_grad = none_grad
-    self._init_optim(
-      parameters=parameters,
-      optimizer=optimizer,
-      lr_scheduler=lr_scheduler,
-      lr_batch_step=lr_batch_step,
-      clip_grad=clip_grad
+    self.loss = yann.resolve.loss(
+      kwargs['loss'],
+      required=False,
+      validate=callable
     )
 
-    batch_size = batch_size or yann.default.batch_size
-    self._init_data_loaders(
-      dataset=dataset,
-      classes=classes,
-      transform=transform,
-      transform_batch=transform_batch,
-      batch_size=batch_size,
-      sampler=sampler,
-      batch_sampler=batch_sampler,
+    self._init_parallel(**kwargs)
+    self._init_optim(**kwargs)
+    self._init_data_loaders(**kwargs)
+    self._init_amp(**kwargs)
+    self._init_callbacks(**kwargs)
 
-      loader=loader,
-      pin_memory=pin_memory,
-      num_workers=num_workers,
-      collate=collate,
+    if kwargs['step'] is not None:
+      self.override(self.step, kwargs['step'])
 
-      val_dataset=val_dataset,
-      val_transform=val_transform,
-      val_loader=val_loader,
-    )
-
-    self._init_amp(amp=amp, grad_scaler=grad_scaler)
-    self._init_callbacks(callbacks=callbacks, metrics=metrics)
-
-    if step is not None:
-      self.override(self.step, step)
-
-    if place is not None:
-      if isinstance(place, Callable):
-        self.place = place
+    if kwargs['place'] is not None:
+      if isinstance(kwargs['place'], Callable):
+        self.place = kwargs['place']
       else:
         from yann.data.place import Place
-        self.place = Place(place)
+        self.place = Place(kwargs['place'])
 
     self.to(device=self.device, memory_format=self.memory_format)
 
-    self.name = name or (
+    self.params.name = self.name = kwargs['name'] or (
       f"{get_dataset_name(self.loader)}-{yann.get_model_name(self.model)}"
     )
-    self.description = description
 
-    self.paths = Paths(Path(root or yann.default.train_root) / self.name / timestr(self.time_created))
+    root = kwargs['root']
+    if isinstance(root, Paths):
+      self.paths = root
+    else:
+      self.paths = Paths(
+        Path(root or yann.default.train_root) / self.name / timestr(
+          self.time_created))
     self.paths.create()
 
     if self.dist.is_main:
-      yann.save.txt(git_diff(), self.paths.git_diff)
+      try:
+        yann.save.txt(git_diff(), self.paths.git_diff)
+      except:
+        pass  # not in git repo
       yann.save.txt(pip_freeze(), self.paths.requirements)
+
+
+    if kwargs['from_checkpoint']:
+      self.load_checkpoint(kwargs['from_checkpoint'])
 
     self.update_summary()
     self.save_summary()
 
-  def _init_callbacks(self, callbacks, metrics):
+  def _init_callbacks(
+      self,
+      metrics=None,
+      callbacks=None,
+      **kwargs
+  ):
     from yann.callbacks import get_callbacks
     from yann.callbacks.callbacks import Callbacks
 
     metrics = metrics or ()
     if not self.dist.is_main:
       # NOTE: disable most callbacks if not on main
-      self.history = yann.callbacks.History(**metrics)\
-        if isinstance(metrics, dict)\
+      self.history = yann.callbacks.History(**metrics) \
+        if isinstance(metrics, dict) \
         else yann.callbacks.History(*metrics)
       self.callbacks = Callbacks(self.history)
       return
 
-    self.callbacks = Callbacks(get_callbacks() if callbacks is True else callbacks)
+    self.callbacks = Callbacks(
+      get_callbacks() if callbacks is True else callbacks)
 
     if 'history' not in self.callbacks:
       metrics = (metrics,) if isinstance(metrics, str) else metrics
-      self.callbacks.history = yann.callbacks.History(**metrics)\
-        if isinstance(metrics, dict)\
+      self.callbacks.history = yann.callbacks.History(**metrics) \
+        if isinstance(metrics, dict) \
         else yann.callbacks.History(*metrics)
 
     self.history = self.callbacks.history
     self.callbacks.move_to_start('history')
 
-  def _init_parallel(self, parallel):
+  def _init_parallel(self, parallel=None, **kwargs):
     if self.model is not None:
       if parallel == 'dp':
         if not isinstance(self.model, torch.nn.parallel.DataParallel):
           self.model = torch.nn.DataParallel(self.model)
       elif parallel == 'ddp' or (parallel is None and self.dist.is_enabled):
-        self.parallel = 'ddp'
+        self.params.parallel = 'ddp'
         if not isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
           self.model.to(self.device)
           self.model = torch.nn.parallel.DistributedDataParallel(
@@ -263,30 +463,43 @@ class Trainer(TrainState, BaseTrainer):
   def _init_data_loaders(
       self,
       dataset=None,
-      loader=None,
-      transform=None,
+      batch_size=None,
+      subset=None,
       classes=None,
+      transform=None,
       transform_batch=None,
+      loader=None,
       sampler=None,
       batch_sampler=None,
-      batch_size=None,
       pin_memory=None,
       collate=None,
       num_workers=None,
       prefetch_factor=2,
       persistent_workers=True,
       val_dataset=None,
+      val_subset=None,
       val_transform=None,
       val_loader=None,
+      **kwargs
   ):
+    self.batch_size = batch_size or yann.default.batch_size
+
     self.dataset = yann.resolve.dataset(dataset, required=False)
+    if self.dataset and subset is not None:
+      self.dataset = yann.datasets.Subset(
+        self.dataset,
+        *subset
+        if isinstance(subset, tuple)
+        else (subset,)
+      )
 
     if classes:
       self.classes = (
         classes if isinstance(classes, Classes)
         else Classes(classes)
       )
-    elif hasattr(self.dataset, 'classes') and isinstance(self.dataset.classes, Classes):
+    elif hasattr(self.dataset, 'classes') and \
+        isinstance(self.dataset.classes, Classes):
       self.classes = self.dataset.classes
     else:
       self.classes = None
@@ -296,10 +509,9 @@ class Trainer(TrainState, BaseTrainer):
     self.transform = transform
 
     self.transform_batch = transform_batch
-    self.batch_size = batch_size
 
     self.sampler = sampler
-    if not sampler and self.dist.is_enabled:
+    if not self.sampler and self.dist.is_enabled:
       self.sampler = torch.utils.data.distributed.DistributedSampler(
         self.dataset,
         num_replicas=self.dist.world_size,
@@ -341,6 +553,14 @@ class Trainer(TrainState, BaseTrainer):
       required=False,
     )
 
+    if self.val_dataset and val_subset is not None:
+      self.val_dataset = yann.datasets.Subset(
+        self.val_dataset,
+        *val_subset
+        if isinstance(val_subset, tuple)
+        else (val_subset,)
+      )
+
     self.val_transform = val_transform or transform
     if self.val_transform:
       self.val_dataset = TransformDataset(self.val_dataset, self.val_transform)
@@ -359,14 +579,26 @@ class Trainer(TrainState, BaseTrainer):
       optimizer=None,
       lr_scheduler=None,
       lr_batch_step=None,
-      clip_grad=None
+      clip_grad=None,
+      lr=None,
+      weight_decay=None,
+      momentum=None,
+      **kwargs
   ):
+    parameters = parameters
     if parameters == 'trainable' and self.model:
       parameters = yann.trainable(self.model.parameters())
 
     self.optimizer = yann.resolve.optimizer(
       optimizer,
       args=(parameters or self.model.parameters(),),
+      kwargs={
+        k: v for k, v in dict(
+          lr=lr,
+          weight_decay=weight_decay,
+          momentum=momentum
+        ).items() if v is not None
+      },
       required=False,
       validate=lambda x: hasattr(x, 'step')
     )
@@ -375,38 +607,29 @@ class Trainer(TrainState, BaseTrainer):
       lr_scheduler,
       kwargs=dict(optimizer=self.optimizer)
     )
-    self.lr_batch_step = lr_batch_step
-    self.clip_grad = clip_grad
 
-  def _init_amp(self, amp, grad_scaler):
+    self.lr_batch_step = lr_batch_step
+
+    if clip_grad:
+      from yann.optim import GradClipper
+      if clip_grad is True:
+        self.clip_grad = GradClipper(value=1)
+      elif isinstance(clip_grad, dict):
+        self.clip_grad = GradClipper(**clip_grad)
+      else:
+        self.clip_grad = clip_grad
+
+  def _init_amp(
+      self,
+      amp=None,
+      grad_scaler=None,
+      **kwargs
+  ):
     self.amp = amp
     if grad_scaler is False:
       self.grad_scaler = None
     else:
       self.grad_scaler = grad_scaler or (GradScaler() if self.amp else None)
-
-  @classmethod
-  def from_params(cls, params: Union[yann.params.HyperParams, str], **kwargs):
-    """
-    Initialize trainer from
-    Args:
-      params: instance of params or fully qualified path to params
-        ex: Trainer.from_params('foo.params.LargeParams')
-      **kwargs:
-
-    Returns:
-
-    """
-    if isinstance(params, str):
-      params = yann.utils.dynamic_import(params)
-      if issubclass(params, yann.params.HyperParams):
-        params = params()
-    return cls(**params, **kwargs, params=params)
-
-  @classmethod
-  def from_checkpoint(cls, path):
-    # TODO
-    raise NotImplementedError()
 
   @property
   def root(self):
@@ -415,14 +638,16 @@ class Trainer(TrainState, BaseTrainer):
 
   def __setattr__(self, key, value):
     if key == 'optimizer':
-      if hasattr(self, 'lr_scheduler') and hasattr(self.lr_scheduler, 'optimizer'):
+      if hasattr(self, 'lr_scheduler') and hasattr(self.lr_scheduler,
+                                                   'optimizer'):
         self.lr_scheduler.optimizer = value
     if key == 'loader':
       if hasattr(self, 'dataset') and hasattr(value, 'dataset'):
         super(Trainer, self).__setattr__('dataset', value.dataset)
       if hasattr(value, 'batch_size'):
         super(Trainer, self).__setattr__('batch_size', value.batch_size)
-    if key == 'batch_size' and hasattr(self, 'batch_size') and self.batch_size != key:
+    if key == 'batch_size' and hasattr(self,
+                                       'batch_size') and self.batch_size != key:
       if hasattr(self, 'loader') and self.loader:
         raise ValueError(
           'Cannot modify batch_size because a loader is defined '
@@ -437,7 +662,7 @@ class Trainer(TrainState, BaseTrainer):
           'try creating and setting a new loader instead'
         )
 
-    logging.debug(f"setting '{key}' to {value}")
+    log.debug(f"setting '{key}' to {value}")
     super(Trainer, self).__setattr__(key, value)
 
   def to(self, **kwargs):
@@ -465,10 +690,10 @@ class Trainer(TrainState, BaseTrainer):
     # FIXME: find better way to handle channels last for specific entries in batch
     # possibly let memory_format take a dict or list to match batch
     if self.memory_format == torch.channels_last:
-      if self._input_key is not None:
+      if self.keys.inputs is not None:
         return (
           yann.to(
-            batch[self._input_key],
+            batch[self.keys.inputs],
             device=self.device,
             memory_format=self.memory_format,
             **kwargs
@@ -477,16 +702,17 @@ class Trainer(TrainState, BaseTrainer):
         )
 
     return yann.to(
-        batch,
-        device=self.device,
-        memory_format=self.memory_format,
-        **kwargs
-      )
+      batch,
+      device=self.device,
+      memory_format=self.memory_format,
+      **kwargs
+    )
 
   def on(self, event, callback=None):
     if self.callbacks is not None:
       return self.callbacks.on(event, callback)
-    logging.warning('.on() callback registration ignored because callbacks are not defined')
+    log.warning(
+      '.on() callback registration ignored because callbacks are not defined')
 
   @property
   def training(self):
@@ -513,7 +739,7 @@ class Trainer(TrainState, BaseTrainer):
 
       yield self.place(batch, device=device)
 
-  def override(self, method, function=False):
+  def override(self, method, function: Union[bool, Callable] = False):
     """
     Override a method of the trainer
     Args:
@@ -522,13 +748,15 @@ class Trainer(TrainState, BaseTrainer):
     """
     method = method if isinstance(method, str) else method.__name__
     if not hasattr(self, method):
-      raise AttributeError(f"Can't override method '{method}' because it's not defined")
+      raise AttributeError(
+        f"Can't override method '{method}' because it's not defined")
     if function is False:
       # assume it's used as a decorator
       # @train.override('step')
       # def custom_step(trainer, inputs, targets):
       def decorator(f):
         setattr(self, method, types.MethodType(f, self))
+
       return decorator
     else:
       setattr(self, method, types.MethodType(function, self))
@@ -570,7 +798,7 @@ class Trainer(TrainState, BaseTrainer):
 
     # TODO: add gradient accumulation
 
-    self.optimizer.zero_grad(set_to_none=self._none_grad)
+    self.optimizer.zero_grad(set_to_none=self.params.none_grad)
 
     if self.grad_scaler:
       self.grad_scaler.scale(loss).backward()
@@ -632,6 +860,8 @@ class Trainer(TrainState, BaseTrainer):
     return loss
 
   def run(self, epochs=None):
+    epochs = epochs or self.params.epochs
+
     self._stop = False
 
     if self.callbacks:
@@ -677,7 +907,7 @@ class Trainer(TrainState, BaseTrainer):
               trainer=self
             )
 
-            if self.lr_scheduler and self.lr_batch_step:
+            if self.lr_scheduler and self.params.lr_batch_step:
               self._lr_scheduler_step(step=self.num_steps)
 
             self.num_steps += 1
@@ -687,11 +917,11 @@ class Trainer(TrainState, BaseTrainer):
           if self._stop: break
 
           val_loss = self.validate() if self.val_loader else None
-          if self.lr_scheduler and not self.lr_batch_step:
+          if self.lr_scheduler and not self.params.lr_batch_step:
             self._lr_scheduler_step(
               step=epoch_idx,
               metric=self.history.metrics.running_mean('loss')
-                if val_loss is None else val_loss,
+              if val_loss is None else val_loss,
             )
 
           self.callbacks.on_epoch_end(epoch=epoch_idx, trainer=self)
@@ -714,7 +944,7 @@ class Trainer(TrainState, BaseTrainer):
         for inputs, targets in self.batches():
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
-          if self.lr_scheduler and self.lr_batch_step:
+          if self.lr_scheduler and self.params.lr_batch_step:
             self.lr_scheduler.step(epoch=self.num_steps)
 
           self.num_steps += 1
@@ -763,7 +993,7 @@ class Trainer(TrainState, BaseTrainer):
       keys=None
   ):
     # TODO: add 'latest', 'best' support
-    logging.info(f'Attempting to load checkpoint {path}')
+    log.info(f'Attempting to load checkpoint {path}')
     data = torch.load(path, map_location=map_location)
     self.load_state_dict(data, metadata=metadata, strict=strict, keys=keys)
 
@@ -787,15 +1017,17 @@ class Trainer(TrainState, BaseTrainer):
 
     return path
 
+
   def state_dict(self):
     data = {
       'metadata': {
         'id': self.id,
+        'name': self.name,
         'num_steps': self.num_steps,
         'num_samples': self.num_samples,
         'num_epochs': self.num_epochs,
         'batch_size': self.batch_size,
-        'name': self.name,
+
         'time_created': self.time_created,
         'param_hash': hash_params(self.model)
       }
@@ -810,7 +1042,8 @@ class Trainer(TrainState, BaseTrainer):
 
     return data
 
-  def load_state_dict(self, data, metadata=True, strict: bool = True, keys=None):
+  def load_state_dict(self, data, metadata=True, strict: bool = True,
+                      keys=None):
     """
     TODO: add a way to specify which parts should be loaded (ex: model only)
     """
@@ -827,9 +1060,9 @@ class Trainer(TrainState, BaseTrainer):
           entry.load_state_dict(v['state_dict'], strict=strict)
         else:
           entry.load_state_dict(v['state_dict'])
-        logging.info(f"loaded {k}")
+        log.debug(f"loaded {k}")
       else:
-        logging.info(f"skipped loading {k}")
+        log.debug(f"skipped loading {k}")
         skipped.add(k)
 
     if metadata and 'metadata' in data:
@@ -838,31 +1071,15 @@ class Trainer(TrainState, BaseTrainer):
         try:
           setattr(self, k, v)
         except ValueError:
-          logging.warning(f'failed to set {k}')
+          log.warning(f'failed to set {k}')
 
     if skipped:
-      logging.warning(f'skipped {skipped} when loading checkpoint')
+      log.warning(f'skipped {skipped} when loading checkpoint')
 
   def _get_env(self):
-    import sys
-    import os
-    import socket
-    return dict(
-      cwd=os.getcwd(),
-      arguments=sys.argv,
-      git_hash=git_hash(),
-      python=dict(
-        executable=sys.executable,
-        version=sys.version,
-        path=sys.path
-      ),
-      torch_version=torch.__version__,
-      yann_version=yann.__version__,
-      hostname=socket.gethostname()
-    )
+    return yann.utils.env_info()
 
   def update_summary(self):
-
     self.summary.update(dict(
       id=self.id,
       name=self.name,
@@ -873,7 +1090,7 @@ class Trainer(TrainState, BaseTrainer):
       batch_size=self.batch_size,
       device=str(self.device),
       time_created=self.time_created,
-      params=self.params,
+      # params={k: str(v) for k, v in self.params.items()},
     ))
 
     if 'env' not in self.summary:
@@ -885,7 +1102,8 @@ class Trainer(TrainState, BaseTrainer):
       self.summary['dataset'].update(dict(
         name=get_dataset_name(self.dataset),
         size=len(self.dataset),
-        num_classes=len(self.dataset.classes) if hasattr(self.dataset, 'classes') else None
+        num_classes=len(self.dataset.classes) if hasattr(self.dataset,
+                                                         'classes') else None
       ))
     if self.model:
       if 'model' not in self.summary:
@@ -893,11 +1111,15 @@ class Trainer(TrainState, BaseTrainer):
       self.summary['model'].update(dict(
         name=yann.get_model_name(self.model),
         param_count=yann.param_count(self.model),
-        trainable_param_count=yann.param_count(yann.trainable(self.model.parameters()))
+        trainable_param_count=yann.param_count(
+          yann.trainable(self.model.parameters()))
       ))
 
   def save_summary(self):
-    yann.save(self.summary, self.paths.summary)
+    try:
+      yann.save(self.summary, self.paths.summary)
+    except Exception as e:
+      log.warning(f'Failed to save summary, most likely due to unserializable params, {e}')
     return self.paths.summary
 
   def __str__(self):
@@ -907,6 +1129,10 @@ name: {self.name}
 root: {self.root}
 batch_size: {self.batch_size}
 device: {self.device}
+
+PARAMS
+======
+{self.params}
 
 MODEL
 =====
@@ -952,11 +1178,11 @@ samples: {self.num_samples}
   def __repr__(self):
     return (
       f"Trainer("
-      f"\n  id={self.id},"
-      f"\n  name={self.name},"
-      f"\n  root={self.root},"
-      f"\n  batch_size={self.batch_size},"
-      f"\n  device={self.device}"
+      f"\n  id={self.params.id},"
+      f"\n  name={self.params.name},"
+      f"\n  root={self.params.root},"
+      f"\n  batch_size={self.params.batch_size},"
+      f"\n  device={self.params.device}"
       "\n)"
     )
 
