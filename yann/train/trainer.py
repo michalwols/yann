@@ -193,6 +193,21 @@ class Trainer(TrainState, BaseTrainer):
 
   DataLoader = DataLoader
 
+  @classmethod
+  def from_params(
+      cls,
+      params: Params,
+      **kwargs: Unpack[Params]
+  ):
+
+    return cls(
+      **{
+        **params,
+        **kwargs
+      },
+      params=params
+    )
+
   @time('Initialize Trainer')
   def __init__(
       self,
@@ -229,13 +244,13 @@ class Trainer(TrainState, BaseTrainer):
       epochs: Optional[int] = None,
 
       loader: Union[torch.utils.data.DataLoader, None] = None,
-      num_workers: int = None,
+      num_workers: int = 8,
       collate: Union[Callable, None] = None,
       pin_memory: bool = None,
       sampler: Union[torch.utils.data.Sampler, None] = None,
       batch_sampler: Union[torch.utils.data.BatchSampler, None] = None,
       prefetch_factor: Optional[int] = None,
-      persistent_workers: Optional[bool] = None,
+      persistent_workers: Optional[bool] = True,
 
       transform: Union[
         Callable,
@@ -291,6 +306,7 @@ class Trainer(TrainState, BaseTrainer):
       from_checkpoint: Optional[str] = None,
 
       params: Union[Params, str, None] = None,
+      **extra
   ):
     super().__init__()
 
@@ -299,41 +315,28 @@ class Trainer(TrainState, BaseTrainer):
     kwargs.pop('params')
     kwargs.pop('__class__')
 
-    if params is not None:
-      if isinstance(params, str):
-        params = self.Params.load(params)
-      if isinstance(params, type) and issubclass(params, self.Params):
-        params = params()
-      self.params = params
-    else:
-      self.params = self.Params()
+    self.params = params or self.Params()
 
-    for k, v in kwargs.items():
-      if v is None:
-        # read defaults from params
-        kwargs[k] = self.params[k]
-      elif isinstance(v, (int, float, bool, str)) and self.params[k] != v:
-        # overwrite passed value if primitive
-        # assumes that non primitive types were instantiated from
-        self.params[k] = v
-      elif v is not None and self.params[k] is None:
-        self.params[k] = repr(v)  # FIXME: maybe set actual value and leave serialization logic to serializer
+    if seed is not None:
+      yann.seed(seed)
 
-    if kwargs['seed'] is not None:
-      yann.seed(kwargs['seed'])
-
-    self.params.id = self.id = self.params.id or memorable_id()
+    self.id = id or memorable_id()
+    self.name = name
+    self.description = description
+    self.project = project
+    self.meta = meta
     self.summary = {}
 
     self.time_created = datetime.datetime.utcnow()
 
-    if kwargs['benchmark']:
+    self._epochs = epochs
+
+    if benchmark:
       yann.benchmark()
 
-    self.dist = kwargs['dist'] or Dist()
+    self.dist = dist or Dist()
     self.dist.initialize()
 
-    device = kwargs['device']
     if self.dist.is_enabled:
       device = device or self.dist.device
 
@@ -341,21 +344,24 @@ class Trainer(TrainState, BaseTrainer):
     self.device = torch.device(device) if isinstance(device, str) else device
 
     self.memory_format = yann.memory_formats.get(
-      kwargs['memory_format'],
-      kwargs['memory_format']
+      memory_format,
+      memory_format
     )
-    self.dtype = kwargs['dtype']
+    self.dtype = dtype
 
+    self.parallel = parallel
+    self.lr_batch_step = lr_batch_step
+    self.none_grad = none_grad
 
     self.model = yann.resolve.model(
-      kwargs['model'],
+      model,
       required=False,
       validate=callable
     )
 
-    if kwargs['jit']:
+    if jit:
       self.model = torch.jit.script(self.model)
-    if kwargs['aot_autograd']:
+    if aot_autograd:
       try:
         from functorch.compile import memory_efficient_fusion
       except ImportError:
@@ -363,7 +369,7 @@ class Trainer(TrainState, BaseTrainer):
       self.model = memory_efficient_fusion(self.model)
 
     self.loss = yann.resolve.loss(
-      kwargs['loss'],
+      loss,
       required=False,
       validate=callable
     )
@@ -374,23 +380,22 @@ class Trainer(TrainState, BaseTrainer):
     self._init_amp(**kwargs)
     self._init_callbacks(**kwargs)
 
-    if kwargs['step'] is not None:
-      self.override(self.step, kwargs['step'])
+    if step is not None:
+      self.override(self.step, step)
 
-    if kwargs['place'] is not None:
-      if isinstance(kwargs['place'], Callable):
-        self.place = kwargs['place']
+    if place is not None:
+      if isinstance(place, Callable):
+        self.place = place
       else:
         from yann.data.place import Place
-        self.place = Place(kwargs['place'])
+        self.place = Place(place)
 
     self.to(device=self.device, memory_format=self.memory_format)
 
-    self.params.name = self.name = kwargs['name'] or (
+    self.name = name or (
       f"{get_dataset_name(self.loader)}-{yann.get_model_name(self.model)}"
     )
 
-    root = kwargs['root']
     if isinstance(root, Paths):
       self.paths = root
     else:
@@ -406,9 +411,8 @@ class Trainer(TrainState, BaseTrainer):
         pass  # not in git repo
       yann.save.txt(pip_freeze(), self.paths.requirements)
 
-
-    if kwargs['from_checkpoint']:
-      self.load_checkpoint(kwargs['from_checkpoint'])
+    if from_checkpoint:
+      self.load_checkpoint(from_checkpoint)
 
     self.update_summary()
     self.save_summary()
@@ -449,7 +453,7 @@ class Trainer(TrainState, BaseTrainer):
         if not isinstance(self.model, torch.nn.parallel.DataParallel):
           self.model = torch.nn.DataParallel(self.model)
       elif parallel == 'ddp' or (parallel is None and self.dist.is_enabled):
-        self.params.parallel = 'ddp'
+        self.parallel = 'ddp'
         if not isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
           self.model.to(self.device)
           self.model = torch.nn.parallel.DistributedDataParallel(
@@ -798,7 +802,7 @@ class Trainer(TrainState, BaseTrainer):
 
     # TODO: add gradient accumulation
 
-    self.optimizer.zero_grad(set_to_none=self.params.none_grad)
+    self.optimizer.zero_grad(set_to_none=self.none_grad)
 
     if self.grad_scaler:
       self.grad_scaler.scale(loss).backward()
@@ -860,7 +864,7 @@ class Trainer(TrainState, BaseTrainer):
     return loss
 
   def run(self, epochs=None):
-    epochs = epochs or self.params.epochs
+    epochs = epochs or self._epochs
 
     self._stop = False
 
@@ -907,7 +911,7 @@ class Trainer(TrainState, BaseTrainer):
               trainer=self
             )
 
-            if self.lr_scheduler and self.params.lr_batch_step:
+            if self.lr_scheduler and self.lr_batch_step:
               self._lr_scheduler_step(step=self.num_steps)
 
             self.num_steps += 1
@@ -917,7 +921,7 @@ class Trainer(TrainState, BaseTrainer):
           if self._stop: break
 
           val_loss = self.validate() if self.val_loader else None
-          if self.lr_scheduler and not self.params.lr_batch_step:
+          if self.lr_scheduler and not self.lr_batch_step:
             self._lr_scheduler_step(
               step=epoch_idx,
               metric=self.history.metrics.running_mean('loss')
@@ -944,7 +948,7 @@ class Trainer(TrainState, BaseTrainer):
         for inputs, targets in self.batches():
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
-          if self.lr_scheduler and self.params.lr_batch_step:
+          if self.lr_scheduler and self.lr_batch_step:
             self.lr_scheduler.step(epoch=self.num_steps)
 
           self.num_steps += 1
@@ -1178,11 +1182,11 @@ samples: {self.num_samples}
   def __repr__(self):
     return (
       f"Trainer("
-      f"\n  id={self.params.id},"
-      f"\n  name={self.params.name},"
-      f"\n  root={self.params.root},"
-      f"\n  batch_size={self.params.batch_size},"
-      f"\n  device={self.params.device}"
+      f"\n  id={self.id},"
+      f"\n  name={self.name},"
+      f"\n  root={self.root},"
+      f"\n  batch_size={self.batch_size},"
+      f"\n  device={self.device}"
       "\n)"
     )
 
