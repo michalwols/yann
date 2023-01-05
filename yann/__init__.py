@@ -261,6 +261,7 @@ def unfreeze(parameters):
     parameters = parameters.parameters()
   for p in parameters:
     p.requires_grad = True
+  return parameters
 
 
 def filter_modules(module: nn.Module, type, named=True):
