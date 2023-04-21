@@ -5,6 +5,8 @@ from .base import Callback
 
 
 class Logger(Callback):
+  dist_placement = 0
+
   def __init__(self, batch_freq=128, dest=sys.stdout):
     super(Logger, self).__init__()
 
