@@ -4,8 +4,13 @@ from collections import defaultdict
 class Callback:
   enabled = True
 
+  dist_placement = None  # none implies all
+
   def disable(self):
     self.enabled = False
+
+  def on_init(self, trainer=None, kwargs=None):
+    pass
 
   def on_train_start(self, trainer=None):
     pass
@@ -45,6 +50,7 @@ class Callback:
 
 class FunctionCallback(Callback):
   _valid_names = {
+    'init',
     'train_start',
     'epoch_start',
     'step_start',
@@ -69,6 +75,9 @@ class FunctionCallback(Callback):
     if callback not in callbacks:
       callbacks.append(callback)
 
+  def on_init(self, *args, **kwargs):
+    for f in self.callbacks['init']:
+      f(*args, **kwargs)
   def on_train_start(self, *args, **kwargs):
     for f in self.callbacks['train_start']:
       f(*args, **kwargs)

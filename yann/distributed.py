@@ -1,6 +1,7 @@
 from torch import distributed as dist
 import torch
 import os
+from typing import NamedTuple, Union
 
 
 class Dist:
@@ -71,3 +72,25 @@ class Dist:
     device={self.device},
     pid={os.getpid()}
     )"""
+
+
+
+
+class DistPlacement(NamedTuple):
+  rank: Union[int, None] = None
+  local_rank: Union[int, None] = None
+
+
+
+def matches(placement: Union[int, DistPlacement, None], dist: Dist):
+  if placement is None:
+    return True
+  if isinstance(placement, int):
+    return placement == dist.rank
+  if isinstance(placement, tuple):
+    rank, local_rank = placement
+    if rank is not None:
+      return rank == dist.rank
+    if local_rank is not None:
+      return local_rank == dist.local_rank
+    return True

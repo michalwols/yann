@@ -3,6 +3,8 @@ from .base import Callback
 
 
 class Checkpoint(Callback):
+  dist_placement = 0
+
   def __init__(self, freq=1, save_on_end=True):
     self.freq = freq
     self.paths = OrderedDict()

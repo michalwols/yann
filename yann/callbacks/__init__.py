@@ -6,7 +6,14 @@ from .logging import Logger
 from .stop import StopOnNaN
 from .timing import Timing
 from .progbar import ProgressBar
+from .wandb import Wandb
+from .ema import EMA
+from .swa import SWA
+from .lr import LRRangeTest
 
+from .callbacks import Callbacks
+
+from yann.utils import is_notebook
 
 def _maybe_init(value, cls, **kwargs):
   if value is None or value is False:
@@ -17,7 +24,7 @@ def _maybe_init(value, cls, **kwargs):
 
 
 def get_callbacks(
-    interactive=True,
+    interactive=None,
     plot=True,
     write=True,
     log=True,
@@ -26,6 +33,9 @@ def get_callbacks(
     progress=True,
     tensorboard=True,
 ):
+
+  if interactive is None:
+    interactive = is_notebook()
 
   if tensorboard:
     from .tensorboard import Tensorboard

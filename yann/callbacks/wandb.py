@@ -9,6 +9,8 @@ from yann.callbacks import Callback
 
 
 class Wandb(Callback):
+  dist_placement = 0
+
   run: Optional['wandb.wandb_sdk.wandb_run.Run']
 
   def __init__(
@@ -56,6 +58,8 @@ class Wandb(Callback):
 
     if self.trackers is None:
       self.trackers = self.get_default_trackers(trainer)
+
+    self.run.summary.update(trainer.summary)
 
   def on_train_end(self, trainer=None):
     self.run.finish()

@@ -6,6 +6,7 @@ from yann.callbacks.base import Callback
 
 
 class Events:
+  init = 'init'
   train_start = 'train_start'
   train_end = 'train_end'
   epoch_start = 'epoch_start'
@@ -101,6 +102,10 @@ class Callbacks(Callback):
         return func
 
       return decorated
+
+  @callback
+  def on_init(self, trainer=None):
+    pass
 
   @callback
   def on_train_start(self, trainer=None):

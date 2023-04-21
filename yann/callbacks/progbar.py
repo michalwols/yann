@@ -1,17 +1,16 @@
-
-
+import yann.utils
 from .base import Callback
 
 
 class ProgressBar(Callback):
-  def __init__(self, length=None, samples=True, notebook=False):
+  def __init__(self, length=None, samples=True, notebook=None):
     """
     Args:
       length: number of steps per epoch, will infer from dataset or loader if not provided
       samples: count samples, if False will track batches/steps
       notebook: use notebook progress bar
     """
-    self.notebook = notebook
+    self.notebook = notebook if notebook is not None else yann.utils.is_notebook()
 
     self.length = length
     self.samples = samples
