@@ -16,8 +16,9 @@ from typing_extensions import Unpack
 
 import yann
 from yann.data import get_dataset_name, Classes
-from yann.datasets import TransformDataset
+from yann.datasets import TransformDataset, Subset
 from yann.distributed import Dist
+import yann.distributed
 from yann.export import export
 from yann.train.base import BaseTrainer
 from yann.train.paths import Paths
@@ -106,7 +107,7 @@ class Params(yann.params.HyperParams):
   dtype: Optional[torch.dtype] = None
 
 
-  val_dataset: Union[torch.utils.data.Dataset, str, None] = None
+  val_dataset: Union[torch.utils.data.Dataset, float, str, None] = None
   val_subset: Optional[int] = None
   val_loader: Union[torch.utils.data.DataLoader, None] = None
   val_transform: Union[
@@ -134,6 +135,9 @@ class Params(yann.params.HyperParams):
   memory_format: Optional[str] = 'preserve_format'
   aot_autograd: bool = False
   cuda_graph: bool = False
+
+  compile: bool = False
+  tf32: bool = False
 
   step: Optional[Callable] = None
   place: Optional[Union[Callable, dict, tuple, yann.data.place.Place]] = None
@@ -268,7 +272,7 @@ class Trainer(TrainState, BaseTrainer):
       device: Union[torch.device, str, None] = None,
       dtype: Optional[torch.dtype] = None,
 
-      val_dataset: Union[torch.utils.data.Dataset, str, None] = None,
+      val_dataset: Union[torch.utils.data.Dataset, str, float, None] = None,
       val_subset: Optional[int] = None,
       val_loader: Union[torch.utils.data.DataLoader, None] = None,
       val_transform: Union[
@@ -296,6 +300,9 @@ class Trainer(TrainState, BaseTrainer):
       memory_format: Optional[str] = None,
       aot_autograd: bool = None,
       cuda_graph: bool = None,
+
+      compile: bool = None,
+      tf32: bool = None,
 
       step: Optional[Callable] = None,
       place: Optional[Union[Callable, dict, tuple, yann.data.place.Place]] = None,
@@ -359,6 +366,15 @@ class Trainer(TrainState, BaseTrainer):
       validate=callable
     )
 
+    if tf32:
+      torch.backends.cuda.matmul.allow_tf32 = True
+
+    if compile:
+      if isinstance(compile, dict):
+        self.model = torch.compile(self.model, **compile)
+      else:
+        self.model = torch.compile(self.model)
+
     if jit:
       self.model = torch.jit.script(self.model)
     if aot_autograd:
@@ -417,6 +433,8 @@ class Trainer(TrainState, BaseTrainer):
     self.update_summary()
     self.save_summary()
 
+    self.callbacks.on_init(trainer=self, kwargs=kwargs)
+
   def _init_callbacks(
       self,
       metrics=None,
@@ -426,17 +444,19 @@ class Trainer(TrainState, BaseTrainer):
     from yann.callbacks import get_callbacks
     from yann.callbacks.callbacks import Callbacks
 
-    metrics = metrics or ()
-    if not self.dist.is_main:
-      # NOTE: disable most callbacks if not on main
-      self.history = yann.callbacks.History(**metrics) \
-        if isinstance(metrics, dict) \
-        else yann.callbacks.History(*metrics)
-      self.callbacks = Callbacks(self.history)
-      return
+    # metrics = metrics or ()
+    # if not self.dist.is_main:
+    #   # NOTE: disable most callbacks if not on main
+    #   self.history = yann.callbacks.History(**metrics) \
+    #     if isinstance(metrics, dict) \
+    #     else yann.callbacks.History(*metrics)
+    #   self.callbacks = Callbacks(self.history)
+    #   return
 
-    self.callbacks = Callbacks(
-      get_callbacks() if callbacks is True else callbacks)
+    callbacks = get_callbacks() if callbacks is True else callbacks
+    callbacks = [c for c in callbacks if yann.distributed.matches(c.dist_placement, self.dist)]
+
+    self.callbacks = Callbacks(callbacks)
 
     if 'history' not in self.callbacks:
       metrics = (metrics,) if isinstance(metrics, str) else metrics
@@ -496,6 +516,11 @@ class Trainer(TrainState, BaseTrainer):
         if isinstance(subset, tuple)
         else (subset,)
       )
+
+    if isinstance(val_dataset, float):
+      split = 1 - val_dataset
+      val_dataset = Subset(dataset, split, 1.0)
+      self.dataset = Subset(dataset, 0, split)
 
     if classes:
       self.classes = (
@@ -1149,6 +1174,10 @@ DATASET
 
 {self.loader.dataset}
 
+VALIDATION DATASET
+=======
+
+{self.val_loader.dataset}
 
 LOADER
 ======

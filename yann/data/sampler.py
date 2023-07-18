@@ -16,7 +16,7 @@ class BalancedTargetSampler(Sampler):
     if not targets and hasattr(dataset, 'targets'):
       targets = dataset.targets
 
-    if targets:
+    if targets is not None:
       for n, ts in enumerate(targets):
         if isinstance(ts, (list, tuple)):
           for t in ts:

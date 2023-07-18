@@ -3,16 +3,16 @@ from scipy.misc import imresize
 
 
 def draw_mask(img, mask, blend=.5, cmap=None, interp='cubic'):
-    if not cmap:
-      import matplotlib.pylab as plt
-      cmap = plt.get_cmap('jet')
-    if isinstance(cmap, str):
-      import matplotlib.pylab as plt
-      cmap = plt.get_cmap(cmap)
+  if not cmap:
+    import matplotlib.pylab as plt
+    cmap = plt.get_cmap('jet')
+  if isinstance(cmap, str):
+    import matplotlib.pylab as plt
+    cmap = plt.get_cmap(cmap)
 
-    if mask.shape[:2] != img.shape[:2]:
-        mask = imresize(mask, img.shape[:2], interp=interp)
-    return (cmap(mask)[:,:,:3] * 255 * blend + img * (1-blend)).round().astype('uint8')
+  if mask.shape[:2] != img.shape[:2]:
+    mask = imresize(mask, img.shape[:2], interp=interp)
+  return (cmap(mask)[:,:,:3] * 255 * blend + img * (1-blend)).round().astype('uint8')
 
 
 def class_activation_maps(features, weights, classes=None, normalize=True):
@@ -25,7 +25,7 @@ def class_activation_maps(features, weights, classes=None, normalize=True):
     class_maps = {}
     for c in classes:
       blended_channels = (
-            weights[c] @ sample.reshape(num_channels, rows * cols)).reshape(
+          weights[c] @ sample.reshape(num_channels, rows * cols)).reshape(
         rows, cols)
       if normalize:
         x = blended_channels - blended_channels.min()

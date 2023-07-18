@@ -1,6 +1,8 @@
 # Editors
 .idea/
 
+
+experiments/*/runs/
 train-runs/
 /datasets/
 

@@ -1,5 +1,7 @@
 import click
 
+import yann
+
 
 @click.group()
 def cli():
@@ -149,6 +151,28 @@ def convert(src: str, dst: str):
 def main():
   cli()
 
+
+@cli.group()
+def dataset():
+  pass
+
+
+@dataset.command()
+@click.argument('name')
+def preview(name: str):
+  count = 10
+
+  ds = yann.resolve.dataset(name)
+
+  print(yann.utils.fully_qualified_name(ds))
+  print('length:', len(ds))
+  for i in range(count):
+    x = ds[i]
+    print(x)
+
+@dataset.command()
+def list():
+  print(yann.registry.dataset.print_tree())
 
 if __name__ == '__main__':
   cli()

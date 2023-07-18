@@ -7,6 +7,13 @@ from collections import deque
 from .utils import to_numpy
 
 
+
+def threshold_targets(metric, threshold=.5, **defaults):
+  def m(preds, targets, **kwargs):
+    return metric(preds, targets > threshold, **defaults, **kwargs)
+  return m
+
+
 def get_preds(scores):
   score, preds = torch.max(scores, dim=1)
   return preds
@@ -16,15 +23,17 @@ def top_k(scores, k=5, largest=True):
   return torch.topk(scores, k=k, dim=1, largest=largest, sorted=True)
 
 
-def accuracy(targets, preds):
-  if targets.shape != preds.shape:
-    preds = get_preds(preds)
+def accuracy(targets: torch.Tensor, preds: torch.Tensor):
+  if len(targets.shape) == 2:
+    _, targets = torch.max(targets, dim=1)
+  if len(preds.shape) == 2:
+    _, preds = torch.max(preds, dim=1)
   return (targets == preds).sum().float() / len(preds)
 
 
 def top_k_accuracy(targets, preds, k=1):
-  if len(targets.shape) != 1:
-    raise ValueError('Multi label targets not supported')
+  if len(targets.shape) == 2:
+    _, targets = torch.max(targets, dim=1)
   scores, preds = preds.topk(k, 1, True, True)
   preds = preds.t()
   correct = (preds == targets.view(1, -1).expand_as(preds))
@@ -32,10 +41,44 @@ def top_k_accuracy(targets, preds, k=1):
   return correct.sum().float() / len(targets)
 
 
+def mAP(targs, preds, pos_thresh=.5):
+  preds = preds.to('cpu').numpy()
+  targs = (targs.to('cpu') > pos_thresh).float().numpy()
+  if np.size(preds) == 0:
+    return 0
+  ap = np.zeros((preds.shape[1]))
+  # compute average precision for each class
+  for k in range(preds.shape[1]):
+    # sort scores
+    scores = preds[:, k]
+    targets = targs[:, k]
+    # compute average precision
+    ap[k] = average_precision(scores, targets)
+  return 100 * ap.mean()
+
+
+def average_precision(output, target):
+  epsilon = 1e-8
+
+  # sort examples
+  indices = output.argsort()[::-1]
+  # Computes prec@i
+  total_count_ = np.cumsum(np.ones((len(output), 1)))
+
+  target_ = target[indices]
+  ind = target_ == 1
+  pos_count_ = np.cumsum(ind)
+  total = pos_count_[-1]
+  pos_count_[np.logical_not(ind)] = 0
+  pp = pos_count_ / total_count_
+  precision_at_i_ = np.sum(pp)
+  precision_at_i = precision_at_i_ / (total + epsilon)
+
+  return precision_at_i
+
 top_3_accuracy = partial(top_k_accuracy, k=3)
 top_5_accuracy = partial(top_k_accuracy, k=5)
 top_10_accuracy = partial(top_k_accuracy, k=10)
-
 
 def precision_at_k(targets, outputs, k=5):
   scores, top_preds = top_k(outputs, k=k)
@@ -55,11 +98,11 @@ def mean_reciprocal_rank():
   pass
 
 
-def average_precision(targets, preds, target_threshold=0):
-  targets, preds = to_numpy(targets), to_numpy(preds)
-  if target_threshold is not None:
-    targets = targets > target_threshold
-  return metrics.average_precision_score(targets, preds)
+# def average_precision(targets, preds, target_threshold=0):
+#   targets, preds = to_numpy(targets), to_numpy(preds)
+#   if target_threshold is not None:
+#     targets = targets > target_threshold
+#   return metrics.average_precision_score(targets, preds)
 
 
 def label_ranking_average_precision(targets, preds, target_threshold=0):

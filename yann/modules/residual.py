@@ -21,7 +21,7 @@ class Residual(nn.Module):
     if self.identity:
       input = self.identity(input)
 
-    input += residual
+    input = input + residual
     if self.activation:
       return self.activation(input)
     else:
