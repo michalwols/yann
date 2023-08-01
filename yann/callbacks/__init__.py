@@ -7,8 +7,8 @@ from .stop import StopOnNaN
 from .timing import Timing
 from .progbar import ProgressBar
 from .wandb import Wandb
-from .ema import EMA
-from .swa import SWA
+# from .ema import EMA
+# from .swa import SWA
 from .lr import LRRangeTest
 
 from .callbacks import Callbacks
