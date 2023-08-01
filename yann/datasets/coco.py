@@ -1,6 +1,6 @@
 from torchvision.datasets import CocoDetection
 from yann.data import Classes
-from yann import default
+from yann.config.defaults import default
 
 import os
 

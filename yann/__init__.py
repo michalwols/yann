@@ -9,7 +9,8 @@ import torch
 from torch import nn
 import numpy as np
 
-from .config.setup import registry, default
+from .config.defaults import default
+from .config.setup import registry
 
 register = registry
 resolve = registry.resolve
