@@ -446,7 +446,11 @@ def grad_norm(parameters, norm_type: float = 2.0):
   if len(parameters) == 0:
     return torch.tensor(0.)
   device = parameters[0].grad.device
-  from torch._six import inf
+  try:
+    from torch import inf
+  except ImportError:
+    from torch._six import inf
+
   if norm_type == inf:
     norms = [p.grad.detach().abs().max().to(device) for p in parameters]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
@@ -471,7 +475,10 @@ def param_norm(parameters, norm_type: float = 2.0):
   if len(parameters) == 0:
     return torch.tensor(0.)
   device = parameters[0].device
-  from torch._six import inf
+  try:
+    from torch import inf
+  except ImportError:
+    from torch._six import inf
   if norm_type == inf:
     norms = [p.detach().abs().max().to(device) for p in parameters]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))

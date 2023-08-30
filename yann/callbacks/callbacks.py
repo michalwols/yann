@@ -104,7 +104,7 @@ class Callbacks(Callback):
       return decorated
 
   @callback
-  def on_init(self, trainer=None):
+  def on_init(self, trainer=None, kwargs=None):
     pass
 
   @callback
