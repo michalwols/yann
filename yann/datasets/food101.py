@@ -29,17 +29,18 @@ class Food101(Dataset):
       self,
       root=None,
       split='train',
-      download=True,
+      download=False,
       shuffle=True
   ):
     assert split in self.splits
     self.root = Path(root) if root else yann.default.dataset_root(Food101)
+    self.root = self.root.expanduser()
     self.split = split
 
     if not self.root.exists() and download:
       self.download()
 
-    with open(self.meta_path) as f:
+    with open(self.meta_path, 'r') as f:
       self.samples = [
         (self.get_image_path(name.strip()), name.split('/')[0])
         for name in f

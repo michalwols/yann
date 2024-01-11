@@ -433,7 +433,7 @@ class Trainer(TrainState, BaseTrainer):
     self.update_summary()
     self.save_summary()
 
-    self.callbacks.on_init(trainer=self, kwargs=kwargs)
+    # self.callbacks.on_init(trainer=self, kwargs=kwargs)
 
   def _init_callbacks(
       self,

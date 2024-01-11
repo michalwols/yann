@@ -3,8 +3,8 @@ from pathlib import Path
 
 
 class default:
-  root = Path('~/.yann/')
-  torch_root = Path('~/.torch')
+  root = Path('~/.yann/').expanduser()
+  torch_root = Path('~/.torch').expanduser()
   train_root = './runs/'
   datasets_root = torch_root / 'datasets'
 
