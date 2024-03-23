@@ -8,7 +8,8 @@ from typing import Optional, Callable, Union, Dict, Mapping, Sequence
 
 import torch
 import torch.nn
-from torch.cuda.amp import autocast, GradScaler
+from torch import autocast
+from torch.cuda.amp import GradScaler, autocast
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Sampler, DataLoader
 from typing_extensions import Literal
@@ -267,7 +268,8 @@ class Trainer(TrainState, BaseTrainer):
       callbacks: Union[
         Sequence['yann.callbacks.Callback'],
         'yann.callbacks.Callbacks',
-        None
+        None,
+        bool
       ] = None,
       device: Union[torch.device, str, None] = None,
       dtype: Optional[torch.dtype] = None,
@@ -1177,7 +1179,7 @@ DATASET
 VALIDATION DATASET
 =======
 
-{self.val_loader.dataset}
+{self.val_loader.dataset if self.val_loader is not None else None}
 
 LOADER
 ======
