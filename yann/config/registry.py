@@ -1,4 +1,5 @@
 import typing
+from typing import Union, Tuple, Dict, Any
 from collections import defaultdict, OrderedDict
 
 from functools import partial
@@ -72,7 +73,7 @@ class Resolver:
 
   def resolve(
       self,
-      x,
+      x: Union[Any, Tuple[Any, Dict]],
       required=False,
       validate=None,
       instance=True,
