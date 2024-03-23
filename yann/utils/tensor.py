@@ -24,7 +24,7 @@ def one_hot(targets: torch.Tensor, num_classes=None, device=None, dtype=None, no
 
 
 def show_hist(hist):
-  chars = '_▁▂▃▄▅▆▇█'
+  chars = ' ▁▂▃▄▅▆▇█'
   top = max(hist)
   step = (top / float(len(chars) - 1)) or 1
   return ''.join(chars[int(round(count / step))] for count in hist)
@@ -33,7 +33,7 @@ def show_hist(hist):
 def describe(tensor: torch.Tensor, bins=10) -> str:
   try:
     stats = (
-      f"μ={tensor.mean():.4f}  σ={tensor.std():.4f}\n"
+      f"mean: {tensor.mean():.4f} std: {tensor.std():.4f} "
     )
   except:
     stats = ''
@@ -41,19 +41,16 @@ def describe(tensor: torch.Tensor, bins=10) -> str:
   try:
     h = tensor.histc(bins=bins).int().tolist()
     hist = (
-      f"hist: {h}\n"
+
       f"hist: {show_hist(h)}\n"
+      f"      {h}\n"
     )
   except:
     hist = ''
-  return (
+  return f"""
+shape: {tuple(tensor.shape)} dtype: {tensor.dtype} device: {tensor.device} grad: {tensor.requires_grad} size: {tensor.numel() * tensor.element_size() / (1e6):,.5f} MB
+min: {tensor.min():.4f}  max: {tensor.max():.4f}  {stats}sum: {tensor.sum():.4f}
+{hist}
 
-    f"{tuple(tensor.shape)} "
-    f"{tensor.dtype} "
-    f"{tensor.device}"
-    f"{' grad' if tensor.requires_grad else ''} "
-    f"({tensor.numel() * tensor.element_size() / (1e6):,.5f} MB)\n"
-    f"{stats}"
-    f"{hist}"
-    f"min: {tensor.min():.4f}  max: {tensor.max():.4f}  sum: {tensor.sum():.4f}\n\n"
-  )
+{tensor}
+  """
