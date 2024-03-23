@@ -19,7 +19,7 @@ class Wandb(Callback):
       entity=None,
       name=None,
       watch_freq=0,
-      # log_code=True,
+      log_code=True,
       batch_log_freq=10,
       trackers=None,
   ):
@@ -30,6 +30,7 @@ class Wandb(Callback):
     self.name = name
     self.batch_log_freq = batch_log_freq
     self.watch_freq = watch_freq
+    self.log_code = log_code
 
     self.trainer = None
 
@@ -47,6 +48,13 @@ class Wandb(Callback):
         name=self.name or trainer.name,
         config=dict(trainer.params) if trainer.params else {}
       )
+
+      if self.log_code is True:
+        self.run.log_code('.')
+      elif isinstance(self.log_code, dict):
+        self.run.log_code(**self.log_code)
+      elif isinstance(self.log_code, str):
+        self.run.log_code(self.log_code)
 
     if trainer.model and self.watch_freq:
       self.run.watch(
