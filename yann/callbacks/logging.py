@@ -2,7 +2,7 @@ import sys
 import logging
 
 from .base import Callback
-
+from yann.utils.tensor import describe
 
 class Logger(Callback):
   dist_placement = 0
@@ -35,11 +35,11 @@ class Logger(Callback):
     if index % self.batch_freq == 0:
       if not self.logged_batch_shapes:
         try:
-          self.log("\nBatch inputs shape:", tuple(inputs.size()),
-                   "\nBatch targets shape:", tuple(targets.size()),
-                   "\nBatch outputs shape:", tuple(outputs.size()), '\n')
-        except:
-          pass
+          self.log("\ninputs:", describe(inputs),
+                   "\ntargets:", describe(targets),
+                   "\noutputs:", describe(outputs), '\n')
+        except Exception as e:
+          raise e
         self.logged_batch_shapes = True
 
       if self.batch_string:
