@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yann"
+version = "0.0.40"
+description = "yet another neural network library"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Michal Wolski", email = "michal@bite.ai" }
+]
+requires-python = ">=3.7"
+dependencies = [
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "torch>=1.0.0",
+    "matplotlib",
+    "torchvision",
+    "tqdm"
+]
+
+[project.optional-dependencies]
+cli = ["click>=6.7"]
+pretrainedmodels = ["pretrainedmodels"]
+
+[project.scripts]
+yann = "yann.cli:main"

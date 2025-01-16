@@ -15,7 +15,7 @@ function watch-tests() {
 function release() {
   rm -rf ./dist
   rm -rf ./build
-  python setup.py sdist bdist_wheel
+  python -m build
   twine upload dist/*
 }
 

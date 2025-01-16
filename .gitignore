@@ -110,3 +110,10 @@ ENV/
 # mypy
 .mypy_cache/
 
+scratch.ipynb
+scratch.py
+
+
+
+.DS_Store
+.cadence/
