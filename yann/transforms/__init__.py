@@ -7,7 +7,7 @@ import pathlib
 import torch
 import random
 from PIL import Image
-from timm.data.mixup import rand_bbox
+
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
 from torchvision import transforms
@@ -263,6 +263,7 @@ def cutout(img, percent=.3, value=0):
 
 
 def cutmix(inputs, targets, beta):
+  from timm.data.mixup import rand_bbox
   lam = np.random.beta(beta, beta)
   rand_index = torch.randperm(inputs.size()[0]).cuda()
   target_a = targets

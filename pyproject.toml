@@ -19,7 +19,8 @@ dependencies = [
     "torch>=1.0.0",
     "matplotlib",
     "torchvision",
-    "tqdm"
+    "tqdm",
+    "timm>=0.9.12",
 ]
 
 [project.optional-dependencies]
