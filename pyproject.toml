@@ -28,3 +28,6 @@ pretrainedmodels = ["pretrainedmodels"]
 
 [project.scripts]
 yann = "yann.cli:main"
+
+[tool.setuptools]
+packages = ["yann"]
