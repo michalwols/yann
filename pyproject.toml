@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yann"
-version = "0.0.40"
+version = "0.0.40dev"
 description = "yet another neural network library"
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,12 +20,11 @@ dependencies = [
     "matplotlib",
     "torchvision",
     "tqdm",
-    "timm>=0.9.12",
+#    "timm>=0.9.12",
 ]
 
 [project.optional-dependencies]
 cli = ["click>=6.7"]
-pretrainedmodels = ["pretrainedmodels"]
 
 [project.scripts]
 yann = "yann.cli:main"
