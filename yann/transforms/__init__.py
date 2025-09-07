@@ -277,6 +277,7 @@ if HAS_TIMM:
     ]
     # adjust lambda to exactly match pixel ratio
     lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+    return lam * target_a + (1 - lam) * target_b
 
 
 def get_imagenet_transforms(

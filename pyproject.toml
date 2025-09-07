@@ -1,6 +1,6 @@
 [project]
 name = "yann"
-version = "0.0.40"
+version = "0.0.40dev"
 description = "yet another neural network library"
 readme = "README.md"
 license = { text = "MIT" }
@@ -13,6 +13,7 @@ dependencies = [
     "rich>=13.8.1",
     "torch",
     "torchvision",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,7 @@ transformers = [
     "tokenizers>=0.13.3", 
     "transformers>=4.30.2",
 ]
+timm = ["timm>=0.9.12"]
 
 [project.scripts]
 yann = "yann.cli:main"
@@ -54,4 +56,3 @@ quote-style = "single"
 
 [tool.ruff.lint]
 select = ["COM812"] # Enforce trailing commas
-
