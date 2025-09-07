@@ -25,6 +25,11 @@ transformers = [
     "transformers>=4.30.2",
 ]
 timm = ["timm>=0.9.12"]
+dev = [
+    "add-trailing-comma>=2.4.0",
+    "ipython>=7.34.0",
+    "pytest>=7.4.4",
+]
 
 [project.scripts]
 yann = "yann.cli:main"
@@ -37,13 +42,6 @@ build-backend = "setuptools.build_meta"
 where = ["."]  # Specifies to look for packages in the current directory
 include = ["yann*"]  # Include the main 'yann' package and any potential 'yann_extras' etc.
 exclude = ["tests*"]  # Example: Exclude tests directory if you have one
-
-[dependency-groups]
-dev = [
-    "add-trailing-comma>=2.4.0",
-    "ipython>=7.34.0",
-    "pytest>=7.4.4",
-]
 
 
 [tool.ruff]
