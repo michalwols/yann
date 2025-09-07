@@ -1,13 +1,15 @@
 import torch
 
 from .defaults import default
-from .registry import Registry, is_public_callable, pass_args
+from .registry import Registry, DatasetRegistry, is_public_callable, pass_args
 
 ## Configure Registry
 
 registry = Registry()
 
-# Datasets
+# Datasets - Use the new DatasetRegistry that handles HuggingFace datasets
+registry.dataset = DatasetRegistry(name='dataset')
+
 import torchvision.datasets
 from torch.utils.data import Dataset
 

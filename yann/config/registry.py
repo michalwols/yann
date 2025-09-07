@@ -374,3 +374,31 @@ class Registry:
     #   parts.append(str(c))
     #
     # return ''.join(parts)
+
+
+class DatasetRegistry(Registry):
+  """Special registry for datasets that handles HuggingFace datasets with hf:// URIs."""
+  
+  def __getitem__(self, item) -> Record:
+    # Handle HuggingFace datasets with hf:// prefix
+    if isinstance(item, str) and item.startswith('hf://'):
+      try:
+        from datasets import load_dataset
+      except ImportError:
+        raise ImportError(
+          "datasets library not installed. "
+          "Install with: pip install yann[transformers]"
+        )
+      
+      # Extract dataset name and create a loader function
+      dataset_name = item[5:]  # Remove 'hf://' prefix
+      
+      # Return a Record with load_dataset as the callable
+      # This allows passing kwargs through the resolution process
+      return Record(
+        x=load_dataset,
+        init=lambda f, **kwargs: f(dataset_name, **kwargs)
+      )
+    
+    # Fall back to standard registry behavior
+    return super().__getitem__(item)
