@@ -7,29 +7,30 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  test:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: [3.9, 3.10, 3.11]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+      fail-fast: false
 
     runs-on: ${{ matrix.os }}
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install package and dependencies
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements-dev.txt || true
-        pip install -r requirements.txt || true
-        pip install numpy scipy
-    - name: Test with pytest
+        pip install -e ".[dev]"
+        pip install numpy scipy  # Additional optional dependencies for tests
+        
+    - name: Run tests
       run: |
-        pytest --mocha
+        pytest -v
