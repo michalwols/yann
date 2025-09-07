@@ -30,20 +30,22 @@
 
 """
 
+import logging
+import typing
 from abc import ABCMeta
 from collections import OrderedDict
 from copy import deepcopy
 from functools import wraps
 from typing import Dict
-import typing
-import logging
-from .utils import get_arg_parser
 
+from .utils import get_arg_parser
 
 log = logging.getLogger(__name__)
 
+
 class ValidationError(ValueError):
   pass
+
 
 class Field:
   def __init__(
@@ -54,7 +56,7 @@ class Field:
     type=None,
     required=False,
     default=None,
-    choices=None
+    choices=None,
   ):
     self.name = name
     self.help = help
@@ -67,18 +69,20 @@ class Field:
     try:
       if self.type and not isinstance(val, self.type):
         raise ValidationError(
-          f'Failed to validate {self.name}, the type ({type(val)} does is not a subclass of {self.type}')
+          f'Failed to validate {self.name}, the type ({type(val)} does is not a subclass of {self.type}',
+        )
     except TypeError as e:
-      log.debug(f'skipping type validation due to unresolved forwardref for {self.name} and expected type {self.type}')
+      log.debug(
+        f'skipping type validation due to unresolved forwardref for {self.name} and expected type {self.type}',
+      )
     if self.choices:
       assert val in self.choices
 
-
   def __repr__(self):
-    return f"{self.__class__.__name__}(type={self.type}, default={self.default})"
+    return f'{self.__class__.__name__}(type={self.type}, default={self.default})'
 
   def __str__(self):
-    return f"{self.__class__.__name__}(type={self.type}, default={self.default})"
+    return f'{self.__class__.__name__}(type={self.type}, default={self.default})'
 
 
 class Choice(Field):
@@ -108,7 +112,7 @@ class HyperParamsBase:
         setattr(self, k, v)
       else:
         raise ValueError(
-          f'Unknown parameter: {k}, should be one of {", ".join(self.__fields__)}'
+          f'Unknown parameter: {k}, should be one of {", ".join(self.__fields__)}',
         )
 
   def validate(self):
@@ -116,20 +120,19 @@ class HyperParamsBase:
       try:
         f.validate(getattr(self, k))
       except Exception as e:
-        raise Exception(f"{k} failed validation. {e}")
+        raise Exception(f'{k} failed validation. {e}')
 
   @classmethod
   def from_command(cls, cmd=None, validate=False, **kwargs):
     parser = get_arg_parser(cls.__fields__, **kwargs)
-    parsed = parser.parse_args(
-      cmd.split() if isinstance(cmd, str) else cmd
-    )
+    parsed = parser.parse_args(cmd.split() if isinstance(cmd, str) else cmd)
     params = cls(**vars(parsed))
 
     if validate:
       params.validate()
 
     return params
+
   #
   # @classmethod
   # def from_env(cls, prefix=''):
@@ -154,6 +157,7 @@ class HyperParamsBase:
 
   def save(self, path):
     import yann
+
     yann.save(dict(self), path)
 
   def on_change(self, callback):
@@ -180,24 +184,25 @@ class HyperParamsBase:
     return len(self.__fields__)
 
   def __eq__(self, other):
-    return len(self) == len(other) and self.keys() == other.keys(
-    ) and all(self[k] == other[k] for k in self.keys())
+    return (
+      len(self) == len(other)
+      and self.keys() == other.keys()
+      and all(self[k] == other[k] for k in self.keys())
+    )
 
   def fork(self, **args):
     return HyperParams(**{**self.items(), **args})
 
   def __repr__(self):
     return (
-      f'{self.__class__.__name__}('
-      f"{', '.join(f'{k}={v}' for k, v in self.items())}"
-      ')'
+      f'{self.__class__.__name__}({", ".join(f"{k}={v}" for k, v in self.items())})'
     )
 
   def __str__(self):
     return (
-      f'{self.__class__.__name__}(\n' +
-      ',\n'.join('  {}={}'.format(k, v) for k, v in self.items()) +
-      '\n)'
+      f'{self.__class__.__name__}(\n'
+      + ',\n'.join('  {}={}'.format(k, v) for k, v in self.items())
+      + '\n)'
     )
 
   def __contains__(self, key):
@@ -215,6 +220,21 @@ class HyperParamsBase:
   def items(self):
     return ((k, getattr(self, k)) for k in self.keys())
 
+  def update(self, other=None, **kwargs):
+    """Update parameters from dict or kwargs."""
+    if other is not None:
+      if hasattr(other, 'items'):
+        for k, v in other.items():
+          if k in self.__fields__:
+            setattr(self, k, v)
+      else:
+        for k in other:
+          if k in self.__fields__:
+            setattr(self, k, other[k])
+    for k, v in kwargs.items():
+      if k in self.__fields__:
+        setattr(self, k, v)
+
   def inject(self, scope=None, uppercase=True):
     scope = globals() if scope is None else scope
     for k, v in self.items():
@@ -226,7 +246,7 @@ class HyperParamsBase:
     scope=None,
     types=(int, str, float, bool),
     upper_only=True,
-    lowercase=True
+    lowercase=True,
   ):
     scope = globals() if scope is None else scope
 
@@ -242,7 +262,6 @@ class HyperParamsBase:
     return cls(**d)
 
 
-
 class MetaHyperParams(ABCMeta):
   def __new__(metaclass, class_name, bases, namespace):
     fields = OrderedDict()
@@ -251,17 +270,14 @@ class MetaHyperParams(ABCMeta):
       if issubclass(base, HyperParamsBase) and base != HyperParamsBase:
         fields.update(
           # deepcopy(
-            base.__fields__
+          base.__fields__,
           # )
         )
 
     # existing_attributes = set(dir(HyperParamsBase)) | set(fields)
 
     new_attributes = {
-      k: v
-      for (k, v) in namespace.items()
-      if not k.startswith('_') and
-      not callable(v)
+      k: v for (k, v) in namespace.items() if not k.startswith('_') and not callable(v)
     }
 
     for name, annotation in namespace.get('__annotations__', {}).items():
@@ -287,7 +303,7 @@ class MetaHyperParams(ABCMeta):
       {
         '__fields__': fields,
         **namespace,
-      }
+      },
     )
 
 
@@ -299,28 +315,26 @@ class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
     self.__dict__.update(state)
 
   def __reduce__(self):
-    return (self.__class__, )
-
+    return (self.__class__,)
 
 
 def to_argparse(params: HyperParams, **kwargs):
   return get_arg_parser(params.__fields__, **kwargs)
 
 
-
 def bind(params, mapping=None):
   def decorator(function):
-
     import inspect
+
     sig = inspect.signature(function)
 
     _mapping = mapping or {}
     for p in sig.parameters:
       if p not in _mapping and p in params:
         _mapping[p] = p
+
     @wraps(function)
     def bound(*args, **kwargs):
-
       for k, p in _mapping.items():
         if k in kwargs:
           params[p] = kwargs[k]
@@ -334,20 +348,21 @@ def bind(params, mapping=None):
   return decorator
 
 
-
 def from_signature(function, params: HyperParams = None):
   import inspect
+
   sig = inspect.signature(function)
 
   params = params or HyperParams()
   for k, p in sig.parameters.items():
-
     default = p.default if p.default is not p.empty else None
 
     params.__fields__[k] = Field(
       name=p.name,
       default=default,
-      type=p.annotation if p.annotation is not p.empty else (type(p.default) if p.default is not p.empty else None)
+      type=p.annotation
+      if p.annotation is not p.empty
+      else (type(p.default) if p.default is not p.empty else None),
     )
     params[k] = default
   return params

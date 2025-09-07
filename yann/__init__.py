@@ -3,32 +3,25 @@ from contextlib import contextmanager
 
 __version__ = '0.0.40'
 
+from pathlib import Path
 from typing import Union
 
+import numpy as np
 import torch
 from torch import nn
-import numpy as np
 
-from .config.defaults import default
-from .config.setup import registry
-
-register = registry
-resolve = registry.resolve
-
-from pathlib import Path
-
-from yann.utils import to_numpy, repeat, counter, is_notebook, timeout
-from yann.data import batches, shuffle, chunk
+from yann.data import batches, chunk, shuffle
 from yann.data.io import load, save
 from yann.data.io.download import download
-from yann.data.utils import pad, pad_to_largest
-# from yann.data import datasets
-from yann.viz import show, plot
-from yann.utils.timer import time
-from yann.utils.profile import profile, param_count
-
-from yann.testing import Checker
 from yann.data.loaders import loader
+from yann.data.utils import pad, pad_to_largest
+from yann.testing import Checker
+from yann.utils import counter, is_notebook, repeat, timeout, to_numpy
+from yann.utils.profile import param_count, profile
+from yann.utils.timer import time
+
+# from yann.data import datasets
+from yann.viz import plot, show
 
 # T = torch.Tensor
 #
@@ -80,27 +73,32 @@ context = object()
 memory_formats = dict(
   contiguous_format=torch.contiguous_format,
   channels_last=torch.channels_last,
-  preserve_format=torch.preserve_format
+  preserve_format=torch.preserve_format,
 )
 
+
 def to_tensor(
-    x: Union[list, tuple, np.ndarray, torch.Tensor, 'PIL.Image.Image']
+  x: Union[list, tuple, np.ndarray, torch.Tensor, 'PIL.Image.Image'],
 ) -> torch.Tensor:
   if torch.is_tensor(x):
     return x
   if isinstance(x, np.ndarray):
     return torch.from_numpy(x)
   import PIL.Image
+
   if isinstance(x, PIL.Image.Image):
     from torchvision.transforms import functional as F
+
     return F.to_tensor(x)
   return torch.Tensor(x)
 
 
 def seed(val=1, deterministic=False):
+  import random
+
   import numpy as np
   import torch
-  import random
+
   random.seed(val)
   np.random.seed(val)
   torch.manual_seed(val)
@@ -127,11 +125,13 @@ def get_item(x: Union[torch.Tensor, np.ndarray]):
 
 def benchmark():
   from torch.backends import cudnn
+
   cudnn.benchmark = True
 
 
 def detect_anomalies(val=True):
   import torch.autograd
+
   torch.autograd.set_detect_anomaly(val)
 
 
@@ -140,9 +140,14 @@ def evaluate(model, batches, device=None, transform=None):
   if isinstance(batches, str):
     batches = yann.loader(batches, transform=transform)
 
-  for x, y in batches:
+  for batch in batches:
+    if isinstance(batch, dict):
+      x, y = batch, batch  # Pass dict as both inputs and targets
+    else:
+      x, y = batch  # Traditional tuple unpacking
+    
     if device:
-      x, y = x.to(device), y.to(device)
+      x, y = to(x, device=device), to(y, device=device)
 
     model.eval()
     with torch.inference_mode():
@@ -191,15 +196,16 @@ def group_params(model, get_key):
     splits[get_key(name, param)] = param
   return splits
 
+
 from torch.nn.modules.batchnorm import _BatchNorm
 
 
 def split_regularization_params(
-    module: nn.Module,
-    excluded_modules=(_BatchNorm,),
-    excluded_names=('bias',),
-    param_groups=True,
-    weight_decay=1e-4
+  module: nn.Module,
+  excluded_modules=(_BatchNorm,),
+  excluded_names=('bias',),
+  param_groups=True,
+  weight_decay=1e-4,
 ):
   """
   filter out parameters which should not be regularized
@@ -217,7 +223,10 @@ def split_regularization_params(
           else:
             reg.append(param)
   if param_groups:
-    return [dict(params=reg, weight_decay=weight_decay), dict(params=no_reg, weight_decay=0)]
+    return [
+      dict(params=reg, weight_decay=weight_decay),
+      dict(params=no_reg, weight_decay=0),
+    ]
   else:
     return reg, no_reg
 
@@ -240,8 +249,9 @@ def freeze(x, exclude=None):
   elif exclude:
     raise ValueError(
       "can't exclude modules if parameters are passed, "
-      "pass an instance of nn.Module if you need to "
-      "exclude certain modules")
+      'pass an instance of nn.Module if you need to '
+      'exclude certain modules',
+    )
   else:
     for p in x:
       p.requires_grad = False
@@ -285,9 +295,8 @@ def replace_linear(model, num_outputs, layer_name=None):
       raise ValueError(
         f'Multiple linear layers found and layer name was not provided, '
         f'provide a valid layer_name, '
-        f'(valid names: {", ".join([n for n, m in linear_layers])})'
+        f'(valid names: {", ".join([n for n, m in linear_layers])})',
       )
-
 
   if '.' in layer_name:
     *path, layer_name = list(layer_name.split('.'))
@@ -298,11 +307,7 @@ def replace_linear(model, num_outputs, layer_name=None):
   new_linear = nn.Linear(old_linear.in_features, num_outputs)
   new_linear.to(old_linear.weight.device)
 
-  setattr(
-    model,
-    layer_name,
-    new_linear
-  )
+  setattr(model, layer_name, new_linear)
 
   return layer_name
 
@@ -331,7 +336,8 @@ def eval_mode(*modules, grad=False):
   if grad:
     training = (m.training for m in modules)
     try:
-      for m in modules: m.eval()
+      for m in modules:
+        m.eval()
       yield
     finally:
       for m, train in zip(modules, training):
@@ -341,7 +347,8 @@ def eval_mode(*modules, grad=False):
     with torch.no_grad():
       training = (m.training for m in modules)
       try:
-        for m in modules: m.eval()
+        for m in modules:
+          m.eval()
         yield
       finally:
         for m, train in zip(modules, training):
@@ -399,11 +406,15 @@ def get_device(module):
 
 def get_trainer(params=None, **kwargs):
   from yann.train import Trainer
+
   return Trainer(params=params, **kwargs)
 
 
 def get_model_name(model):
-  if isinstance(model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel)):
+  if isinstance(
+    model,
+    (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel),
+  ):
     model = model.module
 
   if hasattr(model, 'name'):
@@ -413,15 +424,14 @@ def get_model_name(model):
 
 
 def load_state_dict(
-    x,
-    state_dict: Union[str, 'pathlib.Path', dict],
-    strict: bool = True
+  x,
+  state_dict: Union[str, 'pathlib.Path', dict],
+  strict: bool = True,
 ):
   if not isinstance(state_dict, dict):
     state_dict = yann.load(state_dict)
 
   return x.load_state_dict(state_dict, strict=strict)
-
 
 
 def grad_norm(parameters, norm_type: float = 2.0):
@@ -444,7 +454,7 @@ def grad_norm(parameters, norm_type: float = 2.0):
 
   norm_type = float(norm_type)
   if len(parameters) == 0:
-    return torch.tensor(0.)
+    return torch.tensor(0.0)
   device = parameters[0].grad.device
   try:
     from torch import inf
@@ -456,10 +466,10 @@ def grad_norm(parameters, norm_type: float = 2.0):
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
     norm = torch.norm(
-      torch.stack([
-        torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters
-      ]),
-      norm_type
+      torch.stack(
+        [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters],
+      ),
+      norm_type,
     )
   return norm
 
@@ -473,7 +483,7 @@ def param_norm(parameters, norm_type: float = 2.0):
   parameters = list(parameters)
   norm_type = float(norm_type)
   if len(parameters) == 0:
-    return torch.tensor(0.)
+    return torch.tensor(0.0)
   device = parameters[0].device
   try:
     from torch import inf
@@ -484,10 +494,10 @@ def param_norm(parameters, norm_type: float = 2.0):
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
     norm = torch.norm(
-      torch.stack([
-        torch.norm(p.detach(), norm_type).to(device) for p in parameters
-      ]),
-      norm_type
+      torch.stack(
+        [torch.norm(p.detach(), norm_type).to(device) for p in parameters],
+      ),
+      norm_type,
     )
   return norm
 
@@ -507,8 +517,14 @@ def nested_lookup(obj, key):
   return obj
 
 
-import yann.params
-import yann.metrics
-import yann.train
+from yann.config.defaults import default
+from yann.config.setup import registry
+
+register = registry
+resolve = registry.resolve
+
 import yann.callbacks
+import yann.metrics
 import yann.optim
+import yann.params
+import yann.train

@@ -1,7 +1,6 @@
 from yann.data.classes import Classes, get_class_weights
 
 
-
 def test_classes():
   classes = Classes.ordered(10)
 
@@ -16,15 +15,9 @@ def test_classes():
   assert classes.index_encode('a') == 0
   assert classes.one_hot_encode('a')[0] == 1
 
-
   classes = Classes(counts={'a': 10, 'b': 20})
-  assert classes.weights() == [30/10, 30/20]
+  assert classes.weights(normalize=False) == [30 / 10, 30 / 20]
 
 
 def test_class_weights():
-  counts = {
-    0: 4,
-    1: 5,
-    2: 10
-  }
-
+  counts = {0: 4, 1: 5, 2: 10}

@@ -1,13 +1,15 @@
 import argparse
+import datetime
 import re
+import subprocess
 import sys
-from typing import Union, Optional, Dict, Any, TYPE_CHECKING
 import typing
 from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+
 import numpy as np
 import torch
 from PIL import Image
-import datetime
 
 if TYPE_CHECKING:
   import yann
@@ -15,13 +17,80 @@ if TYPE_CHECKING:
 from .ids import memorable_id
 
 
+def get_env_info(save_to_path=None):
+  """Get environment dependencies and optionally save to files.
+  
+  Args:
+    save_to_path: Optional directory path to save environment files
+                  (env.yml for conda, requirements.txt for pip)
+  
+  Returns:
+    dict: Environment information including packages and versions
+  """
+  import os
+  
+  env_data = {}
+  
+  # Try to get conda environment info
+  try:
+    result = subprocess.run(
+      ['conda', 'env', 'export'],
+      capture_output=True,
+      text=True,
+      check=True,
+    )
+    env_data['conda'] = result.stdout
+    if save_to_path:
+      with open(os.path.join(save_to_path, 'env.yml'), 'w') as f:
+        f.write(result.stdout)
+  except (FileNotFoundError, subprocess.CalledProcessError):
+    pass  # Conda not available
+  
+  # Try to get pip requirements
+  requirements = None
+  
+  # Try uv pip freeze first
+  try:
+    result = subprocess.run(
+      ['uv', 'pip', 'freeze'],
+      capture_output=True,
+      text=True,
+      check=True,
+    )
+    requirements = result.stdout
+    env_data['pip'] = requirements
+    env_data['pip_tool'] = 'uv'
+  except (FileNotFoundError, subprocess.CalledProcessError):
+    # Try regular pip freeze
+    try:
+      result = subprocess.run(
+        ['pip', 'freeze'],
+        capture_output=True,
+        text=True,
+        check=True,
+      )
+      requirements = result.stdout
+      env_data['pip'] = requirements
+      env_data['pip_tool'] = 'pip'
+    except (FileNotFoundError, subprocess.CalledProcessError):
+      pass  # Neither uv nor pip available
+  
+  # Save requirements.txt if we got pip info
+  if save_to_path and requirements:
+    with open(os.path.join(save_to_path, 'requirements.txt'), 'w') as f:
+      f.write(requirements)
+  
+  return env_data
+
+
 def env_info():
-  import sys
   import os
   import socket
-  from .bash import git_hash
+  import sys
+
   import yann
 
+  from .bash import git_hash
 
   try:
     gith = git_hash()
@@ -32,18 +101,15 @@ def env_info():
     cwd=os.getcwd(),
     arguments=sys.argv,
     git_hash=gith,
-    python=dict(
-      executable=sys.executable,
-      version=sys.version,
-      path=sys.path
-    ),
+    python=dict(executable=sys.executable, version=sys.version, path=sys.path),
     torch_version=torch.__version__,
     yann_version=yann.__version__,
-    hostname=socket.gethostname()
+    hostname=socket.gethostname(),
   )
 
+
 def timestr(d=None):
-  return f"{(d or datetime.datetime.utcnow()).strftime('%y-%m-%dT%H:%M:%S')}"
+  return f'{(d or datetime.datetime.utcnow()).strftime("%y-%m-%dT%H:%M:%S")}'
 
 
 def camel_to_snake(text):
@@ -52,7 +118,7 @@ def camel_to_snake(text):
 
 
 def abbreviate(text):
-  return re.sub(r"([a-zA-Z])[a-z]*[^A-Za-z]*", r"\1", text).lower()
+  return re.sub(r'([a-zA-Z])[a-z]*[^A-Za-z]*', r'\1', text).lower()
 
 
 def str2bool(v):
@@ -64,8 +130,8 @@ def str2bool(v):
     return False
   else:
     import argparse
-    raise argparse.ArgumentTypeError('Boolean value expected.')
 
+    raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 def supports_primitive_types(t: type, types=(bool, str, int, float)):
@@ -77,6 +143,7 @@ def supports_primitive_types(t: type, types=(bool, str, int, float)):
 
   return True
 
+
 def get_primitive_type(t: type, types=(bool, str, int, float)):
   if t in types:
     return t
@@ -85,18 +152,26 @@ def get_primitive_type(t: type, types=(bool, str, int, float)):
       if x in t.__args__:
         return x
 
+
 def get_arg_parser(
-    x: Union[Dict[str, Dict[str, Any],], Dict[str, 'yann.params.Field']],
-    description=None,
-    epilog=None,
-    parser: Optional[argparse.ArgumentParser]=None,
-    **kwargs
+  x: Union[
+    Dict[
+      str,
+      Dict[str, Any],
+    ],
+    Dict[str, 'yann.params.Field'],
+  ],
+  description=None,
+  epilog=None,
+  parser: Optional[argparse.ArgumentParser] = None,
+  **kwargs,
 ):
   from ..params import Field
+
   parser = parser or argparse.ArgumentParser(
     description=description,
     epilog=epilog,
-    **kwargs
+    **kwargs,
   )
 
   abbreviations = {'h'}
@@ -115,9 +190,9 @@ def get_arg_parser(
     names = []
     abbreviated = abbreviate(k)
     if abbreviated not in abbreviations:
-      names.append(f"-{abbreviated}")
+      names.append(f'-{abbreviated}')
       abbreviations.add(abbreviated)
-    names.append(f"--{camel_to_snake(k)}")
+    names.append(f'--{camel_to_snake(k)}')
 
     if isinstance(v, dict):
       parser.add_argument(
@@ -128,14 +203,14 @@ def get_arg_parser(
         help=v.get('help'),
         required=v.get('required'),
         choices=v.get('choices'),
-        dest=v.get('dest')
+        dest=v.get('dest'),
       )
     elif isinstance(v, Field):
       parser.add_argument(
         *names,
         default=v.default,
         type=str2bool if prim_type is bool else prim_type,
-        help=f"{v.help or k} (default: {v.default}, type: {prim_type.__name__})",
+        help=f'{v.help or k} (default: {v.default}, type: {prim_type.__name__})',
         required=v.required,
         choices=getattr(v, 'choices', None),
       )
@@ -174,12 +249,12 @@ def progress(it, num=None):
 
   if num:
     for n, x in enumerate(it, 1):
-      sys.stdout.write(f"\r{n} / {num}")
+      sys.stdout.write(f'\r{n} / {num}')
       sys.stdout.flush()
       yield x
   else:
     for n, x in enumerate(it, 1):
-      sys.stdout.write(f"\r{n}")
+      sys.stdout.write(f'\r{n}')
       sys.stdout.flush()
       yield x
 
@@ -242,8 +317,9 @@ def pretty_size(bytes):
 
 
 def print_tree(root, indent=2, depth=None, filter=None):
-  from pathlib import Path
   from datetime import datetime
+  from pathlib import Path
+
   root = Path(root)
   for path in sorted((root, *root.rglob('*'))):
     d = len(path.relative_to(root).parts)
@@ -257,7 +333,7 @@ def print_tree(root, indent=2, depth=None, filter=None):
       print(
         f'{" " * (d * indent)}  - {path.name:25} '
         f'{f"({pretty_size(path.stat().st_size)})":15} '
-        f'{datetime.fromtimestamp(path.stat().st_mtime)}'
+        f'{datetime.fromtimestamp(path.stat().st_mtime)}',
       )
 
 
@@ -271,6 +347,7 @@ def fully_qualified_name(x):
 
 def hash_params(module):
   from hashlib import sha1
+
   s = sha1()
   for p in module.parameters():
     s.update(to_numpy(p).tobytes())
@@ -284,15 +361,16 @@ def dynamic_import(qualified_name: str):
     qualified_name: fully qualified name (ex: `torch.nn.Linear`)
   """
   import importlib
+
   module_name, obj_name = qualified_name.rsplit('.', maxsplit=1)
   module = importlib.import_module(module_name)
   return getattr(module, obj_name)
 
 
 def source_file_import(
-    path: Union[str, 'pathlib.Path'],
-    module_name: Optional[str] = None
-) -> "types.ModuleType":
+  path: Union[str, 'pathlib.Path'],
+  module_name: Optional[str] = None,
+) -> 'types.ModuleType':
   """
   Import python module from a source file
   Args:
@@ -306,6 +384,7 @@ def source_file_import(
 
   if module_name is None:
     from pathlib import Path
+
     module_name = Path(path).stem.replace('-', '_')
 
   spec = importlib.util.spec_from_file_location(module_name, str(path))
@@ -314,7 +393,7 @@ def source_file_import(
   return module
 
 
-def source_string_import(code: str, module_name: str) -> "types.ModuleType":
+def source_string_import(code: str, module_name: str) -> 'types.ModuleType':
   """
   Import code from source code string
   Args:
@@ -325,6 +404,7 @@ def source_string_import(code: str, module_name: str) -> "types.ModuleType":
     imported module
   """
   import importlib.util
+
   spec = importlib.util.spec_from_loader(module_name, loader=None)
   module = importlib.util.module_from_spec(spec)
   exec(code, module.__dict__)
@@ -344,10 +424,10 @@ def is_notebook() -> bool:
     return False
 
 
-
 @contextmanager
 def timeout(seconds, message='Exceeded time'):
   import signal
+
   def error():
     raise TimeoutError(message)
 
@@ -365,9 +445,6 @@ def apply_known(function: typing.Callable, arguments: dict):
     that are defined in the signature
   """
   import inspect
+
   sig = inspect.signature(function)
-  return function(
-    **{k: arguments[k]
-       for k in sig.parameters
-       if k in arguments
-       })
+  return function(**{k: arguments[k] for k in sig.parameters if k in arguments})
