@@ -9,10 +9,13 @@ authors = [
 ]
 requires-python = ">=3.7"
 dependencies = [
+    "datasets>=2.13.2",
     "pyyaml>=6.0.1",
     "rich>=13.8.1",
+    "tokenizers>=0.13.3",
     "torch",
     "torchvision",
+    "transformers>=4.30.2",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +38,7 @@ exclude = ["tests*"]  # Example: Exclude tests directory if you have one
 dev = [
     "add-trailing-comma>=2.4.0",
     "ipython>=7.34.0",
+    "pytest>=7.4.4",
 ]
 
 

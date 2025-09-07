@@ -4,13 +4,16 @@ from torch import nn
 from torch.optim import SGD
 
 from yann.callbacks import (
-  History, HistoryPlotter, HistoryWriter, Logger, Checkpoint
+  Checkpoint,
+  History,
+  HistoryPlotter,
+  HistoryWriter,
+  Logger,
 )
 from yann.datasets import TinyDigits
 from yann.datasets.wrappers import Slice
 from yann.modules import Flatten
 from yann.train import Trainer
-
 
 devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 
@@ -19,6 +22,8 @@ devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 @pytest.mark.parametrize('device', devices)
 def test_train(tmpdir, device):
   """Sanity check train run"""
+  
+  pytest.importorskip("sklearn", reason="scikit-learn not installed")
 
   model = nn.Sequential(
     nn.Conv2d(1, 20, 3),
@@ -26,7 +31,7 @@ def test_train(tmpdir, device):
     nn.Conv2d(20, 20, 3),
     nn.ReLU(inplace=True),
     Flatten(),
-    nn.Linear(320, 10)
+    nn.Linear(320, 10),
   )
 
   train = Trainer(
@@ -34,15 +39,20 @@ def test_train(tmpdir, device):
     model=model,
     dataset=Slice(TinyDigits(), 0, 256),
     device=device,
-    optimizer=SGD(model.parameters(), lr=.01, momentum=0.9, weight_decay=.001),
+    optimizer=SGD(
+      model.parameters(),
+      lr=0.01,
+      momentum=0.9,
+      weight_decay=0.001,
+    ),
     loss=nn.CrossEntropyLoss(),
     callbacks=[
       History(),
       HistoryPlotter(save=True),
       HistoryWriter(),
       Logger(batch_freq=20),
-      Checkpoint()
-    ]
+      Checkpoint(),
+    ],
   )
 
   train(2)
@@ -56,14 +66,12 @@ def test_train(tmpdir, device):
   assert export_path.is_dir()
 
 
-
 def test_interface():
   train = Trainer()
 
   train.callbacks
   train.history
   train.paths
-
 
 
 # @pytest.mark.slow
