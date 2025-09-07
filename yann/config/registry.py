@@ -402,3 +402,31 @@ class DatasetRegistry(Registry):
     
     # Fall back to standard registry behavior
     return super().__getitem__(item)
+
+
+class ModelRegistry(Registry):
+  """Special registry for models that handles HuggingFace models with hf:// URIs."""
+  
+  def __getitem__(self, item) -> Record:
+    # Handle HuggingFace models with hf:// prefix
+    if isinstance(item, str) and item.startswith('hf://'):
+      try:
+        from transformers import AutoModel
+      except ImportError:
+        raise ImportError(
+          "transformers library not installed. "
+          "Install with: pip install yann[transformers]"
+        )
+      
+      # Extract model name and create a loader function
+      model_name = item[5:]  # Remove 'hf://' prefix
+      
+      # Return a Record with AutoModel.from_pretrained as the callable
+      # This allows passing kwargs through the resolution process
+      return Record(
+        x=AutoModel.from_pretrained,
+        init=lambda f, **kwargs: f(model_name, **kwargs)
+      )
+    
+    # Fall back to standard registry behavior
+    return super().__getitem__(item)

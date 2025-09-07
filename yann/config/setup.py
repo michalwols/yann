@@ -1,7 +1,7 @@
 import torch
 
 from .defaults import default
-from .registry import Registry, DatasetRegistry, is_public_callable, pass_args
+from .registry import Registry, DatasetRegistry, ModelRegistry, is_public_callable, pass_args
 
 ## Configure Registry
 
@@ -78,7 +78,8 @@ registry.lr_scheduler.index(lr_scheduler, types=(lr_scheduler._LRScheduler,))
 # ReduceLROnPlateau subclasses object
 registry.lr_scheduler.register(lr_scheduler.ReduceLROnPlateau)
 
-# Models
+# Models - Use the new ModelRegistry that handles HuggingFace models
+registry.model = ModelRegistry(name='model')
 from torchvision import models
 
 registry.model.torchvision.index(
