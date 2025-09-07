@@ -1,9 +1,9 @@
-from itertools import zip_longest
 import logging
-from typing import Union
-import typing
-
 import math
+import typing
+from itertools import zip_longest
+from typing import Union
+
 import numpy as np
 import torch
 
@@ -62,16 +62,22 @@ class Sliceable(DatasetWrapper):
 
 class Subset(DatasetWrapper):
   @typing.overload
-  def __init__(self, dataset: typing.Mapping, indices: Union[np.ndarray, torch.Tensor]):
-    ...
+  def __init__(
+    self,
+    dataset: typing.Mapping,
+    indices: Union[np.ndarray, torch.Tensor],
+  ): ...
 
   @typing.overload
-  def __init__(self, dataset: typing.Mapping, end: Union[float, int]):
-    ...
+  def __init__(self, dataset: typing.Mapping, end: Union[float, int]): ...
 
   @typing.overload
-  def __init__(self, dataset: typing.Mapping, start: Union[float, int], end: Union[float, int]):
-    ...
+  def __init__(
+    self,
+    dataset: typing.Mapping,
+    start: Union[float, int],
+    end: Union[float, int],
+  ): ...
 
   def __init__(self, dataset, *args):
     super(Subset, self).__init__(dataset)
@@ -83,7 +89,9 @@ class Subset(DatasetWrapper):
     if len(args) == 1:
       if isinstance(args[0], int):
         self.start = 0
-        self.end = args[0] if not (0 < args[0] < 1) else math.floor(len(dataset) * args[0])
+        self.end = (
+          args[0] if not (0 < args[0] < 1) else math.floor(len(dataset) * args[0])
+        )
       elif isinstance(args[0], Union[np.ndarray, torch.Tensor]):
         self.indices = args[0]
     elif len(args) == 2:
@@ -126,6 +134,7 @@ class Slice(DatasetWrapper):
 
 # class Subset(DatasetWrapper):
 #   pass
+
 
 class IndexedView(DatasetWrapper):
   def __init__(self, dataset, indices):
@@ -180,13 +189,11 @@ class LookupCache(DatasetWrapper):
 class TransformDataset(DatasetWrapper):
   def __init__(self, dataset, transform):
     super().__init__(dataset)
-    self.transforms = transform if isinstance(transform, tuple) else (
-      transform,)
+    self.transforms = transform if isinstance(transform, tuple) else (transform,)
 
   def __getitem__(self, idx):
     return tuple(
-      t(x) if t else x
-      for (x, t) in zip_longest(self.dataset[idx], self.transforms)
+      t(x) if t else x for (x, t) in zip_longest(self.dataset[idx], self.transforms)
     )
 
   def __repr__(self):
@@ -194,7 +201,8 @@ class TransformDataset(DatasetWrapper):
       f'{self.__class__.__name__}('
       f'\nDataset: {repr(self.dataset)}'
       f'\nTransforms: {repr(self.transforms)}'
-      f'\n)')
+      f'\n)'
+    )
 
 
 # class Noisy(DatasetWrapper):
@@ -237,4 +245,3 @@ class VariableLength(DatasetWrapper):
 
   def __getitem__(self, idx):
     return self.dataset[idx % len(self.dataset)]
-

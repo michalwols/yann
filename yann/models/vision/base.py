@@ -1,8 +1,8 @@
+from typing import Callable
+
 from torch import nn
 
 from ...data import Classes
-from typing import Callable
-
 
 
 class CNN(nn.Module):
@@ -17,13 +17,11 @@ class RecognitionModel(nn.Module):
   input_shape = (None, None, None, None)
   classes: Classes
 
-
   backbone: Callable
   # "Global" pooling layer that converts features into an embedding
   pool_features: Callable
 
   classifier: Callable
-
 
   def get_features(self, inputs):
     raise NotImplementedError()

@@ -1,13 +1,10 @@
-from collections import OrderedDict
-from collections import abc
+from collections import OrderedDict, abc
 from typing import List
 
 
 class Container(abc.MutableMapping):
   def __init__(self, *args, **kwargs):
-    items = OrderedDict(
-      ('_arg' + str(n), v) for n, v in enumerate(args)
-    )
+    items = OrderedDict(('_arg' + str(n), v) for n, v in enumerate(args))
     items.update(kwargs)
 
     self.__dict__.update(items)
@@ -62,4 +59,3 @@ class Samples:
 
   def __iter__(self):
     return (*self.inputs, *self.targets)
-

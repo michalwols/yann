@@ -3,7 +3,7 @@ import os.path
 
 from annoy import AnnoyIndex
 
-from ..io import save_json, load_json
+from ..io import load_json, save_json
 from .base import VectorIndex
 
 
@@ -18,14 +18,17 @@ class Annoy(VectorIndex):
     if os.path.isfile(self.path):
       logging.debug(f'Loading existing index: {self.path}')
       self.load_meta()
-      assert self.dims == dims or not dims, \
+      assert self.dims == dims or not dims, (
         'Passed path to existing index but dims do not match'
-      assert self.metric == metric or not metric, \
+      )
+      assert self.metric == metric or not metric, (
         'Passed path to existing index but metrics do not match'
+      )
       self.index = AnnoyIndex(self.dims, metric=self.metric)
     elif dims:
       logging.debug(
-        f'Creating new index with {dims} dimensions and {self.metric} metric')
+        f'Creating new index with {dims} dimensions and {self.metric} metric',
+      )
       self.dims = dims
       self.index = AnnoyIndex(self.dims, metric=self.metric)
       if build_on_disk:
@@ -44,9 +47,7 @@ class Annoy(VectorIndex):
     return [self.path, self.meta_path]
 
   def load_meta(self):
-    self.__dict__.update(
-      load_json(self.meta_path)
-    )
+    self.__dict__.update(load_json(self.meta_path))
 
   def save_meta(self):
     d = {**self.__dict__}

@@ -1,5 +1,3 @@
-
-
 class YannException(Exception):
   pass
 

@@ -1,6 +1,5 @@
 from torch import nn
 
-# TODO: handle downsampling logic
 
 def residual(input, block, identity=None):
   p = block(input)
@@ -10,9 +9,11 @@ def residual(input, block, identity=None):
 
 
 class Residual(nn.Module):
-  def __init__(self, block, identity=None, activation=None):
+  def __init__(self, *block, identity=None, activation=None):
     super().__init__()
-    self.block = block
+    from . import Stack
+
+    self.block = block[0] if len(block) == 1 else Stack(*block)
     self.identity = identity
     self.activation = activation
 

@@ -1,4 +1,5 @@
 import yann.utils
+
 from .base import Callback
 
 
@@ -24,24 +25,21 @@ class ProgressBar(Callback):
     else:
       from tqdm import tqdm
 
-
     if trainer:
       try:
-        total = (len(trainer.dataset) if self.samples else len(trainer.loader))
+        total = len(trainer.dataset) if self.samples else len(trainer.loader)
       except:
         total = None
     else:
       total = None
 
     self.bar = tqdm(
-      desc=f"Epoch {epoch}",
+      desc=f'Epoch {epoch}',
       total=self.length or total,
-      unit='samples' if self.samples else 'batches'
+      unit='samples' if self.samples else 'batches',
     )
 
-  def on_epoch_end(
-    self, epoch=None, loss=None, metrics=None, trainer=None
-  ):
+  def on_epoch_end(self, epoch=None, loss=None, metrics=None, trainer=None):
     self.bar.close()
 
   def on_step_end(
@@ -51,7 +49,7 @@ class ProgressBar(Callback):
     targets=None,
     outputs=None,
     loss=None,
-    trainer=None
+    trainer=None,
   ):
     if self.samples:
       self.bar.update(len(inputs))

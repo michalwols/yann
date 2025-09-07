@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
-from torch.nn.modules.loss import _Loss, _WeightedLoss
 from torch import nn
+from torch.nn.modules.loss import _Loss, _WeightedLoss
 
 from yann.data.classes import smooth as label_smoothing
 
@@ -21,19 +21,19 @@ def _reduce(x, reduce=True, reduction=None):
 
 
 def soft_target_cross_entropy(
-    inputs,
-    targets,
-    smooth=None,
-    reduce=True,
-    dim=1,
-    reduction='mean'):
-  """"like cross_entropy but using soft targets"""
+  inputs,
+  targets,
+  smooth=None,
+  reduce=True,
+  dim=1,
+  reduction='mean',
+):
+  """ "like cross_entropy but using soft targets"""
   if smooth:
     targets = label_smoothing(targets, smooth)
 
   vals = torch.sum(-targets * F.log_softmax(inputs, dim=dim), dim=dim)
   return _reduce(vals, reduce=reduce, reduction=reduction)
-
 
 
 class SoftTargetCrossEntropyLoss(_Loss):
@@ -51,11 +51,19 @@ class SoftTargetCrossEntropyLoss(_Loss):
       smooth=self.smooth,
       reduce=self.reduce,
       dim=self.dim,
-      reduction=self.reduction)
+      reduction=self.reduction,
+    )
 
 
-
-def binary_focal_loss(logits, targets, gamma=2, alpha=None, pos_weight=None, reduce=True, reduction='mean'):
+def binary_focal_loss(
+  logits,
+  targets,
+  gamma=2,
+  alpha=None,
+  pos_weight=None,
+  reduce=True,
+  reduction='mean',
+):
   """
   Binary focal loss (with sigmoids)
 
@@ -93,7 +101,12 @@ def binary_focal_loss(logits, targets, gamma=2, alpha=None, pos_weight=None, red
   # TODO try this numerically stable version https://github.com/richardaecn/class-balanced-loss/issues/1
 
   probs = torch.sigmoid(logits)
-  bce = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=pos_weight, reduction='none')
+  bce = F.binary_cross_entropy_with_logits(
+    logits,
+    targets,
+    pos_weight=pos_weight,
+    reduction='none',
+  )
 
   pt = targets * probs + (1 - targets) * (1 - probs)
   modulate = 1 if gamma is None else (1 - pt) ** gamma
@@ -109,7 +122,14 @@ def binary_focal_loss(logits, targets, gamma=2, alpha=None, pos_weight=None, red
 
 
 class BinaryFocalLoss(_Loss):
-  def __init__(self, gamma=2, alpha=None, pos_weight=None, reduce=True, reduction='mean'):
+  def __init__(
+    self,
+    gamma=2,
+    alpha=None,
+    pos_weight=None,
+    reduce=True,
+    reduction='mean',
+  ):
     super(BinaryFocalLoss, self).__init__()
 
     self.gamma = gamma
@@ -125,8 +145,9 @@ class BinaryFocalLoss(_Loss):
       gamma=self.gamma,
       alpha=self.alpha,
       pos_weight=self.pos_weight,
-      reduction=self.reduction
+      reduction=self.reduction,
     )
+
 
 class ClassWeighted(_Loss):
   def __init__(self, loss, weights=None, reduce=True, reduction='mean'):
@@ -151,15 +172,15 @@ def triplet_loss():
   pass
 
 
-
-
 def tempered_log(x, temperature=1):
-  if temperature == 1: return torch.log(x)
+  if temperature == 1:
+    return torch.log(x)
   return (x ** (1 - temperature) - 1) / (1 - temperature)
 
 
 def tempered_exp(x, temperature=1):
-  if temperature == 1: return torch.exp(x)
+  if temperature == 1:
+    return torch.exp(x)
   return torch.relu(1 + (1 - temperature) * x) ** (1 / (1 - temperature))
 
 
@@ -173,7 +194,6 @@ def bi_tempered_logistic_loss():
 
 def bi_tempered_binary_logistic_loss():
   pass
-
 
 
 class WeightedLoss(_WeightedLoss):
@@ -206,7 +226,15 @@ MultiTaskLoss = CombinedLoss
 
 
 class KeepK(_Loss):
-  def __init__(self, loss, top=None, bottom=None, reduce=True, reduction='mean', **kwargs):
+  def __init__(
+    self,
+    loss,
+    top=None,
+    bottom=None,
+    reduce=True,
+    reduction='mean',
+    **kwargs,
+  ):
     super().__init__(reduce=reduce, reduction=reduction, **kwargs)
     self.loss = loss
     if hasattr(self.loss, 'reduction'):
@@ -236,9 +264,16 @@ class KeepK(_Loss):
     return _reduce(losses, reduction=self.reduction, reduce=self.reduce)
 
 
-
 class KeepRange(_Loss):
-  def __init__(self, loss, min=None, max=None, reduce=True, reduction='mean', **kwargs):
+  def __init__(
+    self,
+    loss,
+    min=None,
+    max=None,
+    reduce=True,
+    reduction='mean',
+    **kwargs,
+  ):
     super().__init__(reduce=reduce, reduction=reduction, **kwargs)
     self.loss = loss
     if hasattr(self.loss, 'reduction'):

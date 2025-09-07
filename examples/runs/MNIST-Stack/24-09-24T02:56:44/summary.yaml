@@ -1,0 +1,39 @@
+id: doubtful-zesty-borer
+name: MNIST-Stack
+path: runs/MNIST-Stack/24-09-24T02:56:44
+num_steps: 7196
+num_samples: 230272
+num_epochs: 3
+batch_size: 32
+device: mps
+time_created: 2024-09-24 02:56:44.787630
+env:
+  cwd: /Users/michalwolski/projects/yann/examples
+  arguments:
+  - /Users/michalwolski/projects/yann/examples/train_mnist.py
+  git_hash: 96f5b0c5f5d986e20050f906aaaeb7eef9e421af
+  python:
+    executable: /Users/michalwolski/projects/yann/env/bin/python
+    version: "3.9.6 (default, Aug  9 2024, 14:24:13) \n[Clang 16.0.0 (clang-1600.0.26.3)]"
+    path:
+    - /Users/michalwolski/projects/yann/examples
+    - /Users/michalwolski/projects/yann
+    - /Applications/PyCharm.app/Contents/plugins/python-ce/helpers/pycharm_display
+    - /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python39.zip
+    - /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9
+    - /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lib-dynload
+    - /Users/michalwolski/projects/yann/env/lib/python3.9/site-packages
+    - /Applications/PyCharm.app/Contents/plugins/python-ce/helpers/pycharm_matplotlib_backend
+    - /Applications/PyCharm.app/Contents/plugins/python-ce/helpers/pycharm_plotly_backend
+  torch_version: !!python/object/new:torch.torch_version.TorchVersion
+  - 2.2.1
+  yann_version: 0.0.40
+  hostname: Michals-MacBook-Pro.local
+dataset:
+  name: MNIST
+  size: 60000
+  num_classes: 10
+model:
+  name: Stack
+  param_count: 21840
+  trainable_param_count: 21840

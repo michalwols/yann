@@ -1,17 +1,18 @@
-from time import time as get_time
 from pathlib import Path
+from time import time as get_time
+
 import torch
 
-from ..utils.decorators import lazy
+from .. import get_item, resolve
 from ..callbacks.base import Callback
-from ..viz import plot_line
-from .. import resolve, get_item
-from ..data.metrics import MetricStore, EventStore, Event
+from ..data.metrics import Event, EventStore, MetricStore
 from ..evaluation import evaluate_metrics
+from ..utils.decorators import lazy
+from ..viz import plot_line
 
 
 class History(Callback):
-  def __init__(self, *metrics, **named_metrics):
+  def __init__(self, *metrics, eval_freq: int = 1, **named_metrics):
     super(History, self).__init__()
     if len(metrics) == 1 and not named_metrics:
       if isinstance(metrics[0], dict):
@@ -31,30 +32,49 @@ class History(Callback):
       else:
         raise ValueError(f'Unknown metric {m}')
 
-    self.metrics = MetricStore(
-      self.metric_funcs.keys(),
-      cast_value=get_item
-    )
+    self.metrics = MetricStore(self.metric_funcs.keys(), cast_value=get_item)
     self.val_metrics = MetricStore(
       self.metric_funcs.keys(),
-      cast_value=get_item
+      cast_value=get_item,
     )
     self.events = EventStore()
+    self.eval_freq = eval_freq
 
     self.trainer = None
 
   def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
+    step = trainer.num_steps
+    metrics_to_update = {'loss': loss}
+
+    # Evaluate other metrics only at the specified frequency
+    if step % self.eval_freq == 0:
+      evaluated_metrics = evaluate_metrics(
+        targets=targets,
+        outputs=outputs,
+        metrics=self.metric_funcs,
+      )
+      metrics_to_update.update(evaluated_metrics)
+
     self.metrics.update(
-      step=trainer.num_steps,
-      loss=loss,
-      **evaluate_metrics(targets=targets, outputs=outputs, metrics=self.metric_funcs)
+      step=step,
+      **metrics_to_update,
     )
 
-  def on_validation_end(self, loss=None, outputs=None, targets=None, trainer=None):
+  def on_validation_end(
+    self,
+    loss=None,
+    outputs=None,
+    targets=None,
+    trainer=None,
+  ):
     self.val_metrics.update(
       step=trainer.num_epochs,
       loss=loss,
-      **evaluate_metrics(targets=targets, outputs=outputs, metrics=self.metric_funcs)
+      **evaluate_metrics(
+        targets=targets,
+        outputs=outputs,
+        metrics=self.metric_funcs,
+      ),
     )
 
   @lazy
@@ -62,10 +82,16 @@ class History(Callback):
     return HistoryPlotter(history=self)
 
 
-
 class HistoryPlotter(Callback):
-  def __init__(self, freq=500, window=50, metrics=None,
-               clear=False, save=False, history: History = None):
+  def __init__(
+    self,
+    freq=500,
+    window=50,
+    metrics=None,
+    clear=False,
+    save=False,
+    history: History = None,
+  ):
     super().__init__()
     self.history: History = history
     self.freq = freq
@@ -85,10 +111,10 @@ class HistoryPlotter(Callback):
     if self.clear:
       try:
         from IPython.display import clear_output
+
         clear_output(wait=True)
       except:
         pass
-
 
     if validation:
       metrics = self.history.val_metrics
@@ -108,11 +134,10 @@ class HistoryPlotter(Callback):
         ylabel=f'validation {name}' if validation else name,
         name=f'validation {name}' if validation else name,
         window=1 if validation else self.window,
-        save=self.save and
-             self.root / (f'validation {name}' if validation else name),
+        save=self.save and self.root / (f'validation {name}' if validation else name),
         show=not self.save,
         figsize=self.figsize,
-        **kwargs
+        **kwargs,
       )
 
   def on_train_start(self, trainer=None):
@@ -122,20 +147,25 @@ class HistoryPlotter(Callback):
 
   def on_step_end(self, *args, trainer=None, **kwargs):
     if trainer.num_steps % self.freq == 0:
-      self.plot(
-        title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}'
-      )
+      self.plot(title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}')
 
   def on_validation_end(self, *args, trainer=None, **kwargs):
     self.plot(
       validation=True,
-      title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}'
+      title=f'Epoch: {trainer.num_epochs} Steps: {trainer.num_steps}',
     )
 
 
 class HistoryWriter(Callback):
-  def __init__(self, root=None, train=True, val=True, mode='a+',
-               write_freq=1, flush_freq=500):
+  def __init__(
+    self,
+    root=None,
+    train=True,
+    val=True,
+    mode='a+',
+    write_freq=1,
+    flush_freq=500,
+  ):
     self.root = root
     self.mode = mode
     self.train = train
@@ -181,35 +211,51 @@ class HistoryWriter(Callback):
       return
 
     if self.header is None:
-      self.header = ['timestamp', 'epoch', 'step', *trainer.history.metrics.keys()]
+      self.header = [
+        'timestamp',
+        'epoch',
+        'step',
+        *trainer.history.metrics.keys(),
+      ]
       self.train_file.write('\t'.join(self.header) + '\n')
 
     self.train_file.write(
-      f"{trainer.history.metrics.times[-1]}\t"
-      f"{trainer.num_epochs}\t"
-      f"{len(trainer.history.metrics.times)}\t"
-      + '\t'.join((f"{trainer.history.metrics[m][-1]:.4f}"
-                   for m in self.header[3:]))
-      + '\n'
+      f'{trainer.history.metrics.times[-1]}\t'
+      f'{trainer.num_epochs}\t'
+      f'{len(trainer.history.metrics.times)}\t'
+      + '\t'.join(
+        (f'{trainer.history.metrics[m][-1]:.4f}' for m in self.header[3:]),
+      )
+      + '\n',
     )
 
     if index % self.flush_freq == 0:
       self.train_file.flush()
 
-  def on_validation_end(self, targets=None, outputs=None, loss=None,
-                        trainer=None):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     if self.val_header is None:
-      self.val_header = ['timestamp', 'epoch', 'step',
-                         *trainer.history.val_metrics.keys()]
+      self.val_header = [
+        'timestamp',
+        'epoch',
+        'step',
+        *trainer.history.val_metrics.keys(),
+      ]
       self.val_file.write('\t'.join(self.header) + '\n')
 
     self.val_file.write(
-      f"{trainer.history.val_metrics.times[-1]}\t"
-      f"{trainer.num_epochs}\t"
-      f"{len(trainer.history.val_metrics.times)}\t"
-      + '\t'.join((f"{trainer.history.val_metrics[m][-1]:.4f}"
-                   for m in self.val_header[3:]))
-      + '\n'
+      f'{trainer.history.val_metrics.times[-1]}\t'
+      f'{trainer.num_epochs}\t'
+      f'{len(trainer.history.val_metrics.times)}\t'
+      + '\t'.join(
+        (f'{trainer.history.val_metrics[m][-1]:.4f}' for m in self.val_header[3:]),
+      )
+      + '\n',
     )
 
     self.val_file.flush()

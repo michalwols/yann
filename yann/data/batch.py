@@ -29,7 +29,7 @@ class Batch:
       self.outputs,
       self.losses,
       device=device,
-      **kwargs
+      **kwargs,
     )
     return self
 

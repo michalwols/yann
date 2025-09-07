@@ -1,8 +1,8 @@
 from collections import OrderedDict
 
 import yann.callbacks
-from yann.utils import camel_to_snake
 from yann.callbacks.base import Callback
+from yann.utils import camel_to_snake
 
 
 class Events:
@@ -80,7 +80,7 @@ class Callbacks(Callback):
     return len(self._callbacks) > 0
 
   def __str__(self):
-    return f"Callbacks({', '.join(f'{k}={v}' for k,v in self._callbacks.items())}"
+    return f'Callbacks({", ".join(f"{k}={v}" for k, v in self._callbacks.items())}'
 
   def append(self, callback):
     name = self._get_name(callback)
@@ -97,6 +97,7 @@ class Callbacks(Callback):
       self.function_callback.on(event, callback)
       return self
     else:
+
       def decorated(func):
         self.function_callback.on(event, func)
         return func
@@ -120,7 +121,15 @@ class Callbacks(Callback):
     pass
 
   @callback
-  def on_step_end(self, index: int, inputs, targets, outputs, loss, trainer=None):
+  def on_step_end(
+    self,
+    index: int,
+    inputs,
+    targets,
+    outputs,
+    loss,
+    trainer=None,
+  ):
     pass
 
   @callback
@@ -144,10 +153,15 @@ class Callbacks(Callback):
     pass
 
   @callback
-  def on_validation_end(self, targets=None, outputs=None, loss=None, trainer=None):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     pass
 
   @callback
   def on_train_end(self, trainer=None):
     pass
-

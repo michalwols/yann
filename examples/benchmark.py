@@ -1,10 +1,12 @@
+from itertools import repeat
+
 import timm
 import torch
-from itertools import repeat
-from torch.cuda.amp import autocast, GradScaler
+from torch.cuda.amp import GradScaler, autocast
+
 import yann
-from yann.callbacks import ProgressBar
 import yann.transforms
+from yann.callbacks import ProgressBar
 
 
 class Params(yann.params.HyperParams):
@@ -21,7 +23,6 @@ class Params(yann.params.HyperParams):
   pin_memory = False
   prefetch_factor = 2
 
-
   device = yann.default.device
   memory_format: str = 'contiguous_format'
   dtype = 'float32'
@@ -36,21 +37,20 @@ class Params(yann.params.HyperParams):
 
 
 def simple_train_loop(
-    model: torch.nn.Module,
-    loader,
-    loss,
-    optimizer,
-    device=None,
-    memory_format=None,
-    dtype=None,
-    non_blocking=False,
-    amp=False,
-    progress: ProgressBar = None
+  model: torch.nn.Module,
+  loader,
+  loss,
+  optimizer,
+  device=None,
+  memory_format=None,
+  dtype=None,
+  non_blocking=False,
+  amp=False,
+  progress: ProgressBar = None,
 ):
   model.train()
   progress.on_epoch_start()
   for i, (inputs, targets) in enumerate(loader):
-
     # print(i)
     if device or memory_format:
       inputs, targets = (
@@ -58,12 +58,9 @@ def simple_train_loop(
           device,
           memory_format=memory_format,
           dtype=dtype,
-          non_blocking=non_blocking
+          non_blocking=non_blocking,
         ),
-        targets.to(
-          device=device,
-          non_blocking=non_blocking
-        )
+        targets.to(device=device, non_blocking=non_blocking),
       )
 
     with autocast(enabled=amp):
@@ -76,7 +73,6 @@ def simple_train_loop(
 
     progress.on_step_end(inputs=inputs)
   progress.on_epoch_end()
-
 
 
 def benchmark_train(params: Params):
@@ -92,7 +88,7 @@ def benchmark_train(params: Params):
   transform = yann.transforms.ImageTransformer(
     resize=params.size,
     crop=params.size,
-    color_space='RGB'
+    color_space='RGB',
   )
 
   dataset = yann.resolve.dataset(params.dataset, download=True)
@@ -118,7 +114,7 @@ def benchmark_train(params: Params):
     batch_size=params.batch_size,
     num_workers=params.num_workers,
     pin_memory=params.pin_memory,
-    prefetch_factor=params.prefetch_factor
+    prefetch_factor=params.prefetch_factor,
   )
 
   if params.skip_loader:
@@ -141,7 +137,7 @@ def benchmark_train(params: Params):
       memory_format=memory_format,
       non_blocking=params.non_blocking,
       amp=params.amp,
-      progress=ProgressBar(length=len(dataset))
+      progress=ProgressBar(length=len(dataset)),
     )
   else:
     train = yann.train.Trainer(
@@ -153,7 +149,7 @@ def benchmark_train(params: Params):
       # dtype=dtype,
       # memory_format=memory_format,
       amp=params.amp,
-      callbacks=[ProgressBar(length=len(dataset))]
+      callbacks=[ProgressBar(length=len(dataset))],
     )
     train(1)
 
@@ -161,4 +157,3 @@ def benchmark_train(params: Params):
 if __name__ == '__main__':
   params = Params.from_command()
   benchmark_train(params)
-

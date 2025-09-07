@@ -6,12 +6,12 @@ TODO: snapshot testing
 TODO: acceptance criteria / validation against test set
 """
 
-
-import torch
 from contextlib import contextmanager
 
-from .utils.debug import iter_allocated_tensors
+import torch
+
 from .exceptions import CheckFailure
+from .utils.debug import iter_allocated_tensors
 
 
 def check_tensor(
@@ -34,21 +34,18 @@ def check_tensor(
   gt=None,
   lte=None,
   gte=None,
-  none=False
+  none=False,
 ):
   if share_memory is not None:
     assert t.storage().data_ptr() == share_memory.storage().data_ptr()
   if not_share_memory is not None:
-    assert t.storage().data_ptr() != not_share_memory.storage(
-    ).data_ptr()
+    assert t.storage().data_ptr() != not_share_memory.storage().data_ptr()
   if different is not None:
     assert different is not t
   if same is not None:
     assert same is t
   if like is not None:
-    check_tensor(
-      t, device=like.device, shape=like.shape, dtype=like.shape
-    )
+    check_tensor(t, device=like.device, shape=like.shape, dtype=like.shape)
   if not none:
     assert t is not None
   if device:
@@ -109,12 +106,10 @@ def newly_allocated_tensors(count=None, max=None):
   diff = len(new_tensors)
 
   if count is not None and count != diff:
-    raise CheckFailure(
-      f'Expected {count} tensor allocations but got {diff}'
-    )
+    raise CheckFailure(f'Expected {count} tensor allocations but got {diff}')
   if max is not None:
     raise CheckFailure(
-      f'Expected at most {count} tensor allocations but got {diff}'
+      f'Expected at most {count} tensor allocations but got {diff}',
     )
 
 
@@ -164,7 +159,7 @@ def rand_image_tensor(
   min=0,
   max=1,
   dtype=None,
-  device=None
+  device=None,
 ):
   if width is None:
     width = height
@@ -180,13 +175,11 @@ def rand_image_batch(
   min=0,
   max=1,
   dtype=None,
-  device=None
+  device=None,
 ):
   if width is None:
     width = height
-  t = torch.rand(
-    num, channels, height, width, dtype=dtype, device=device
-  )
+  t = torch.rand(num, channels, height, width, dtype=dtype, device=device)
   return (min - max) * t + max
 
 
@@ -198,11 +191,11 @@ def check_model(
   output_shape=None,
   # loss=None,
   device=None,
-  dtype=None
+  dtype=None,
 ):
   device = device or model.device
-  input = input if input is not None else torch.rand(
-    input_shape, device=device, dtype=dtype
+  input = (
+    input if input is not None else torch.rand(input_shape, device=device, dtype=dtype)
   )
 
   output = model(input)

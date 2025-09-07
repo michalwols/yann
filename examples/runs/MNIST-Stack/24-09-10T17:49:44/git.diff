@@ -1,0 +1,227 @@
+diff --git a/TODO.md b/TODO.md
+index e69de29..84a1880 100644
+--- a/TODO.md
++++ b/TODO.md
+@@ -0,0 +1,20 @@
++
++
++
++- [ ] ViT Zoo
++  - dense former
++  - sparse former
++  - ViTamin
++  - mixture of depth
++  - MOE
++  - PEFT
++    - https://github.com/GraphPKU/PiSSA
++- [ ] schedule free optim
++- [ ] bits and bytes
++
++- [ ] liger kernels
++- [ ] triton
++- [ ] torchao
++- [ ] distributed training
++
++https://arxiv.org/abs/2404.0p5196
+\ No newline at end of file
+diff --git a/examples/train_mnist.py b/examples/train_mnist.py
+index 26f6d94..d4cc400 100644
+--- a/examples/train_mnist.py
++++ b/examples/train_mnist.py
+@@ -1,7 +1,7 @@
+ import torch
+ from torch import nn
+ from torchvision import transforms
+-
++from torchvision.datasets import MNIST
+ import yann
+ from yann.modules import Stack, Flatten, Infer
+ from yann.params import HyperParams, Choice, Range
+@@ -17,62 +17,82 @@ class Params(HyperParams):
+   momentum = 0
+ 
+   seed = 1
++#
++#
++# class Vit(nn.Module):
++#   def __init__(self):
++#     self.conv = nn.Sequential(
++#       nn.Conv2d(1, 16, kernel_size=5, stride=1, padding=2),
++#     )
++#
++#     self.transformers = nn.Sequential(
++#       nn.TransformerEncoder()
++#
++#     )
++#
++#
++
++
++if __name__ == '__main__':
++  # parse command line arguments
++  params = Params.from_command()
++  params.validate()
++
++  print(params)
++
++  # set random, numpy and pytorch seeds in one call
++  yann.seed(params.seed)
++
++
++  lenet = Stack(
++    Infer(nn.Conv2d, 10, kernel_size=5),
++    nn.MaxPool2d(2),
++    nn.ReLU(inplace=True),
++
++    Infer(nn.Conv2d, 20, kernel_size=5),
++    nn.MaxPool2d(2),
++    nn.ReLU(inplace=True),
++
++    Flatten(),
++
++    Infer(nn.Linear, 50),
++    nn.ReLU(inplace=True),
++    Infer(nn.Linear, 10),
++    activation=nn.LogSoftmax(dim=1)
++  )
++
++  # run a forward pass to infer input shapes using `Infer` modules
++  lenet(torch.rand(1, 1, 28, 28))
++
++  # use the registry to resolve optimizer name to an optimizer class
++  optimizer = yann.resolve.optimizer(
++    params.optimizer,
++    yann.trainable(lenet.parameters()),
++    momentum=params.momentum,
++    lr=params.learning_rate
++  )
++
++  train = Trainer(
++    model=lenet,
++    optimizer=optimizer,
++    dataset=params.dataset,
++    val_dataset=(params.dataset, {'train': False}),
++    batch_size=params.batch_size,
++    transform=transforms.Compose([
++      transforms.ToTensor(),
++      transforms.Normalize((0.1307,), (0.3081,))
++    ]),
++    loss='nll_loss',
++    metrics=('accuracy',),
++    callbacks=True,
++    amp=False
++  )
++
++  train(params.epochs)
++
++  # save checkpoint
++  train.checkpoint()
++
++  # plot the loss curve
++  # train.history.plot()
+ 
+-# parse command line arguments
+-params = Params.from_command()
+-params.validate()
+-
+-print(params)
+-
+-# set random, numpy and pytorch seeds in one call
+-yann.seed(params.seed)
+-
+-
+-lenet = Stack(
+-  Infer(nn.Conv2d, 10, kernel_size=5),
+-  nn.MaxPool2d(2),
+-  nn.ReLU(inplace=True),
+-
+-  Infer(nn.Conv2d, 20, kernel_size=5),
+-  nn.MaxPool2d(2),
+-  nn.ReLU(inplace=True),
+-
+-  Flatten(),
+-
+-  Infer(nn.Linear, 50),
+-  nn.ReLU(inplace=True),
+-  Infer(nn.Linear, 10),
+-  activation=nn.LogSoftmax(dim=1)
+-)
+-
+-# run a forward pass to infer input shapes using `Infer` modules
+-lenet(torch.rand(1, 1, 28, 28))
+-
+-# use the registry to resolve optimizer name to an optimizer class
+-optimizer = yann.resolve.optimizer(
+-  params.optimizer,
+-  yann.trainable(lenet.parameters()),
+-  momentum=params.momentum,
+-  lr=params.learning_rate
+-)
+-
+-train = Trainer(
+-  model=lenet,
+-  optimizer=optimizer,
+-  dataset=params.dataset,
+-  batch_size=params.batch_size,
+-  transform=transforms.Compose([
+-    transforms.ToTensor(),
+-    transforms.Normalize((0.1307,), (0.3081,))
+-  ]),
+-  loss='nll_loss',
+-  metrics=('accuracy',)
+-)
+-
+-train(params.epochs)
+-
+-# save checkpoint
+-train.checkpoint()
+-
+-# plot the loss curve
+-train.history.plot()
+\ No newline at end of file
+diff --git a/requirements.txt b/requirements.txt
+index 56d239d..10795dc 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -4,5 +4,5 @@ scipy
+ matplotlib
+ requests
+ scikit-learn
+-torch==1.2.0
+-torchvision==0.4.0
++torch
++torchvision
+diff --git a/yann/init.py b/yann/init.py
+index 31d88b1..a1f2615 100644
+--- a/yann/init.py
++++ b/yann/init.py
+@@ -1,6 +1,6 @@
+ from torch import nn
+ from torch.nn import init
+-
++import math
+ 
+ def kaiming(model: nn.Module):
+   for module in model.modules():
+@@ -20,3 +20,8 @@ def kaiming(model: nn.Module):
+ 
+ 
+ msr = kaiming
++
++
++def linear_zero_bias(linear: nn.Module, num_classes):
++  init.zeros_(linear.weight)
++  init.constant_(linear.bias, -math.log(num_classes))
+\ No newline at end of file
+diff --git a/yann/typedefs.py b/yann/typedefs.py
+index ffab150..03bf79c 100644
+--- a/yann/typedefs.py
++++ b/yann/typedefs.py
+@@ -12,7 +12,6 @@ LogProbabilities = torch.FloatTensor
+ Batch = typing.NewType('Batch', torch.Tensor)
+ 
+ ClassIndices = torch.LongTensor
+-OneHot = torch.FloatTensor
+ MultiLabelOneHot = OneHot
+ 
+ ImageTensor = torch.ShortTensor

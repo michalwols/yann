@@ -1,12 +1,11 @@
 import pyarrow
 
-
 ctx = pyarrow.serialization.default_serialization_context()
 
+
 def enable_torch_serialization(context=ctx):
-  pyarrow.serialization.register_torch_serialization_handlers(
-    context
-  )
+  pyarrow.serialization.register_torch_serialization_handlers(context)
+
 
 # enable by default
 enable_torch_serialization()

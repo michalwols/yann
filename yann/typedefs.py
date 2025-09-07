@@ -1,6 +1,6 @@
-import torch
 import typing
 
+import torch
 
 Logits = torch.FloatTensor
 Embedding = torch.FloatTensor
@@ -12,7 +12,6 @@ LogProbabilities = torch.FloatTensor
 Batch = typing.NewType('Batch', torch.Tensor)
 
 ClassIndices = torch.LongTensor
-OneHot = torch.FloatTensor
 MultiLabelOneHot = OneHot
 
 ImageTensor = torch.ShortTensor

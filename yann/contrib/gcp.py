@@ -4,7 +4,6 @@ from ..callbacks.base import Callback
 from ..utils.bash import run
 
 
-
 def gcloud(command):
   return run(['gcloud', command])
 
@@ -14,38 +13,42 @@ def gsutil(command):
 
 
 def args(*flags, hyphenate=True, **kwargs):
-  return ' \ \n'.join((
-    *(f'--{str(n).replace("_", "-") if hyphenate else n}' for n in flags),
-    *(x for x in (
-      f'--{str(k).replace("_", "-") if hyphenate else k}={v}'
-      if not (v is True or v is False)
-      else (f'--{str(k).replace("_", "-") if hyphenate else k}' if v else '')
-      for k, v in kwargs.items() if v is not None)
-      if x)
-  ))
+  return ' \ \n'.join(
+    (
+      *(f'--{str(n).replace("_", "-") if hyphenate else n}' for n in flags),
+      *(
+        x
+        for x in (
+          f'--{str(k).replace("_", "-") if hyphenate else k}={v}'
+          if not (v is True or v is False)
+          else (f'--{str(k).replace("_", "-") if hyphenate else k}' if v else '')
+          for k, v in kwargs.items()
+          if v is not None
+        )
+        if x
+      ),
+    ),
+  )
 
 
-def start_instance(
-    name,
-    zone=None,
-    preemptible=True):
-  command = (
-    f"""gcloud compute instances create {name} \
+def start_instance(name, zone=None, preemptible=True):
+  command = f"""gcloud compute instances create {name} \
           {
     args(
       zone=zone,
       preemptible=preemptible,
       maintenance_policy='foo',
     )
-    }
+  }
 
     """
-  )
 
   return run(command)
 
 
-def start_dl_instance(name, ):
+def start_dl_instance(
+  name,
+):
   pass
 
 
@@ -64,27 +67,14 @@ def kill_instance():
 def shutdown():
   return run('sudo shutdown -h now')
 
+
 def gcp_sync(src, dst, exclude=None):
   if exclude:
-    return subprocess.call([
-      'gsutil',
-      '-m',
-      'rsync',
-      '-r',
-      '-x',
-      exclude,
-      src,
-      dst
-    ])
+    return subprocess.call(
+      ['gsutil', '-m', 'rsync', '-r', '-x', exclude, src, dst],
+    )
   else:
-    return subprocess.call([
-      'gsutil',
-      '-m',
-      'rsync',
-      '-r',
-      src,
-      dst
-    ])
+    return subprocess.call(['gsutil', '-m', 'rsync', '-r', src, dst])
 
 
 class SyncCallback(Callback):

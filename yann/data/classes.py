@@ -1,5 +1,6 @@
-import numpy as np
 from collections import Counter
+
+import numpy as np
 
 # from enum import Enum
 #
@@ -7,6 +8,7 @@ from collections import Counter
 #   index = 'index'
 #   one_hot = 'one_hot'
 #   normalized_one_hot = 'normalized_one_hot'
+
 
 class TargetTransformer:
   def encode(self, x, many=True):
@@ -30,18 +32,14 @@ class TargetTransformer:
 
 
 class Classes(TargetTransformer):
-  valid_encodings = {
-    'index',
-    'one_hot',
-    'normalized_one_hot'
-  }
+  valid_encodings = {'index', 'one_hot', 'normalized_one_hot'}
 
   def __init__(
-      self,
-      names=None,
-      meta=None,
-      counts=None,
-      default_encoding='index',
+    self,
+    names=None,
+    meta=None,
+    counts=None,
+    default_encoding='index',
   ):
     if names:
       self.names = list(names)
@@ -53,13 +51,14 @@ class Classes(TargetTransformer):
       raise ValueError('At least one of names, counts or meta must be defined')
     self.indices = {c: i for i, c in enumerate(self.names)}
     self.meta = meta
-    
+
     self.counts = counts
 
     self.dtype = 'float32'
 
-    assert default_encoding in self.valid_encodings, \
+    assert default_encoding in self.valid_encodings, (
       f'default_encoding must be one of {self.valid_encodings}, got {default_encoding}'
+    )
     self.default_encoding = default_encoding
 
   def weights(self, list=True, mode='multiclass', normalize=True):
@@ -71,7 +70,7 @@ class Classes(TargetTransformer):
         return weights
     else:
       raise NotImplementedError(
-        'Weights can not be determined unless `counts` are set'
+        'Weights can not be determined unless `counts` are set',
       )
 
   @classmethod
@@ -82,10 +81,7 @@ class Classes(TargetTransformer):
         counts[l] += 1
       else:
         counts.update(l)
-    return cls(
-      counts=counts,
-      **kwargs
-    )
+    return cls(counts=counts, **kwargs)
 
   @classmethod
   def ordered(cls, num, **kwargs):
@@ -95,12 +91,12 @@ class Classes(TargetTransformer):
     c = min(len(self.names) // 2, 3)
 
     return (
-      f"Classes(\n" 
-      f"  count={len(self)},\n" 
-      f"  default_encoding={self.default_encoding}\n"
-      f"  names=[{', '.join([str(x) for x in self.names[:c]])}, ..., {', '.join([str(x) for x in self.names[-c:]])}]\n"
+      f'Classes(\n'
+      f'  count={len(self)},\n'
+      f'  default_encoding={self.default_encoding}\n'
+      f'  names=[{", ".join([str(x) for x in self.names[:c]])}, ..., {", ".join([str(x) for x in self.names[-c:]])}]\n'
       # f"  encoded={self.encode(self.names[:c])}, ..., {self.encode(self.names[-c:])}\n"
-      f")"
+      f')'
     )
 
   def state_dict(self):
@@ -108,7 +104,7 @@ class Classes(TargetTransformer):
       'names': self.names,
       'meta': self.meta,
       'default_encoding': self.default_encoding,
-      'counts': self.counts
+      'counts': self.counts,
     }
 
   def load_state_dict(self, data):
@@ -142,7 +138,8 @@ class Classes(TargetTransformer):
 
   def decode(self, encoded, encoding=None):
     return getattr(self, (encoding or self.default_encoding) + '_decode')(
-      encoded)
+      encoded,
+    )
 
   def index_encode(self, classes):
     if isinstance(classes, (str, int)):
@@ -178,7 +175,8 @@ class Classes(TargetTransformer):
   #     raise NotImplementedError("truncate not supported without counts")
   #   pass
 
-def smooth(y, eps=.1, num_classes=None):
+
+def smooth(y, eps=0.1, num_classes=None):
   if not num_classes:
     if len(y.shape) == 1:
       num_classes = len(y)
@@ -187,7 +185,12 @@ def smooth(y, eps=.1, num_classes=None):
   return y * (1 - eps) + eps * (1.0 / num_classes)
 
 
-def get_class_weights(class_counts: dict, mode='multiclass', normalize=True, num_samples=None):
+def get_class_weights(
+  class_counts: dict,
+  mode='multiclass',
+  normalize=True,
+  num_samples=None,
+):
   """
   Args:
     class_counts: dict mapping from class to count
@@ -199,9 +202,7 @@ def get_class_weights(class_counts: dict, mode='multiclass', normalize=True, num
   """
   if mode == 'multiclass':
     num_samples = num_samples or sum(class_counts.values())
-    weights = {
-      k: num_samples / count for k, count in class_counts.items()
-    }
+    weights = {k: num_samples / count for k, count in class_counts.items()}
     if normalize:
       scale = len(weights) / sum(weights.values())
       return {k: w * scale for k, w in weights.items()}
@@ -221,5 +222,5 @@ def get_class_weights(class_counts: dict, mode='multiclass', normalize=True, num
   else:
     raise ValueError(
       f'''Unsupported mode, got "{mode}", expected one of '''
-      '''multiclass, multilabel, binary'''
+      """multiclass, multilabel, binary""",
     )

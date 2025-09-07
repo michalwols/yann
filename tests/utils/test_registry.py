@@ -54,7 +54,9 @@ def test():
 
   yann.register.optimizers(
     SGD,
-    init=lambda SGD, *args, parameters=None, **kwargs: SGD(parameters, )
+    init=lambda SGD, *args, parameters=None, **kwargs: SGD(
+      parameters,
+    ),
   )
 
 
@@ -107,7 +109,6 @@ def test_yann_registry():
   assert len(yann.registry.optimizer)
 
   yann.resolve('MNIST', required=True)
-
 
 
 def test_tuple_arg():

@@ -1,42 +1,39 @@
-from matplotlib import pylab as plt
-import numpy as np
-import datetime
-import pathlib
-from sklearn.metrics import roc_curve, auc, confusion_matrix
-import matplotlib.dates as mdates
-from matplotlib.collections import PolyCollection
-from collections import OrderedDict
-
-import io
 import base64
+import datetime
+import io
+import itertools
+import pathlib
+from collections import OrderedDict
 from urllib.parse import quote
 
-import itertools
+import numpy as np
 
 from .. import to_numpy
 from ..metrics import moving_average
 
 
 def plot_line(
-    y,
-    x=None,
-    figsize=None,
-    window=1,
-    xlim=None,
-    ylim=None,
-    line_width=2,
-    stroke='-',
-    title=None,
-    xlabel=None,
-    ylabel=None,
-    xscale=None,
-    yscale=None,
-    show=True,
-    save=False,
-    legend=True,
-    name=None,
-    grid=True
+  y,
+  x=None,
+  figsize=None,
+  window=1,
+  xlim=None,
+  ylim=None,
+  line_width=2,
+  stroke='-',
+  title=None,
+  xlabel=None,
+  ylabel=None,
+  xscale=None,
+  yscale=None,
+  show=True,
+  save=False,
+  legend=True,
+  name=None,
+  grid=True,
 ):
+  from matplotlib import pylab as plt
+
   fig = figsize and plt.figure(figsize=figsize)
 
   if xlim:
@@ -78,8 +75,9 @@ def plot_line(
     plt.show()
   if save:
     plt.gcf().savefig(
-      save if isinstance(save, (str, pathlib.Path)) else
-      f"{title or ylabel or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg"
+      save
+      if isinstance(save, (str, pathlib.Path))
+      else f'{title or ylabel or datetime.datetime.utcnow().strftime("%y-%m-%dT%H%M%S")}.jpg',
     )
     plt.gcf().clear()
     if fig:
@@ -87,47 +85,81 @@ def plot_line(
 
   return plt.gcf()
 
+
 def plot_pred_scores(
-    preds,
-    targets,
-    classes=None,
-    logscale=True,
-    figsize=(12, 6),
-    show=True,
-    save=False,
-    title=None):
+  preds,
+  targets,
+  classes=None,
+  logscale=True,
+  figsize=(12, 6),
+  show=True,
+  save=False,
+  title=None,
+):
   import seaborn as sns
+  from matplotlib import pylab as plt
 
   preds, targets = to_numpy(preds), to_numpy(targets)
 
   if title:
     plt.title(title)
 
-
   if classes:
-    classes = classes.items() if isinstance(classes, dict) else \
-      ((c, n) for n, c in enumerate(classes))
+    classes = (
+      classes.items()
+      if isinstance(classes, dict)
+      else ((c, n) for n, c in enumerate(classes))
+    )
   else:
     classes = ((n, n) for n in range(preds.shape[1]))
-
 
   for cls, idx in classes:
     f, ax = plt.subplots(figsize=figsize)
     if logscale:
-      ax.set(yscale="log")
+      ax.set(yscale='log')
 
     if len(targets.shape) == 1:
-      sns.distplot(preds[targets != idx, idx], bins=50, kde=False,
-                   rug=False, hist_kws={"range": [0, 1]}, ax=ax, color='red',
-                   label='Negative')
-      sns.distplot(preds[targets == idx, idx], bins=50, kde=False,
-                   rug=False, hist_kws={"range": [0, 1]}, ax=ax, color='blue',
-                   label='Positive')
+      sns.distplot(
+        preds[targets != idx, idx],
+        bins=50,
+        kde=False,
+        rug=False,
+        hist_kws={'range': [0, 1]},
+        ax=ax,
+        color='red',
+        label='Negative',
+      )
+      sns.distplot(
+        preds[targets == idx, idx],
+        bins=50,
+        kde=False,
+        rug=False,
+        hist_kws={'range': [0, 1]},
+        ax=ax,
+        color='blue',
+        label='Positive',
+      )
     else:
-      sns.distplot(preds[targets[:, idx] == 0, idx], bins=50, kde=False,
-                   rug=False, hist_kws={"range": [0,1]}, ax=ax, color='red', label='Negative')
-      sns.distplot(preds[targets[:, idx] == 1, idx], bins=50, kde=False,
-                   rug=False, hist_kws={"range": [0,1]}, ax=ax, color='blue', label='Positive')
+      sns.distplot(
+        preds[targets[:, idx] == 0, idx],
+        bins=50,
+        kde=False,
+        rug=False,
+        hist_kws={'range': [0, 1]},
+        ax=ax,
+        color='red',
+        label='Negative',
+      )
+      sns.distplot(
+        preds[targets[:, idx] == 1, idx],
+        bins=50,
+        kde=False,
+        rug=False,
+        hist_kws={'range': [0, 1]},
+        ax=ax,
+        color='blue',
+        label='Positive',
+      )
     ax.set_title(cls)
     plt.xlabel('Score')
     plt.ylabel('Sample Count')
@@ -136,19 +168,25 @@ def plot_pred_scores(
   if show:
     plt.show()
   if save:
-    plt.savefig(save if isinstance(save, (str, pathlib.Path)) else
-                  f"{title or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg")
+    plt.savefig(
+      save
+      if isinstance(save, (str, pathlib.Path))
+      else f'{title or datetime.datetime.utcnow().strftime("%y-%m-%dT%H%M%S")}.jpg',
+    )
     plt.gcf().clear()
 
 
 def plot_rocs(
-    preds,
-    targets,
-    classes=None,
-    figsize=(12,12),
-    show=True,
-    save=False,
-    title=None):
+  preds,
+  targets,
+  classes=None,
+  figsize=(12, 12),
+  show=True,
+  save=False,
+  title=None,
+):
+  from matplotlib import pylab as plt
+  from sklearn.metrics import auc, roc_curve
 
   preds, targets = to_numpy(preds), to_numpy(targets)
 
@@ -157,8 +195,11 @@ def plot_rocs(
     plt.title(title)
 
   if classes:
-    classes = classes.items() if isinstance(classes, dict) else \
-      ((c, n) for n, c in enumerate(classes))
+    classes = (
+      classes.items()
+      if isinstance(classes, dict)
+      else ((c, n) for n, c in enumerate(classes))
+    )
   else:
     classes = ((n, n) for n in range(preds.shape[1]))
 
@@ -167,7 +208,6 @@ def plot_rocs(
   plt.xlabel('False Positive Rate')
   plt.ylabel('True Positive Rate')
   plt.plot([0, 1], [0, 1], 'k--', lw=2)
-
 
   vals = {}
   for cls, idx in classes:
@@ -181,36 +221,37 @@ def plot_rocs(
     vals[cls] = (area, fpr, tpr, thresholds)
   plt.legend(loc='best')
 
-
   if show:
     plt.show()
   if save:
-    plt.savefig(save if isinstance(save, (str, pathlib.Path)) else
-                f"{title or datetime.datetime.utcnow().strftime('%y-%m-%dT%H%M%S')}.jpg")
+    plt.savefig(
+      save
+      if isinstance(save, (str, pathlib.Path))
+      else f'{title or datetime.datetime.utcnow().strftime("%y-%m-%dT%H%M%S")}.jpg',
+    )
     plt.gcf().clear()
 
   return vals
 
 
 def plot_cooccurrences(counts, classes, figsize=(14, 11)):
-  import seaborn as sns
   import pandas as pd
+  import seaborn as sns
+  from matplotlib import pylab as plt
 
   mask = np.ones_like(counts)
   mask[np.tril_indices_from(mask)] = False
 
-  df_cm = pd.DataFrame(
-    counts,
-    index=list(classes),
-    columns=list(classes))
+  df_cm = pd.DataFrame(counts, index=list(classes), columns=list(classes))
   plt.figure(figsize=figsize)
   plot = sns.heatmap(
     df_cm,
     robust=True,
     annot=True,
-    fmt="d",
-    cmap="YlGnBu",
-    mask=mask)
+    fmt='d',
+    cmap='YlGnBu',
+    mask=mask,
+  )
   plot.set_title('Class Co-occurrence')
 
 
@@ -219,7 +260,7 @@ def sorted_indices(matrix, desc=False):
   return (np.fliplr(inds) if desc else inds)[0]
 
 
-def truncate_confusion_matrix(matrix, thresh=.2, top=None, symmetric=True):
+def truncate_confusion_matrix(matrix, thresh=0.2, top=None, symmetric=True):
   inds = sorted_indices(matrix, desc=True)
   inds = [(r, c) for r, c in inds if r != c]
 
@@ -240,8 +281,18 @@ def truncate_confusion_matrix(matrix, thresh=.2, top=None, symmetric=True):
 
 
 def plot_confusion_matrix(
-    preds, targets, classes, figsize=(16, 16),
-    thresh=None, top=None, normalize=False, symmetric=True):
+  preds,
+  targets,
+  classes,
+  figsize=(16, 16),
+  thresh=None,
+  top=None,
+  normalize=False,
+  symmetric=True,
+):
+  from matplotlib import pylab as plt
+  from sklearn.metrics import confusion_matrix
+
   preds, targets = to_numpy(preds), to_numpy(targets)
 
   cm = confusion_matrix(targets, preds)
@@ -251,7 +302,11 @@ def plot_confusion_matrix(
 
   if thresh or top:
     cm, rows, cols = truncate_confusion_matrix(
-      cm, thresh=thresh, top=top, symmetric=symmetric)
+      cm,
+      thresh=thresh,
+      top=top,
+      symmetric=symmetric,
+    )
   else:
     rows, cols = list(range(len(classes))), list(range(len(classes)))
 
@@ -266,11 +321,15 @@ def plot_confusion_matrix(
   plt.yticks(np.arange(len(rows)), [classes[i] for i in rows])
 
   fmt = '.2f' if normalize else 'd'
-  th = cm.max() / 2.
+  th = cm.max() / 2.0
   for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-    plt.text(j, i, format(cm[i, j], fmt),
-             horizontalalignment="center",
-             color="white" if cm[i, j] > th else "black")
+    plt.text(
+      j,
+      i,
+      format(cm[i, j], fmt),
+      horizontalalignment='center',
+      color='white' if cm[i, j] > th else 'black',
+    )
 
   plt.tight_layout()
   plt.ylabel('True label')
@@ -281,17 +340,23 @@ def plot_confusion_matrix(
 
 
 def plot_timeline(tasks, figsize=None):
+  import matplotlib.dates as mdates
+  from matplotlib import pylab as plt
+  from matplotlib.collections import PolyCollection
+
   inds = OrderedDict((c, n) for n, c in enumerate(set(t.name for t in tasks)))
-  color_map = {c: f"C{n}" for c, n in inds.items()}
+  color_map = {c: f'C{n}' for c, n in inds.items()}
 
   verts = []
   colors = []
   for task in tasks:
-    v = [(mdates.date2num(task.start_time), inds[task.name] - .4),
-         (mdates.date2num(task.start_time), inds[task.name] + .4),
-         (mdates.date2num(task.end_time), inds[task.name] + .4),
-         (mdates.date2num(task.end_time), inds[task.name] - .4),
-         (mdates.date2num(task.start_time), inds[task.name] - .4)]
+    v = [
+      (mdates.date2num(task.start_time), inds[task.name] - 0.4),
+      (mdates.date2num(task.start_time), inds[task.name] + 0.4),
+      (mdates.date2num(task.end_time), inds[task.name] + 0.4),
+      (mdates.date2num(task.end_time), inds[task.name] - 0.4),
+      (mdates.date2num(task.start_time), inds[task.name] - 0.4),
+    ]
     verts.append(v)
     colors.append(color_map[task.name])
 
@@ -312,8 +377,9 @@ def plot_timeline(tasks, figsize=None):
   plt.show()
 
 
-
 def figure_to_base64(fig, format='png', data_encoded=True, close=False):
+  from matplotlib import pylab as plt
+
   buf = io.BytesIO()
   fig.savefig(buf, format=format)
   buf.seek(0)
@@ -323,6 +389,6 @@ def figure_to_base64(fig, format='png', data_encoded=True, close=False):
     plt.close(fig)
 
   if data_encoded:
-    return f"data:image/{format};base64,{quote(string)}"
+    return f'data:image/{format};base64,{quote(string)}'
 
   return string

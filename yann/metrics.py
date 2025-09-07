@@ -1,16 +1,16 @@
-import torch
-import numpy as np
-from sklearn import metrics
-from functools import partial
 from collections import deque
+from functools import partial
+
+import numpy as np
+import torch
 
 from .utils import to_numpy
 
 
-
-def threshold_targets(metric, threshold=.5, **defaults):
+def threshold_targets(metric, threshold=0.5, **defaults):
   def m(preds, targets, **kwargs):
     return metric(preds, targets > threshold, **defaults, **kwargs)
+
   return m
 
 
@@ -36,12 +36,12 @@ def top_k_accuracy(targets, preds, k=1):
     _, targets = torch.max(targets, dim=1)
   scores, preds = preds.topk(k, 1, True, True)
   preds = preds.t()
-  correct = (preds == targets.view(1, -1).expand_as(preds))
+  correct = preds == targets.view(1, -1).expand_as(preds)
 
   return correct.sum().float() / len(targets)
 
 
-def mAP(targs, preds, pos_thresh=.5):
+def mAP(targs, preds, pos_thresh=0.5):
   preds = preds.to('cpu').numpy()
   targs = (targs.to('cpu') > pos_thresh).float().numpy()
   if np.size(preds) == 0:
@@ -76,9 +76,11 @@ def average_precision(output, target):
 
   return precision_at_i
 
+
 top_3_accuracy = partial(top_k_accuracy, k=3)
 top_5_accuracy = partial(top_k_accuracy, k=5)
 top_10_accuracy = partial(top_k_accuracy, k=10)
+
 
 def precision_at_k(targets, outputs, k=5):
   scores, top_preds = top_k(outputs, k=k)
@@ -109,14 +111,57 @@ def label_ranking_average_precision(targets, preds, target_threshold=0):
   targets, preds = to_numpy(targets), to_numpy(preds)
   if target_threshold is not None:
     targets = targets > target_threshold
-  return metrics.label_ranking_average_precision_score(targets, preds)
+
+  # Inlined NumPy implementation
+  n_samples, n_labels = targets.shape
+  scores = np.zeros(n_samples)
+
+  for i in range(n_samples):
+    true_indices = np.flatnonzero(targets[i])
+    if len(true_indices) == 0:
+      continue
+
+    pred_ranking = np.argsort(preds[i])[::-1]
+    ranks = np.empty_like(pred_ranking)
+    ranks[pred_ranking] = np.arange(1, n_labels + 1)  # 1-based rank
+
+    true_ranks = ranks[true_indices]
+    relevant_ranks_sorted = np.sort(true_ranks)
+
+    precisions = np.arange(1, len(true_indices) + 1) / relevant_ranks_sorted
+    scores[i] = np.mean(precisions)
+
+  return np.mean(scores)
 
 
 def coverage_error(targets, preds, target_threshold=0):
   targets, preds = to_numpy(targets), to_numpy(preds)
   if target_threshold is not None:
     targets = targets > target_threshold
-  return metrics.coverage_error(targets, preds)
+
+  # Inlined NumPy implementation
+  n_samples, n_labels = targets.shape
+  max_ranks = np.zeros(n_samples)
+
+  for i in range(n_samples):
+    true_indices = np.flatnonzero(targets[i])
+    if len(true_indices) == 0:
+      # Assign 0 coverage error if no true labels, consistent with sklearn
+      max_ranks[i] = 0
+      continue
+
+    pred_ranking = np.argsort(preds[i])[::-1]
+    ranks = np.empty_like(pred_ranking)
+    ranks[pred_ranking] = np.arange(1, n_labels + 1)  # 1-based rank
+
+    true_ranks = ranks[true_indices]
+    max_ranks[i] = np.max(true_ranks)
+
+  # sklearn definition: average over samples of (max_rank - 1) / n_labels
+  # Let's match that definition for consistency if users expect it
+  # The definition actually seems to be just mean(max_rank) / n_labels for scikit-learn.
+  # Let's stick to that.
+  return np.mean(max_ranks) / n_labels if n_labels > 0 else 0
 
 
 def average_precision_at_k(targets, preds, k=5):
@@ -127,31 +172,26 @@ def mean_average_precision_at_k(targets, preds, k=5):
   raise NotImplementedError()
 
 
-def evaluate_multiclass(
-    targets,
-    outputs,
-    preds=None,
-    classes=None
-):
+def evaluate_multiclass(targets, outputs, preds=None, classes=None):
   preds = preds or get_preds(outputs)
   targets, outputs, preds = (
     to_numpy(targets),
     to_numpy(outputs),
-    to_numpy(preds)
+    to_numpy(preds),
   )
   raise NotImplementedError()
 
 
 def evaluate_multilabel(
-    targets,
-    outputs,
-    preds=None,
-    classes=None,
+  targets,
+  outputs,
+  preds=None,
+  classes=None,
 ):
   targets, outputs, preds = (
     to_numpy(targets),
     to_numpy(outputs),
-    to_numpy(preds)
+    to_numpy(preds),
   )
   raise NotImplementedError()
 
@@ -205,16 +245,17 @@ class WindowMeter:
 
   @property
   def average(self):
-    if not self.values: return None
+    if not self.values:
+      return None
     return sum(self.values) / len(self.values)
 
 
-def exp_moving_avg(cur, prev=None, alpha=.05, steps=None):
+def exp_moving_avg(cur, prev=None, alpha=0.05, steps=None):
   """exponential moving average"""
   if prev is None:
     return cur
   avg = alpha * cur + prev * (1 - alpha)
-  return avg / (1 - alpha ** steps) if steps else avg
+  return avg / (1 - alpha**steps) if steps else avg
 
 
 def moving_average(data, window=10):

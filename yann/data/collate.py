@@ -25,13 +25,11 @@ class PadCollate:
 class FilterCollate:
   def __init__(
     self,
-      filter=None,
-      value=None,
-      collate=default_collate,
+    filter=None,
+    value=None,
+    collate=default_collate,
   ):
-    self.filter = filter or (
-      lambda items: [it for it in items if it is not value]
-    )
+    self.filter = filter or (lambda items: [it for it in items if it is not value])
     self.collate = collate
 
   def __call__(self, batch):
@@ -61,12 +59,11 @@ def image_collate(batch, memory_format=torch.contiguous_format):
 
   for i, img in enumerate(images):
     nump_array = np.asarray(img, dtype=np.uint8)
-    if (nump_array.ndim < 3):
+    if nump_array.ndim < 3:
       nump_array = np.expand_dims(nump_array, axis=-1)
     nump_array = np.rollaxis(nump_array, 2)
     tensor[i] += torch.from_numpy(nump_array)
   return tensor, targets
-
 
 
 class KeyCollate:
@@ -74,8 +71,4 @@ class KeyCollate:
     self.keys = keys
 
   def __call__(self, samples):
-    return tuple(
-      torch.stack(
-        [s[k] for s in samples]
-      ) for k in self.keys
-    )
+    return tuple(torch.stack([s[k] for s in samples]) for k in self.keys)

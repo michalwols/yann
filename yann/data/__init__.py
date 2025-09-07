@@ -1,10 +1,12 @@
-import torch
 import types
 
+import torch
+
+from . import place
 from .classes import Classes
 from .loaders import TransformLoader
 from .transform import Transformer
-from . import place
+
 
 def get_name(x):
   if hasattr(x, 'name'):
@@ -27,6 +29,7 @@ def batches(*tensors, size=32, shuffle=False, order=None):
   if len(tensors) == 1 and isinstance(tensors[0], str):
     # assume a registered dataset name was passed (like batches('MNIST'))
     import yann
+
     tensors = (yann.resolve.dataset(tensors[0]),)
   if shuffle:
     order = torch.randperm(len(tensors[0]))
@@ -34,17 +37,17 @@ def batches(*tensors, size=32, shuffle=False, order=None):
   if len(tensors) == 1:
     for i in range(0, len(tensors[0]), size):
       if order is not None:
-        indices = order[i:i+size]
+        indices = order[i : i + size]
         yield tensors[0][indices]
       else:
-        yield tensors[0][i:i+size]
+        yield tensors[0][i : i + size]
   else:
     for i in range(0, len(tensors[0]), size):
       if order is not None:
-        indices = order[i:i+size]
+        indices = order[i : i + size]
         yield tuple(t[indices] for t in tensors)
       else:
-        yield tuple(t[i:i+size] for t in tensors)
+        yield tuple(t[i : i + size] for t in tensors)
 
 
 def unbatch(batches):
@@ -61,7 +64,7 @@ def chunk(sequence, size=32):
         batch = []
   else:
     for i in range(0, len(sequence), size):
-      yield sequence[i:i+size]
+      yield sequence[i : i + size]
 
 
 def loop(items):
@@ -72,9 +75,10 @@ def loop(items):
 def shuffle(*sequences):
   order = torch.randperm(len(sequences[0]))
   return (
-     [s[i] for i in order] if isinstance(s, (tuple, list)) else s[order]
-     for s in sequences
+    [s[i] for i in order] if isinstance(s, (tuple, list)) else s[order]
+    for s in sequences
   )
+
 
 def flatten(x, out=None, prefix='', sep='.'):
   """
@@ -84,10 +88,15 @@ def flatten(x, out=None, prefix='', sep='.'):
 
   if isinstance(x, dict):
     for k in x:
-      flatten(x[k], out=out, prefix=f"{prefix}{sep if prefix else ''}{k}", sep=sep)
+      flatten(
+        x[k],
+        out=out,
+        prefix=f'{prefix}{sep if prefix else ""}{k}',
+        sep=sep,
+      )
   elif isinstance(x, (list, tuple)):
     for k, v in enumerate(x):
-      flatten(k, out=out, prefix=f"{prefix}{sep if prefix else ''}{k}", sep=sep)
+      flatten(k, out=out, prefix=f'{prefix}{sep if prefix else ""}{k}', sep=sep)
   else:
     out[prefix] = x
 
@@ -96,6 +105,7 @@ def flatten(x, out=None, prefix='', sep='.'):
 
 def print_tree(root, indent=4):
   from pathlib import Path
+
   root = Path(root)
   print(f'{root}')
   for path in sorted(root.rglob('*')):

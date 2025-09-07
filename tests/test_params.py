@@ -6,7 +6,6 @@ def test():
     a = 4
     b = 'b'
 
-
   p = Params()
   assert p.a == 4
   assert p.b == 'b'
@@ -27,7 +26,6 @@ def test():
 
 
 def test_serialization(tmpdir):
-
   class Params(params.HyperParams):
     a = 4
     b = 'b'

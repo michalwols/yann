@@ -1,12 +1,17 @@
-from .plot import plot_line, plot_pred_scores, plot_rocs, \
-  plot_confusion_matrix, plot_cooccurrences
 from .image import show_images
-
+from .plot import (
+  plot_confusion_matrix,
+  plot_cooccurrences,
+  plot_line,
+  plot_pred_scores,
+  plot_rocs,
+)
 
 
 class Plotter:
   def __call__(self, *args, **kwargs):
     pass
+
 
 class Shower:
   def __call__(self, x, format=None, **kwargs):
@@ -17,6 +22,7 @@ class Shower:
 
       try:
         from PIL import Image
+
         if isinstance(x[0], Image.Image):
           return self.images(x, **kwargs)
       except:
@@ -27,15 +33,16 @@ class Shower:
 
     try:
       from PIL import Image
+
       if isinstance(x, Image.Image):
         return self.images(x, **kwargs)
     except:
       pass
 
     import torch
+
     if isinstance(x, torch.Tensor):
       return self.tensor(x)
-
 
     return x
 
@@ -44,7 +51,9 @@ class Shower:
 
   def tensor(self, t, *args, **kwargs):
     from .html import tensor
+
     return tensor(t, *args, **kwargs).display()
+
 
 show = Shower()
 plot = Plotter()

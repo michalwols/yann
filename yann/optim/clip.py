@@ -1,6 +1,7 @@
 """
 Adapted from https://github.com/rwightman/pytorch-image-models/blob/master/timm/utils/agc.py
 """
+
 import torch
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 
@@ -12,7 +13,7 @@ def unitwise_norm(x: torch.Tensor, p=2.0):
     return x.norm(p, dim=tuple(range(1, x.ndim)), keepdim=True)
 
 
-def clip_grad_adaptive_(parameters, value=.01, norm_type=2.0, eps=1e-3):
+def clip_grad_adaptive_(parameters, value=0.01, norm_type=2.0, eps=1e-3):
   """
   Adaptive grad clipping
   """
@@ -20,14 +21,10 @@ def clip_grad_adaptive_(parameters, value=.01, norm_type=2.0, eps=1e-3):
     parameters = [parameters]
   parameters = [p for p in parameters if p.grad is not None]
   if len(parameters) == 0:
-    return torch.tensor(0.)
+    return torch.tensor(0.0)
   for param in parameters:
     weights, grads = param.detach(), param.grad.detach()
-    max_norm = (
-      unitwise_norm(weights, p=norm_type)
-        .clamp_(min=eps)
-        .mul_(value)
-    )
+    max_norm = unitwise_norm(weights, p=norm_type).clamp_(min=eps).mul_(value)
     grad_norm = unitwise_norm(grads, p=norm_type)
     clipped_grad = grads * (max_norm / grad_norm.clamp(min=1e-6))
     new_grads = torch.where(grad_norm < max_norm, grads, clipped_grad)
@@ -39,13 +36,13 @@ def clip_grad_(parameters, value, norm_type=2.0, mode='adaptive'):
     return clip_grad_adaptive_(
       parameters=parameters,
       value=value,
-      norm_type=norm_type
+      norm_type=norm_type,
     )
   elif mode == 'norm':
     return clip_grad_norm_(
       parameters=parameters,
       max_norm=value,
-      norm_type=norm_type
+      norm_type=norm_type,
     )
   elif mode == 'value':
     return clip_grad_value_(
@@ -53,7 +50,9 @@ def clip_grad_(parameters, value, norm_type=2.0, mode='adaptive'):
       clip_value=value,
     )
   else:
-    raise ValueError(f'Unsupported mode={mode}, must be adaptive, norm or value')
+    raise ValueError(
+      f'Unsupported mode={mode}, must be adaptive, norm or value',
+    )
 
 
 class GradClipper:
@@ -74,7 +73,7 @@ class GradClipper:
       parameters=parameters,
       value=self.value,
       norm_type=self.norm_type,
-      mode=self.mode
+      mode=self.mode,
     )
 
   def state_dict(self):

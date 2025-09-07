@@ -1,0 +1,36 @@
+id: wet-airy-sweet
+name: MNIST-Stack
+path: runs/MNIST-Stack/25-04-05T21:37:26
+num_steps: 18750
+num_samples: 600000
+num_epochs: 10
+batch_size: 32
+device: mps
+time_created: 2025-04-05 21:37:26.583056
+env:
+  cwd: /Users/michalwolski/projects/yann
+  arguments:
+  - examples/train_mnist.py
+  git_hash: '7919910'
+  python:
+    executable: /Users/michalwolski/projects/yann/.venv/bin/python3
+    version: 3.11.11 (main, Mar 17 2025, 21:33:08) [Clang 20.1.0 ]
+    path:
+    - /Users/michalwolski/projects/yann/examples
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python311.zip
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python3.11
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python3.11/lib-dynload
+    - /Users/michalwolski/projects/yann/.venv/lib/python3.11/site-packages
+    - /var/folders/16/qqcqrk5d2c748c0t_fnps_g00000gn/T/tmp61jumvwi
+  torch_version: !!python/object/new:torch.torch_version.TorchVersion
+  - 2.6.0
+  yann_version: 0.0.40
+  hostname: Michals-MacBook-Pro.local
+dataset:
+  name: MNIST
+  size: 60000
+  num_classes: 10
+model:
+  name: Stack
+  param_count: 21840
+  trainable_param_count: 21840

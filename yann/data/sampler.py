@@ -1,6 +1,7 @@
-from torch.utils.data.sampler import Sampler
 import random
 from collections import defaultdict
+
+from torch.utils.data.sampler import Sampler
 
 from . import batches
 

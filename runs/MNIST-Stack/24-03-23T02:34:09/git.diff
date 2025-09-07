@@ -1,0 +1,363 @@
+diff --git a/examples/train_mnist.py b/examples/train_mnist.py
+index 26f6d94..26e8c23 100644
+--- a/examples/train_mnist.py
++++ b/examples/train_mnist.py
+@@ -1,7 +1,7 @@
+ import torch
+ from torch import nn
+ from torchvision import transforms
+-
++from torchvision.datasets import MNIST
+ import yann
+ from yann.modules import Stack, Flatten, Infer
+ from yann.params import HyperParams, Choice, Range
+@@ -11,68 +11,72 @@ from yann.train import Trainer
+ class Params(HyperParams):
+   dataset = 'MNIST'
+   batch_size = 32
+-  epochs = 10
++  epochs = 1
+   optimizer: Choice(('SGD', 'Adam')) = 'SGD'
+   learning_rate: Range(.01, .0001) = .01
+   momentum = 0
+ 
+   seed = 1
+ 
+-# parse command line arguments
+-params = Params.from_command()
+-params.validate()
+-
+-print(params)
+-
+-# set random, numpy and pytorch seeds in one call
+-yann.seed(params.seed)
+-
+-
+-lenet = Stack(
+-  Infer(nn.Conv2d, 10, kernel_size=5),
+-  nn.MaxPool2d(2),
+-  nn.ReLU(inplace=True),
+-
+-  Infer(nn.Conv2d, 20, kernel_size=5),
+-  nn.MaxPool2d(2),
+-  nn.ReLU(inplace=True),
+-
+-  Flatten(),
+-
+-  Infer(nn.Linear, 50),
+-  nn.ReLU(inplace=True),
+-  Infer(nn.Linear, 10),
+-  activation=nn.LogSoftmax(dim=1)
+-)
+-
+-# run a forward pass to infer input shapes using `Infer` modules
+-lenet(torch.rand(1, 1, 28, 28))
+-
+-# use the registry to resolve optimizer name to an optimizer class
+-optimizer = yann.resolve.optimizer(
+-  params.optimizer,
+-  yann.trainable(lenet.parameters()),
+-  momentum=params.momentum,
+-  lr=params.learning_rate
+-)
+-
+-train = Trainer(
+-  model=lenet,
+-  optimizer=optimizer,
+-  dataset=params.dataset,
+-  batch_size=params.batch_size,
+-  transform=transforms.Compose([
+-    transforms.ToTensor(),
+-    transforms.Normalize((0.1307,), (0.3081,))
+-  ]),
+-  loss='nll_loss',
+-  metrics=('accuracy',)
+-)
+-
+-train(params.epochs)
+-
+-# save checkpoint
+-train.checkpoint()
+-
+-# plot the loss curve
+-train.history.plot()
+\ No newline at end of file
++if __name__ == '__main__':
++  # parse command line arguments
++  params = Params.from_command()
++  params.validate()
++
++  print(params)
++
++  # set random, numpy and pytorch seeds in one call
++  yann.seed(params.seed)
++
++
++  lenet = Stack(
++    Infer(nn.Conv2d, 10, kernel_size=5),
++    nn.MaxPool2d(2),
++    nn.ReLU(inplace=True),
++
++    Infer(nn.Conv2d, 20, kernel_size=5),
++    nn.MaxPool2d(2),
++    nn.ReLU(inplace=True),
++
++    Flatten(),
++
++    Infer(nn.Linear, 50),
++    nn.ReLU(inplace=True),
++    Infer(nn.Linear, 10),
++    activation=nn.LogSoftmax(dim=1)
++  )
++
++  # run a forward pass to infer input shapes using `Infer` modules
++  lenet(torch.rand(1, 1, 28, 28))
++
++  # use the registry to resolve optimizer name to an optimizer class
++  optimizer = yann.resolve.optimizer(
++    params.optimizer,
++    yann.trainable(lenet.parameters()),
++    momentum=params.momentum,
++    lr=params.learning_rate
++  )
++
++  train = Trainer(
++    model=lenet,
++    optimizer=optimizer,
++    dataset=params.dataset,
++    val_dataset=(params.dataset, {'train': False}),
++    batch_size=params.batch_size,
++    transform=transforms.Compose([
++      transforms.ToTensor(),
++      transforms.Normalize((0.1307,), (0.3081,))
++    ]),
++    loss='nll_loss',
++    metrics=('accuracy',),
++    callbacks=True,
++    amp=False
++  )
++
++  train(params.epochs)
++
++  # save checkpoint
++  train.checkpoint()
++
++  # plot the loss curve
++  # train.history.plot()
+\ No newline at end of file
+diff --git a/requirements.txt b/requirements.txt
+index 56d239d..10795dc 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -4,5 +4,5 @@ scipy
+ matplotlib
+ requests
+ scikit-learn
+-torch==1.2.0
+-torchvision==0.4.0
++torch
++torchvision
+diff --git a/yann/callbacks/logging.py b/yann/callbacks/logging.py
+index 4532c58..67ad419 100644
+--- a/yann/callbacks/logging.py
++++ b/yann/callbacks/logging.py
+@@ -2,7 +2,7 @@ import sys
+ import logging
+ 
+ from .base import Callback
+-
++from yann.utils.tensor import describe
+ 
+ class Logger(Callback):
+   dist_placement = 0
+@@ -35,11 +35,11 @@ class Logger(Callback):
+     if index % self.batch_freq == 0:
+       if not self.logged_batch_shapes:
+         try:
+-          self.log("\nBatch inputs shape:", tuple(inputs.size()),
+-                   "\nBatch targets shape:", tuple(targets.size()),
+-                   "\nBatch outputs shape:", tuple(outputs.size()), '\n')
+-        except:
+-          pass
++          self.log("\ninputs:", describe(inputs),
++                   "\ntargets:", describe(targets),
++                   "\noutputs:", describe(outputs), '\n')
++        except Exception as e:
++          raise e
+         self.logged_batch_shapes = True
+ 
+       if self.batch_string:
+diff --git a/yann/callbacks/wandb.py b/yann/callbacks/wandb.py
+index c217dcb..a594f7b 100644
+--- a/yann/callbacks/wandb.py
++++ b/yann/callbacks/wandb.py
+@@ -19,7 +19,7 @@ class Wandb(Callback):
+       entity=None,
+       name=None,
+       watch_freq=0,
+-      # log_code=True,
++      log_code=True,
+       batch_log_freq=10,
+       trackers=None,
+   ):
+@@ -30,6 +30,7 @@ class Wandb(Callback):
+     self.name = name
+     self.batch_log_freq = batch_log_freq
+     self.watch_freq = watch_freq
++    self.log_code = log_code
+ 
+     self.trainer = None
+ 
+@@ -48,6 +49,13 @@ class Wandb(Callback):
+         config=dict(trainer.params) if trainer.params else {}
+       )
+ 
++      if self.log_code is True:
++        self.run.log_code('.')
++      elif isinstance(self.log_code, dict):
++        self.run.log_code(**self.log_code)
++      elif isinstance(self.log_code, str):
++        self.run.log_code(self.log_code)
++
+     if trainer.model and self.watch_freq:
+       self.run.watch(
+         models=trainer.model,
+diff --git a/yann/config/registry.py b/yann/config/registry.py
+index 3b3cf24..ed5d778 100644
+--- a/yann/config/registry.py
++++ b/yann/config/registry.py
+@@ -1,4 +1,5 @@
+ import typing
++from typing import Union, Tuple, Dict, Any
+ from collections import defaultdict, OrderedDict
+ 
+ from functools import partial
+@@ -72,7 +73,7 @@ class Resolver:
+ 
+   def resolve(
+       self,
+-      x,
++      x: Union[Any, Tuple[Any, Dict]],
+       required=False,
+       validate=None,
+       instance=True,
+diff --git a/yann/init.py b/yann/init.py
+index 31d88b1..a1f2615 100644
+--- a/yann/init.py
++++ b/yann/init.py
+@@ -1,6 +1,6 @@
+ from torch import nn
+ from torch.nn import init
+-
++import math
+ 
+ def kaiming(model: nn.Module):
+   for module in model.modules():
+@@ -20,3 +20,8 @@ def kaiming(model: nn.Module):
+ 
+ 
+ msr = kaiming
++
++
++def linear_zero_bias(linear: nn.Module, num_classes):
++  init.zeros_(linear.weight)
++  init.constant_(linear.bias, -math.log(num_classes))
+\ No newline at end of file
+diff --git a/yann/train/trainer.py b/yann/train/trainer.py
+index 82028df..75eea4e 100644
+--- a/yann/train/trainer.py
++++ b/yann/train/trainer.py
+@@ -8,7 +8,8 @@ from typing import Optional, Callable, Union, Dict, Mapping, Sequence
+ 
+ import torch
+ import torch.nn
+-from torch.cuda.amp import autocast, GradScaler
++from torch import autocast
++from torch.cuda.amp import GradScaler, autocast
+ from torch.optim.optimizer import Optimizer
+ from torch.utils.data import Sampler, DataLoader
+ from typing_extensions import Literal
+@@ -267,7 +268,8 @@ class Trainer(TrainState, BaseTrainer):
+       callbacks: Union[
+         Sequence['yann.callbacks.Callback'],
+         'yann.callbacks.Callbacks',
+-        None
++        None,
++        bool
+       ] = None,
+       device: Union[torch.device, str, None] = None,
+       dtype: Optional[torch.dtype] = None,
+@@ -1177,7 +1179,7 @@ DATASET
+ VALIDATION DATASET
+ =======
+ 
+-{self.val_loader.dataset}
++{self.val_loader.dataset if self.val_loader is not None else None}
+ 
+ LOADER
+ ======
+diff --git a/yann/typedefs.py b/yann/typedefs.py
+index ffab150..03bf79c 100644
+--- a/yann/typedefs.py
++++ b/yann/typedefs.py
+@@ -12,7 +12,6 @@ LogProbabilities = torch.FloatTensor
+ Batch = typing.NewType('Batch', torch.Tensor)
+ 
+ ClassIndices = torch.LongTensor
+-OneHot = torch.FloatTensor
+ MultiLabelOneHot = OneHot
+ 
+ ImageTensor = torch.ShortTensor
+diff --git a/yann/utils/tensor.py b/yann/utils/tensor.py
+index 5f78b86..2cafdb8 100644
+--- a/yann/utils/tensor.py
++++ b/yann/utils/tensor.py
+@@ -24,7 +24,7 @@ def one_hot(targets: torch.Tensor, num_classes=None, device=None, dtype=None, no
+ 
+ 
+ def show_hist(hist):
+-  chars = '_▁▂▃▄▅▆▇█'
++  chars = '.▁▂▃▄▅▆▇█'
+   top = max(hist)
+   step = (top / float(len(chars) - 1)) or 1
+   return ''.join(chars[int(round(count / step))] for count in hist)
+@@ -33,7 +33,7 @@ def show_hist(hist):
+ def describe(tensor: torch.Tensor, bins=10) -> str:
+   try:
+     stats = (
+-      f"μ={tensor.mean():.4f}  σ={tensor.std():.4f}\n"
++      f"mean: {tensor.mean():.4f} std: {tensor.std():.4f} "
+     )
+   except:
+     stats = ''
+@@ -41,19 +41,16 @@ def describe(tensor: torch.Tensor, bins=10) -> str:
+   try:
+     h = tensor.histc(bins=bins).int().tolist()
+     hist = (
+-      f"hist: {h}\n"
++
+       f"hist: {show_hist(h)}\n"
++      f"      {h}\n"
+     )
+   except:
+     hist = ''
+-  return (
+-
+-    f"{tuple(tensor.shape)} "
+-    f"{tensor.dtype} "
+-    f"{tensor.device}"
+-    f"{' grad' if tensor.requires_grad else ''} "
+-    f"({tensor.numel() * tensor.element_size() / (1e6):,.5f} MB)\n"
+-    f"{stats}"
+-    f"{hist}"
+-    f"min: {tensor.min():.4f}  max: {tensor.max():.4f}  sum: {tensor.sum():.4f}\n\n"
+-  )
+\ No newline at end of file
++  return f"""
++shape: {tuple(tensor.shape)} dtype: {tensor.dtype} device: {tensor.device} grad: {tensor.requires_grad} size: {tensor.numel() * tensor.element_size() / (1e6):,.5f} MB
++min: {tensor.min():.4f}  max: {tensor.max():.4f}  {stats}sum: {tensor.sum():.4f}
++{hist}
++
++{tensor}
++  """
+\ No newline at end of file

@@ -1,14 +1,21 @@
 from typing import Dict
 
 import torch
-from yann.train import Trainer
+
 import yann
+from yann.train import Trainer
+
 from . import Callback
 
 
 class GradualUnfreezing(Callback):
   trainer: Trainer
-  def __init__(self, modules: Dict[int, torch.nn.Module], unfreeze=yann.unfreeze):
+
+  def __init__(
+    self,
+    modules: Dict[int, torch.nn.Module],
+    unfreeze=yann.unfreeze,
+  ):
     self.modules = modules
     self.unfreeze = unfreeze
 
@@ -25,9 +32,7 @@ class GradualUnfreezing(Callback):
 
     # clone param group variables to avoid missing keys (used by things like lr_schedulers)
     param_group = {
-      k: v for (k, v)
-      in self.trainer.optimizer.param_groups[0].items()
-      if k != 'params'
+      k: v for (k, v) in self.trainer.optimizer.param_groups[0].items() if k != 'params'
     }
     param_group['params'] = parameters
 

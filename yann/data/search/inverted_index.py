@@ -1,6 +1,5 @@
-
-from collections import defaultdict
 import operator
+from collections import defaultdict
 from functools import reduce
 
 

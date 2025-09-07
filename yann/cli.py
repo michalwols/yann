@@ -18,20 +18,20 @@ def cli():
 @click.option('-cp', '--checkpoint')
 @click.option('-c', '--continue')
 def train(
-    name,
-    model,
-    dataset,
-    loss=None,
-    transform=None,
-    optimizer='SGD',
-    checkpoint=None,
-    lr=0.01,
-    momentum=.9,
-    epochs=10
+  name,
+  model,
+  dataset,
+  loss=None,
+  transform=None,
+  optimizer='SGD',
+  checkpoint=None,
+  lr=0.01,
+  momentum=0.9,
+  epochs=10,
 ):
   """Train model"""
-  from .train import Trainer
   from .callbacks import get_callbacks
+  from .train import Trainer
 
   t = Trainer(
     name=name,
@@ -40,7 +40,7 @@ def train(
     dataset=dataset,
     transform=transform,
     loss=loss,
-    callbacks=get_callbacks(interactive=False)
+    callbacks=get_callbacks(interactive=False),
   )
 
   if checkpoint:
@@ -137,16 +137,16 @@ def scaffold():
   raise NotImplementedError()
 
 
-
-
 @cli.command()
 @click.argument('src')
 @click.argument('dst')
 def convert(src: str, dst: str):
   import yann
+
   data = yann.load(src)
   print(f'loaded {type(data)}')
   yann.save(data, dst)
+
 
 def main():
   cli()
@@ -170,9 +170,11 @@ def preview(name: str):
     x = ds[i]
     print(x)
 
+
 @dataset.command()
 def list():
   print(yann.registry.dataset.print_tree())
+
 
 if __name__ == '__main__':
   cli()

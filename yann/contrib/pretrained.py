@@ -1,26 +1,29 @@
 from torch.nn import AdaptiveAvgPool2d
-from ..data.containers import Outputs, Inputs
+
+from ..data.containers import Inputs, Outputs
 from ..models import Model
 
 
 def register_models():
   import logging
+
   from .. import registry
-  from ..config.registry import pass_args, is_public_callable
+  from ..config.registry import is_public_callable, pass_args
 
   try:
     import pretrainedmodels.models
   except ImportError:
     logging.warn(
       "Couldn't register pretrainedmodels models because it's not "
-      "installed\n to install run `pip install pretrainedmodels`"
+      'installed\n to install run `pip install pretrainedmodels`',
     )
   else:
     registry.model.pretrainedmodels.index(
       pretrainedmodels.models,
       init=pass_args,
-      include=is_public_callable
+      include=is_public_callable,
     )
+
 
 # auto register the models on import of this module
 # NOTE:
@@ -41,7 +44,7 @@ class PretrainedModel(Model):
     return Outputs(
       embeddings=embeddings,
       logits=logits,
-      activations=activations
+      activations=activations,
     )
 
 
@@ -80,7 +83,7 @@ class PretrainedModelWrapper(Model):
     return Outputs(
       embeddings=embeddings,
       logits=logits,
-      activations=activations
+      activations=activations,
     )
 
 

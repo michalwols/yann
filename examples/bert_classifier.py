@@ -9,7 +9,8 @@ This example demonstrates how to:
 4. Evaluate the model performance
 
 Requirements:
-    pip install transformers datasets tokenizers torch
+    uv add --optional transformers
+    # or: pip install yann[transformers]
 
 Usage:
     python examples/bert_classifier.py --dataset imdb --max_length 512 --epochs 3

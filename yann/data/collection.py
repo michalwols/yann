@@ -1,4 +1,4 @@
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from itertools import chain
 
 
@@ -25,7 +25,6 @@ def count(*args):
   return Counter(chain(*args))
 
 
-
 class Collection:
   def __init__(self, items):
     self.items = items
@@ -47,9 +46,7 @@ class Collection:
       yield from (tuple(getattr(x, a) for a in attrs) for x in self.items)
 
   def filter(self, condition):
-    return Collection(
-      x for x in self if condition(x)
-    )
+    return Collection(x for x in self if condition(x))
 
   def map(self, f):
     return Collection(f(x) for x in self)
@@ -59,18 +56,14 @@ class Collection:
       return sorted(
         self.items,
         key=lambda x: tuple(getattr(x, p) for p in props),
-        reverse=reverse
+        reverse=reverse,
       )
 
-    return sorted(
-      self.items,
-      key=key,
-      reverse=reverse
-    )
+    return sorted(self.items, key=key, reverse=reverse)
 
   def __getattr__(self, name: str):
     if name.startswith('by_unique_'):
-      x = by(self.items, name[len('by_unique_'):], unique=True)
+      x = by(self.items, name[len('by_unique_') :], unique=True)
       setattr(self, name, x)
       return x
 
@@ -80,13 +73,13 @@ class Collection:
       return x
 
     if name.endswith('_counts'):
-      attr = name[:-len('_counts')]
+      attr = name[: -len('_counts')]
       x = count(getattr(x, attr) for x in self.items)
       setattr(self, name, x)
       return x
 
     if name.endswith('_set'):
-      attr = name[:-len('_set')]
+      attr = name[: -len('_set')]
       x = set(getattr(x, attr) for x in self.items)
       setattr(self, name, x)
       return x
@@ -98,4 +91,3 @@ class Collection:
       return x
 
     raise AttributeError(name)
-

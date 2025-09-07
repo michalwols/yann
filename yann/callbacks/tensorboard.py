@@ -1,15 +1,17 @@
-from pathlib import Path
 import logging
-from torch.utils.tensorboard import SummaryWriter
+from pathlib import Path
+
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
 from .base import Callback
 
-
 log = logging.getLogger(__name__)
+
 
 class Tensorboard(Callback):
   writer: SummaryWriter
+
   def __init__(self, root=None, trainer=None, writer=None):
     self.root = root
     self.trainer = trainer
@@ -28,11 +30,12 @@ class Tensorboard(Callback):
       self.writer.add_graph(
         val,
         kwargs.get('input'),
-        verbose=kwargs.get('verbose', False)
+        verbose=kwargs.get('verbose', False),
       )
 
   def show(self, root=None):
     from IPython import get_ipython
+
     ipython = get_ipython()
     ipython.magic('load_ext tensorboard')
 
@@ -68,7 +71,7 @@ class Tensorboard(Callback):
       try:
         self.writer.add_hparams(
           dict(self.trainer.params),
-          self.trainer.history.val_metrics.summary()
+          self.trainer.history.val_metrics.summary(),
         )
       except ValueError as e:
         log.error(e)
@@ -85,15 +88,29 @@ class Tensorboard(Callback):
     targets=None,
     outputs=None,
     loss=None,
-    trainer=None
+    trainer=None,
   ):
     self.writer.add_scalar('train/loss', loss, global_step=trainer.num_steps)
     for metric, values in trainer.history.metrics.items():
-      self.writer.add_scalar(f'train/{metric}', values[-1], global_step=len(values) - 1)
+      self.writer.add_scalar(
+        f'train/{metric}',
+        values[-1],
+        global_step=len(values) - 1,
+      )
 
-  def on_validation_end(self, targets=None, outputs=None, loss=None, trainer=None):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     for metric, values in trainer.history.val_metrics.items():
-      self.writer.add_scalar(f'validation/{metric}', values[-1], global_step=len(values) - 1)
+      self.writer.add_scalar(
+        f'validation/{metric}',
+        values[-1],
+        global_step=len(values) - 1,
+      )
 
   def sanitize_model(self, model):
     if isinstance(model, nn.DataParallel):

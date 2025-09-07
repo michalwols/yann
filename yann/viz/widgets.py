@@ -1,4 +1,4 @@
-from .html import div, prop, ReactiveMixin, Node
+from .html import Node, ReactiveMixin, div, prop
 
 
 class ProgressBar(ReactiveMixin, Node):
@@ -17,11 +17,9 @@ class ProgressBar(ReactiveMixin, Node):
         background-color: {self.background}; 
         overflow: hidden; 
         padding: 5px 10px;
-        """
+        """,
       )(
-        div(style='position:relative; z-index: 1;')(
-          *self.children
-        ),
+        div(style='position:relative; z-index: 1;')(*self.children),
         div(
           style=f"""
           background-color: {self.color};
@@ -31,6 +29,7 @@ class ProgressBar(ReactiveMixin, Node):
           left: 0;
           right: {100 - self.value / self.max * 100}%;
           z-index: 0;
-        """)
-        )
+        """,
+        ),
+      )
     ).html()

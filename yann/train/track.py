@@ -1,4 +1,4 @@
-from typing import Mapping, Any
+from typing import Any, Mapping
 
 import yann
 
@@ -7,6 +7,7 @@ class Tracker:
   """
   Simple callable that takes a trainer instance as input and returns a dict of values to log
   """
+
   freq: int = None
 
   def __call__(self, trainer: 'yann.train.Trainer') -> Mapping[str, Any]:
@@ -15,17 +16,19 @@ class Tracker:
 
 class OptimizerState(Tracker):
   def __init__(
-      self,
-      optimizer=None,
-      prefix='',
-      keys=('lr', 'weight_decay', 'momentum', 'betas', 'alpha')):
+    self,
+    optimizer=None,
+    prefix='',
+    keys=('lr', 'weight_decay', 'momentum', 'betas', 'alpha'),
+  ):
     self.optimizer = optimizer
     self.keys = keys
     self.prefix = prefix
 
   def __call__(self, trainer: 'import yann.train.trainer.Trainer'):
     optim = self.optimizer or trainer.optimizer
-    if not optim: return {}
+    if not optim:
+      return {}
 
     values = {}
 
@@ -49,6 +52,7 @@ class ParamNorms(Tracker):
 
   def __call__(self, trainer):
     import yann
+
     model = self.model or trainer.model
 
     return {self.key: yann.param_norm(model)}
@@ -61,6 +65,7 @@ class GradNorms(Tracker):
 
   def __call__(self, trainer):
     import yann
+
     model = self.model or trainer.model
 
     return {self.key: yann.grad_norm(model)}
@@ -78,4 +83,3 @@ class Keys(Tracker):
       except:
         pass
     return values
-

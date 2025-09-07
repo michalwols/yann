@@ -1,5 +1,6 @@
 from abc import ABCMeta
 
+
 class styles(dict):
   def __init__(self, *args, **props):
     super().__init__()
@@ -17,8 +18,7 @@ class styles(dict):
     self.update(props)
 
   def __str__(self):
-    return ' '.join(f"{k.replace('_', '-')}: {v};"
-                    for k, v in self.items())
+    return ' '.join(f'{k.replace("_", "-")}: {v};' for k, v in self.items())
 
 
 class Node:
@@ -45,13 +45,15 @@ class Node:
   def html(self):
     if self.CHILDREN:
       return f"""
-         <{self.name} {' '.join(
-        f'{k}="{v}"' for k, v in self.props.items())}  style="{self.style}"/>
+         <{self.name} {' '.join(f'{k}="{v}"' for k, v in self.props.items())}  style="{
+        self.style
+      }"/>
       """
 
     return f"""
-    <{self.name} {' '.join(
-      f'{k}="{v}"' for k, v in self.props.items())} style="{self.style}">
+    <{self.name} {' '.join(f'{k}="{v}"' for k, v in self.props.items())} style="{
+      self.style
+    }">
        {self.format_children()}
     </{self.name}>
     """
@@ -62,6 +64,7 @@ class Node:
 
   def render(self):
     from IPython.core.display import HTML
+
     return HTML(self.html())
 
   def format_children(self):
@@ -69,6 +72,7 @@ class Node:
 
   def display(self):
     from IPython.core.display import display
+
     self._display_handle = display(self.render(), display_id=True)
 
   def update(self):
@@ -111,6 +115,7 @@ class ReactiveNodeMeta(ABCMeta):
 
     return super().__new__(mcls, name, bases, namespace)
 
+
 class ReactiveMixin(metaclass=ReactiveNodeMeta):
   _props: set
   _default_props: dict
@@ -131,19 +136,40 @@ class EmptyNode(Node):
   CHILDREN = True
 
 
-class div(Node): pass
+class div(Node):
+  pass
 
 
-class span(Node): pass
+class span(Node):
+  pass
 
 
-class img(EmptyNode): pass
-class p(Node): pass
-class h1(Node): pass
-class h2(Node): pass
-class h3(Node): pass
-class h4(Node): pass
-class progress(EmptyNode): pass
+class img(EmptyNode):
+  pass
+
+
+class p(Node):
+  pass
+
+
+class h1(Node):
+  pass
+
+
+class h2(Node):
+  pass
+
+
+class h3(Node):
+  pass
+
+
+class h4(Node):
+  pass
+
+
+class progress(EmptyNode):
+  pass
 
 
 class matplotfig(img):
@@ -157,19 +183,20 @@ class matplotfig(img):
 
     if not self.live:
       from .plot import figure_to_base64
-      self.props['src'] = figure_to_base64(figure, data_encoded=True)
 
+      self.props['src'] = figure_to_base64(figure, data_encoded=True)
 
   def html(self):
     if self.live:
       from .plot import figure_to_base64
+
       self.props['src'] = figure_to_base64(self.figure, data_encoded=True)
     if 'src' not in self.props:
       from .plot import figure_to_base64
+
       self.props['src'] = figure_to_base64(self.figure, data_encoded=True)
 
     return super(matplotfig, self).html()
-
 
 
 def _cell(val, size=25):
@@ -177,44 +204,58 @@ def _cell(val, size=25):
     style=(
       f'width: {size}px; height: {size}px;'
       f' display: inline-block;'
-      f' background-color: rgba({50 + val}, {20 + val * .8}, {80 + val * .6}, 1);'
+      f' background-color: rgba({50 + val}, {20 + val * 0.8}, {80 + val * 0.6}, 1);'
       f' margin: 0; border: 1px solid rgba(0,0,0, .05)'
-    ))
+    ),
+  )
 
 
 def _row(*args):
-  return div(*args, style='margin: 0; padding: 0; font-size:0; white-space: nowrap;')
+  return div(
+    *args,
+    style='margin: 0; padding: 0; font-size:0; white-space: nowrap;',
+  )
 
 
-def tensor(t, cell_size=15, scaled=None, min=None, max=None, max_elements=50000):
+def tensor(
+  t,
+  cell_size=15,
+  scaled=None,
+  min=None,
+  max=None,
+  max_elements=50000,
+):
   if t.numel() > max_elements:
     raise ValueError('tensor too large')
   if scaled is None:
     max = t.max() if max is None else max
     min = t.min() if min is None else min
-    scaled = (t.float() - min) / (max-min) * 255
+    scaled = (t.float() - min) / (max - min) * 255
 
   if t.ndim == 1:
     return div(
-      f"shape: {tuple(t.shape)}",
-      _row(*(_cell(v, size=cell_size) for v in scaled))
+      f'shape: {tuple(t.shape)}',
+      _row(*(_cell(v, size=cell_size) for v in scaled)),
     )
 
   if t.ndim == 2:
     return div(
-      f"shape: {tuple(t.shape)}",
-      *[
-        _row(*(_cell(v, size=cell_size) for v in row)) for row in scaled
-      ]
+      f'shape: {tuple(t.shape)}',
+      *[_row(*(_cell(v, size=cell_size) for v in row)) for row in scaled],
     )
 
   if t.ndim >= 3:
     return div(
-      f"shape: {tuple(t.shape)}",
+      f'shape: {tuple(t.shape)}',
       div(
-        *(div(style='border: 1px solid #CCC; padding: 5px; margin: 3px; display: inline-block; border-radius: 6px')(
-          f"index: {n}", tensor(x, scaled=x, cell_size=cell_size, min=min, max=max)
-        ) for n, x in enumerate(scaled)
-        )
-      )
+        *(
+          div(
+            style='border: 1px solid #CCC; padding: 5px; margin: 3px; display: inline-block; border-radius: 6px',
+          )(
+            f'index: {n}',
+            tensor(x, scaled=x, cell_size=cell_size, min=min, max=max),
+          )
+          for n, x in enumerate(scaled)
+        ),
+      ),
     )

@@ -58,7 +58,7 @@ class Stack(nn.Module):
         stop = layers.index(x.stop)
 
       return self.__class__(
-        **dict(list(self.named_children())[start:stop:x.step])
+        **dict(list(self.named_children())[start : stop : x.step]),
       )
     elif isclass(x):
       return [m for m in self.children() if isinstance(m, x)]
@@ -77,4 +77,4 @@ class Stack(nn.Module):
   def upto(self, module):
     layers = list(self.children())
     stop = layers.index(module)
-    return self[:stop + 1]
+    return self[: stop + 1]

@@ -1,11 +1,10 @@
-import yann
 import torch
+
+import yann
 
 
 def test_io(tmpdir):
-  x = {
-    'a': 2
-  }
+  x = {'a': 2}
 
   yann.save(x, tmpdir / 'x.json')
   y = yann.load(tmpdir / 'x.json')

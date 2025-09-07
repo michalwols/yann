@@ -1,6 +1,6 @@
-from pyarrow import parquet as pq
-import pyarrow as pa
 import pandas as pd
+import pyarrow as pa
+from pyarrow import parquet as pq
 
 
 def write_parquet(dest, data, columns=None, **kwargs):
@@ -16,7 +16,7 @@ def write_parquet(dest, data, columns=None, **kwargs):
     with pq.ParquetWriter(dest, schema=table.schema, **kwargs) as writer:
       writer.write_table(table)
       for d in next(data):
-        writer.write_table(pa.Table.from_pandas(pd.DataFrame(d))
+        writer.write_table(pa.Table.from_pandas(pd.DataFrame(d)))
 
 
 def read_parquet():

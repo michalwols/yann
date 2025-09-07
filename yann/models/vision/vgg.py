@@ -1,5 +1,6 @@
 from torch import nn
-from yann.modules import Stack, Flatten
+
+from yann.modules import Flatten, Stack
 
 
 class VGG(nn.Module):
@@ -12,14 +13,7 @@ class VGG(nn.Module):
 
   in_channels = 3
 
-  channels = [
-    (64,),
-    (128,),
-    (256,),
-    (512,),
-    (512,)
-
-  ]
+  channels = [(64,), (128,), (256,), (512,), (512,)]
 
   def __init__(self, num_classes):
     super(VGG, self).__init__()
@@ -28,7 +22,7 @@ class VGG(nn.Module):
 
     self.activations_to_features = Stack(
       pool=self.Reduce(kernel_size=1, stride=1),
-      flatten=Flatten()
+      flatten=Flatten(),
     )
 
     self.project = nn.Linear(self.channels[-1][-1], self.num_classes)
@@ -49,8 +43,8 @@ class VGG(nn.Module):
           Stack(
             conv=self.Conv(prev_channels, c, kernel_size=3, padding=1),
             norm=self.Norm(c),
-            activation=self.Activation(inplace=True)
-          )
+            activation=self.Activation(inplace=True),
+          ),
         )
         prev_channels = c
       layers.append(self.Downsample(kernel_size=2, stride=2))
@@ -95,4 +89,3 @@ class VGG19(VGG):
     (512,) * 4,
     (512,) * 4,
   ]
-

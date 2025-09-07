@@ -1,5 +1,6 @@
 import torch
 
+
 class TensorStats:
   def __init__(self, device=None, dim=0):
     self.total = None
@@ -25,8 +26,16 @@ class TensorStats:
     else:
       self.total += sum
       self.count += batch.shape[self.dim]
-      self.max = torch.maximum(self.max, batch.max(dim=self.dim)[0], out=self.max)
-      self.min = torch.minimum(self.min, batch.min(dim=self.dim)[0], out=self.min)
+      self.max = torch.maximum(
+        self.max,
+        batch.max(dim=self.dim)[0],
+        out=self.max,
+      )
+      self.min = torch.minimum(
+        self.min,
+        batch.min(dim=self.dim)[0],
+        out=self.min,
+      )
 
   @property
   def mean(self):

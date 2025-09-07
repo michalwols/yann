@@ -2,12 +2,7 @@ from . import Callback
 
 
 class Profile(Callback):
-  def __init__(
-      self,
-      start_step=16,
-      stop_step=80,
-      **kwargs
-  ):
+  def __init__(self, start_step=16, stop_step=80, **kwargs):
     self.profiler = None
 
     self.start_step = start_step
@@ -16,10 +11,10 @@ class Profile(Callback):
 
     self.profiler_args = kwargs
 
-
   def on_step_start(self, index=None, **kwargs):
     if index == self.start_step:
       from torch.profiler import profile
+
       self.profiler = profile(**kwargs)
       self.profiler.start()
 
@@ -31,27 +26,26 @@ class Profile(Callback):
       self.save(root=trainer.paths.profile)
       self.disable()
 
-
   def save(self, root: 'pathlib.Path' = None):
-     self.profiler.export_chrome_trace(str(root / 'chrome_trace.json'))
+    self.profiler.export_chrome_trace(str(root / 'chrome_trace.json'))
 
-     try:
+    try:
       self.profiler.tensorboard_trace_handler(str(root / 'tensorboard'))
-     except:
-       pass
+    except:
+      pass
 
-     try:
-       self.profiler.export_stacks(
-         str(root / 'cpu.stacks'),
-         metric='self_cpu_time_total'
-       )
-     except:
-       pass
+    try:
+      self.profiler.export_stacks(
+        str(root / 'cpu.stacks'),
+        metric='self_cpu_time_total',
+      )
+    except:
+      pass
 
-     try:
-       self.profiler.export_stacks(
-         str(root / 'cuda.stacks'),
-         metric='self_cuda_time_total'
-       )
-     except:
-       pass
+    try:
+      self.profiler.export_stacks(
+        str(root / 'cuda.stacks'),
+        metric='self_cuda_time_total',
+      )
+    except:
+      pass

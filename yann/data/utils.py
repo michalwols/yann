@@ -3,7 +3,8 @@ import torch
 
 
 def pad(tensor, shape, value=0):
-  if tensor.shape == shape: return tensor
+  if tensor.shape == shape:
+    return tensor
 
   if isinstance(tensor, np.ndarray):
     padded = np.zeros(shape, dtype=tensor.dtype)

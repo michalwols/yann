@@ -1,6 +1,6 @@
-from .base import Callback
-
 import torch
+
+from .base import Callback
 
 
 class EarlyStopping(Callback):
@@ -10,7 +10,6 @@ class EarlyStopping(Callback):
 
 class StopOnNaN(Callback):
   def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
-    if torch.isnan(loss).any() \
-       or torch.isinf(loss).any():
+    if torch.isnan(loss).any() or torch.isinf(loss).any():
       print('NaN or Inf detected, stopping training')
       trainer.stop()

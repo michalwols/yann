@@ -1,10 +1,11 @@
 import logging
 import os
 from math import cos, pi
+
 import numpy as np
 
-from ..callbacks.base import Callback
 from .. import set_param
+from ..callbacks.base import Callback
 from ..metrics import exp_moving_avg
 from ..viz import plot_line
 
@@ -15,15 +16,15 @@ def cosine_anneal(min_lr, max_lr, cur_step, num_steps):
 
 class SGDR(Callback):
   def __init__(
-      self,
-      optimizer=None,
-      max_lr=None,
-      min_lr=0,
-      cycle_len=10,
-      cycle_mult=1,
-      lr_mult=1,
-      verbose=True,
-      checkpoint=False
+    self,
+    optimizer=None,
+    max_lr=None,
+    min_lr=0,
+    cycle_len=10,
+    cycle_mult=1,
+    lr_mult=1,
+    verbose=True,
+    checkpoint=False,
   ):
     self.optimizer = optimizer
     self.max_lr = max_lr
@@ -52,10 +53,13 @@ class SGDR(Callback):
 
   def restart(self):
     if self.save_checkpoints:
-      self.checkpoints.append(self.trainer.checkpoint(
-        f'cycle-{self.completed_cycles}'
-        f'-epochs-{self.trainer.num_epochs}'
-        f'-steps-{self.trainer.num_steps}'))
+      self.checkpoints.append(
+        self.trainer.checkpoint(
+          f'cycle-{self.completed_cycles}'
+          f'-epochs-{self.trainer.num_epochs}'
+          f'-steps-{self.trainer.num_steps}',
+        ),
+      )
 
     self.cur_cycle_len *= self.cycle_mult
     self.cur_max_lr *= self.lr_mult
@@ -75,23 +79,27 @@ class SGDR(Callback):
     if self.cur_step >= self.cur_cycle_len:
       self.restart()
     else:
-      new_lr = cosine_anneal(self.cur_min_lr, self.cur_max_lr, self.cur_step,
-                             self.cur_cycle_len)
+      new_lr = cosine_anneal(
+        self.cur_min_lr,
+        self.cur_max_lr,
+        self.cur_step,
+        self.cur_cycle_len,
+      )
       self.update_lr(new_lr)
       self.cur_step += 1
 
 
 class LRRangeTest(Callback):
   def __init__(
-      self,
-      start_lr=.00001,
-      end_lr=1,
-      steps=500,
-      step=None,
-      log_freq=10,
-      plot_freq=100,
-      divergence_multiplier=4,
-      plot_path=None,
+    self,
+    start_lr=0.00001,
+    end_lr=1,
+    steps=500,
+    step=None,
+    log_freq=10,
+    plot_freq=100,
+    divergence_multiplier=4,
+    plot_path=None,
   ):
     super(LRRangeTest, self).__init__()
     self.checkpoint_path = None
@@ -115,17 +123,16 @@ class LRRangeTest(Callback):
     self.plot_freq = plot_freq
     self.log_freq = log_freq
 
-
     self.divergence_multiplier = divergence_multiplier
 
   def __repr__(self):
     return (
-      f"LRRangeTest (\n"
-      f"  min_lr: {self.start_lr}\n"
-      f"  max_lr: {self.end_lr}\n"
-      f"  step: {self.step}\n"
-      f"  steps: {self.steps}\n"
-      ")"
+      f'LRRangeTest (\n'
+      f'  min_lr: {self.start_lr}\n'
+      f'  max_lr: {self.end_lr}\n'
+      f'  step: {self.step}\n'
+      f'  steps: {self.steps}\n'
+      ')'
     )
 
   def on_train_start(self, trainer=None):
@@ -137,19 +144,23 @@ class LRRangeTest(Callback):
 
   def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
     self.losses.append(loss.item())
-    self.avg_loss = exp_moving_avg(self.losses[-1], self.avg_loss,
-                                   steps=len(self.losses))
+    self.avg_loss = exp_moving_avg(
+      self.losses[-1],
+      self.avg_loss,
+      steps=len(self.losses),
+    )
 
     if self.log_freq and len(self.lrs) % self.log_freq == 0:
-      print(f"lr: {self.lrs[-1]:.5f}  loss: {self.avg_loss:.5f}")
+      print(f'lr: {self.lrs[-1]:.5f}  loss: {self.avg_loss:.5f}')
 
     if self.plot_freq and len(self.lrs) % self.plot_freq == 0:
       self.plot()
 
     if self.min_loss is None:
       self.min_loss = self.avg_loss
-    elif (self.avg_loss > self.divergence_multiplier * self.min_loss) and \
-        len(self.lrs) > 50:
+    elif (self.avg_loss > self.divergence_multiplier * self.min_loss) and len(
+      self.lrs,
+    ) > 50:
       logging.info('Loss diverged, stopping LR Range Test')
       trainer.stop()
       return
@@ -163,7 +174,6 @@ class LRRangeTest(Callback):
     self.lrs.append(self.lrs[-1] + self.step)
     set_param(trainer.optimizer, 'lr', self.lrs[-1])
 
-
   def plot(self, **kwargs):
     plot_line(
       x=self.lrs,
@@ -172,7 +182,7 @@ class LRRangeTest(Callback):
       ylabel='loss',
       save=self.plot_path,
       show=not self.plot_path,
-      **kwargs
+      **kwargs,
     )
 
 

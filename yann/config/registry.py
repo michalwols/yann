@@ -1,9 +1,8 @@
 import typing
-from typing import Union, Tuple, Dict, Any
-from collections import defaultdict, OrderedDict
-
+from collections import OrderedDict, defaultdict
 from functools import partial
 from itertools import chain
+from typing import Any, Dict, Tuple, Union
 
 
 def dedupe(items):
@@ -19,15 +18,11 @@ def pass_args(x, *args, **kwargs):
 
 
 def is_public(x):
-  return (hasattr(x, '__name__') and not x.__name__.startswith('_'))
+  return hasattr(x, '__name__') and not x.__name__.startswith('_')
 
 
 def is_public_callable(x):
-  return (
-      hasattr(x, '__name__')
-      and not x.__name__.startswith('_')
-      and callable(x)
-  )
+  return hasattr(x, '__name__') and not x.__name__.startswith('_') and callable(x)
 
 
 class default:
@@ -35,7 +30,7 @@ class default:
 
   @staticmethod
   def get_names(x):
-    return x.__name__,
+    return (x.__name__,)
 
 
 class RegistryError(Exception):
@@ -72,15 +67,15 @@ class Resolver:
     self.registry = registry
 
   def resolve(
-      self,
-      x: Union[Any, Tuple[Any, Dict]],
-      required=False,
-      validate=None,
-      instance=True,
-      types=None,
-      init=None,
-      args=None,
-      kwargs=None
+    self,
+    x: Union[Any, Tuple[Any, Dict]],
+    required=False,
+    validate=None,
+    instance=True,
+    types=None,
+    init=None,
+    args=None,
+    kwargs=None,
   ):
     """
 
@@ -123,13 +118,13 @@ class Resolver:
     if not required and x is None:
       return x
     elif required and x is None:
-      raise ResolutionError("Could not resolve to a value and was required")
+      raise ResolutionError('Could not resolve to a value and was required')
 
     if types and not isinstance(x, types):
       raise ResolutionError(
-        f"Failed to resolve {initial} to one of "
-        f"{' '.join(str(t) for t in types)}, "
-        f"got {x} instead of type {type(x)}"
+        f'Failed to resolve {initial} to one of '
+        f'{" ".join(str(t) for t in types)}, '
+        f'got {x} instead of type {type(x)}',
       )
 
     if validate and not validate(x):
@@ -138,9 +133,18 @@ class Resolver:
     return x
 
   def __call__(
-      self, x, *_args, required=False, validate=None,
-      instance=True, types=None, args=None, kwargs=None, init=None,
-      **_kwargs, ):
+    self,
+    x,
+    *_args,
+    required=False,
+    validate=None,
+    instance=True,
+    types=None,
+    args=None,
+    kwargs=None,
+    init=None,
+    **_kwargs,
+  ):
     return self.resolve(
       x,
       required=required,
@@ -149,7 +153,7 @@ class Resolver:
       types=types,
       args=args or _args,
       kwargs=kwargs or _kwargs,
-      init=init
+      init=init,
     )
 
   def __getattr__(self, name):
@@ -184,11 +188,12 @@ class Registry:
       return partial(self.register, name=x)
 
     if self.types and not (
-        issubclass(x, self.types) if isinstance(x, type)
-        else isinstance(x, self.types)):
+      issubclass(x, self.types) if isinstance(x, type) else isinstance(x, self.types)
+    ):
       raise RegistryError(
         f"Can't register an object of type {type(x)} in "
-        f"typed registry which expects one of {self.types}")
+        f'typed registry which expects one of {self.types}',
+      )
 
     r = Record(x, init=init)
 
@@ -256,18 +261,21 @@ class Registry:
 
     raise KeyError(
       f"Couldn't find key: '{item}', "
-      f"valid options include: {', '.join(self._records.keys())}")
+      f'valid options include: {", ".join(self._records.keys())}',
+    )
 
   def values(self):
-    return dedupe((
-      *(r.x for r in self._records.values()),
-      *chain(*(c.values() for c in self.public_subregistries()))
-    ))
+    return dedupe(
+      (
+        *(r.x for r in self._records.values()),
+        *chain(*(c.values() for c in self.public_subregistries())),
+      ),
+    )
 
   def items(self):
     return (
       *((k, r.x) for k, r in self._records.items()),
-      *chain(*(c.items() for c in self.public_subregistries()))
+      *chain(*(c.items() for c in self.public_subregistries())),
     )
 
   def keys(self):
@@ -277,14 +285,14 @@ class Registry:
     return len(self.values())
 
   def index(
-      self,
-      modules,
-      types=None,
-      get_names=None,
-      include=None,
-      exclude=None,
-      init=None,
-      include_private=False
+    self,
+    modules,
+    types=None,
+    get_names=None,
+    include=None,
+    exclude=None,
+    init=None,
+    include_private=False,
   ):
     """
     Indexes a module. If types are specified will only include entries of
@@ -306,8 +314,10 @@ class Registry:
           continue
         if types:
           if not (
-              isinstance(item, types) or
-              (isinstance(item, type)) and issubclass(item, types)):
+            isinstance(item, types)
+            or (isinstance(item, type))
+            and issubclass(item, types)
+          ):
             continue
 
         if include and not include(item):
@@ -335,11 +345,13 @@ class Registry:
   def print_tree(self, contents=True, indent=0):
     if not indent:
       print(
-        f'registry{" (Private - not resolvable from higher scopes)" if self.is_private else ""}')
+        f'registry{" (Private - not resolvable from higher scopes)" if self.is_private else ""}',
+      )
       indent += 2
     for name, registry in self._subregistries.items():
       print(
-        f"{' ' * indent}.{name} {' (Private - not resolvable from higher scopes)' if registry.is_private else ''}")
+        f'{" " * indent}.{name} {" (Private - not resolvable from higher scopes)" if registry.is_private else ""}',
+      )
       registry.print_tree(indent=indent + 2, contents=contents)
 
     if contents:
@@ -347,8 +359,8 @@ class Registry:
         if isinstance(record.x, partial) or not hasattr(record.x, '__module__'):
           details = str(record.x)
         else:
-          details = f"{record.x.__module__}.{record.x.__name__ if hasattr(record.x, '__name__') else record.x}"
-        print(f"{' ' * (indent + 2)}- {name}\t\t({details})")
+          details = f'{record.x.__module__}.{record.x.__name__ if hasattr(record.x, "__name__") else record.x}'
+        print(f'{" " * (indent + 2)}- {name}\t\t({details})')
 
   def __str__(self):
     return f"<Registry '{self.name}' ({len(self)} entries)>"

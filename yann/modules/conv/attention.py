@@ -5,14 +5,16 @@ class EfficientChannelAttention(nn.Module):
   """
   https://github.com/BangguWu/ECANet
   """
+
   def __init__(self, kernel_size=3):
     super().__init__()
     self.pool = nn.AdaptiveAvgPool2d(1)
     self.conv = nn.Conv1d(
-      1, 1,
+      1,
+      1,
       kernel_size=kernel_size,
       padding=(kernel_size - 1) // 2,
-      bias=False
+      bias=False,
     )
     self.sigmoid = nn.Sigmoid()
 
@@ -22,5 +24,6 @@ class EfficientChannelAttention(nn.Module):
     x = self.sigmoid(x)
 
     return input * x.expand_as(input)
+
 
 ECA = EfficientChannelAttention

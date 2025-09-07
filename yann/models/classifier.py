@@ -17,15 +17,14 @@ class Classifier(nn.Module):
     raise NotImplementedError()
 
 
-
 class LinearClassifier(Classifier):
   def __init__(
-      self,
-      in_features,
-      classes,
-      bias=True,
-      activation=None,
-      test_activation=None
+    self,
+    in_features,
+    classes,
+    bias=True,
+    activation=None,
+    test_activation=None,
   ):
     super(Classifier, self).__init__()
 

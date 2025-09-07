@@ -1,5 +1,6 @@
-from time import time as get_time
 from statistics import mean
+from time import time as get_time
+
 
 def padded_insert(items, index, value, null_val=None):
   """
@@ -81,12 +82,14 @@ class MetricStore:
 
   def to_pandas(self):
     import pandas as pd
+
     return pd.DataFrame({'times': self.times, **self.values})
 
   def plot(self, metrics=None, time=False, clear=False):
     if clear:
       try:
         from IPython.display import clear_output
+
         clear_output(wait=True)
       except:
         pass
@@ -95,15 +98,14 @@ class MetricStore:
     s = {}
     for metric, values in self.values.items():
       try:
-        s[f"{metric}_min"] = min(values)
-        s[f"{metric}_max"] = max(values)
+        s[f'{metric}_min'] = min(values)
+        s[f'{metric}_max'] = max(values)
       except:
         pass
     return s
 
-
   def __repr__(self):
-    return  f"MetricStore({', '.join(f'{k}=(min={min(v)}, max={max(v)})' for k,v in self.values.items())}, len={len(self)})"
+    return f'MetricStore({", ".join(f"{k}=(min={min(v)}, max={max(v)})" for k, v in self.values.items())}, len={len(self)})'
 
 
 class EventStore(list):

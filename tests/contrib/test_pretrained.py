@@ -1,5 +1,5 @@
-import torch
 import pytest
+import torch
 from torch import nn
 
 import yann
@@ -15,7 +15,8 @@ except ImportError:
 
 @pytest.mark.skipif(
   not PRETRAINED_INSTALLED,
-  reason='pretrainedmodels not instaled')
+  reason='pretrainedmodels not instaled',
+)
 def test_pretrained():
   timer = Timer(log=True)
 

@@ -1,5 +1,4 @@
 import time
-from matplotlib import pylab as plt
 
 from .base import Callback
 
@@ -29,6 +28,8 @@ class Timing(Callback):
     return [s - e for (s, e) in zip(self.starts, [self.start_time, *self.ends])]
 
   def plot(self, start=0, end=None, scatter=False):
+    from matplotlib import pylab as plt
+
     end = end or len(self.starts)
 
     fig = plt.figure(figsize=(12, 4))
@@ -38,8 +39,12 @@ class Timing(Callback):
       plt.scatter(range(start, end), list(self.waits)[start:end], label='prep')
     else:
       plt.bar(range(start, end), list(self.waits)[start:end], label='prep')
-      plt.bar(range(start, end), list(self.times)[start:end],
-              bottom=list(self.waits)[start:end], label='step')
+      plt.bar(
+        range(start, end),
+        list(self.times)[start:end],
+        bottom=list(self.waits)[start:end],
+        label='step',
+      )
 
     plt.xlabel('step')
     plt.ylabel('seconds')

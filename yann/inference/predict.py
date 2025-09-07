@@ -9,7 +9,6 @@ class Predictor:
   def __init__(self, model):
     self.model: torch.nn.Module = model
 
-
   def __call__(self, *args, **kwargs):
     x = self.load(*args, **kwargs)
     x = self.transform(x)

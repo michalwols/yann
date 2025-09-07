@@ -1,9 +1,9 @@
+import os
+import pathlib
 import urllib.request
 from concurrent import futures
-import pathlib
 from pathlib import Path
 from urllib.parse import urlparse
-import os
 
 from ...utils import progress
 
@@ -13,7 +13,7 @@ class CachedExecutor:
     self._executor = futures.ThreadPoolExecutor(max_workers=workers)
 
     self.pending = {}  # key => future
-    self.results = {} # key => local path
+    self.results = {}  # key => local path
     self.errors = {}  # key => error
 
     self.error_callbacks = []
@@ -88,7 +88,7 @@ class CachedExecutor:
   def enqueue(self, key, *args, **kwargs):
     if key in self.results or key in self.pending:
       return
-    return self.submit(key,  *args, **kwargs)
+    return self.submit(key, *args, **kwargs)
 
   def get(self, key):
     if key in self.results:
@@ -101,12 +101,8 @@ class CachedExecutor:
   def __getitem__(self, key):
     return self.get(key)
 
-  def __contains__(self,key):
-    return (
-      key in self.results
-      or key in self.errors
-      or key in self.pending
-    )
+  def __contains__(self, key):
+    return key in self.results or key in self.errors or key in self.pending
 
   def __delitem__(self, key):
     self.results.pop(key)
@@ -114,6 +110,7 @@ class CachedExecutor:
     p = self.pending.pop(key)
     if p:
       p.cancel()
+
 
 class Downloader(CachedExecutor):
   def __init__(self, local_root='./', workers=8):
@@ -141,7 +138,7 @@ def download(url, dest=None, skip_existing=True, nest=True, root='./'):
   """
   if not dest:
     root = os.path.abspath(root)
-    dest = (urlparse(url).path if nest else os.path.basename(urlparse(url).path))
+    dest = urlparse(url).path if nest else os.path.basename(urlparse(url).path)
     dest = os.path.join(root, dest[1:] if dest[0] == '/' else dest)
   elif hasattr(dest, '__call__'):
     dest = dest(url)
@@ -153,8 +150,14 @@ def download(url, dest=None, skip_existing=True, nest=True, root='./'):
   return urllib.request.urlretrieve(url, dest)
 
 
-def download_urls(urls, dest=None, skip_existing=True, nest=True, root='./',
-                  max_workers=12):
+def download_urls(
+  urls,
+  dest=None,
+  skip_existing=True,
+  nest=True,
+  root='./',
+  max_workers=12,
+):
   results, errors = [], []
   with futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
     queued_futures = {
@@ -164,7 +167,7 @@ def download_urls(urls, dest=None, skip_existing=True, nest=True, root='./',
         dest=dest,
         skip_existing=skip_existing,
         nest=nest,
-        root=root
+        root=root,
       ): url
       for url in urls
     }

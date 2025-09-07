@@ -1,27 +1,29 @@
-from typing import Union, Callable, Iterable
 import time
-from torch import nn
-from torch.utils.data.dataset import Dataset
-from torch.utils.data.dataloader import DataLoader
-import torch.jit
+from typing import Callable, Iterable, Union
+
 import torch
+import torch.jit
+from torch import nn
+from torch.utils.data.dataloader import DataLoader
+from torch.utils.data.dataset import Dataset
+
 import yann
 
 from ..data.loaders import TransformLoader
 
 
 def inference_stream(
-    model: Union[nn.Module, Callable, str],
-    data: Union[Dataset, DataLoader, Iterable, str],
-    device=None,
-    transform=None,
-    batch_size=64,
-    parallel=False,
-    num_workers=1,
-    pin_memory=False,
-    shuffle=False,
-    progress=10,
-    eval=True,
+  model: Union[nn.Module, Callable, str],
+  data: Union[Dataset, DataLoader, Iterable, str],
+  device=None,
+  transform=None,
+  batch_size=64,
+  parallel=False,
+  num_workers=1,
+  pin_memory=False,
+  shuffle=False,
+  progress=10,
+  eval=True,
 ):
   device = device or yann.default.device
 
@@ -31,7 +33,8 @@ def inference_stream(
   if isinstance(model, nn.Module):
     if parallel:
       model = nn.DataParallel(model)
-    if eval: model.eval()
+    if eval:
+      model.eval()
     model.to(device)
 
   if isinstance(data, str):
@@ -44,7 +47,7 @@ def inference_stream(
       pin_memory=pin_memory,
       batch_size=batch_size,
       shuffle=shuffle,
-      num_workers=num_workers
+      num_workers=num_workers,
     )
 
   try:
@@ -62,7 +65,8 @@ def inference_stream(
       yield (inputs, *rest, outputs)
 
       if progress and idx % progress == 0:
-        print(f"[{idx} / {size}] ({time.time() - begin}, total: {time.time() - start})")
+        print(
+          f'[{idx} / {size}] ({time.time() - begin}, total: {time.time() - start})',
+        )
 
       begin = time.time()
-

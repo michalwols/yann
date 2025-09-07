@@ -18,6 +18,7 @@ class Place:
     place = Place({'inputs': dict(device='cuda', memory_format=torch.channels_last), 'targets': 'cpu'})
     place(dict(inputs=t1, targets=t2, keys=[1,2,3])
   """
+
   def __init__(self, placements=None, **kwargs):
     if isinstance(placements, abc.Sequence):
       self.placements = dict(enumerate(placements))
@@ -38,13 +39,14 @@ class Place:
         for n, x in enumerate(batch)
       )
     elif isinstance(batch, abc.Mapping):
-      return batch.__class__({
-        k: x.to(**self.placements[n]) if n in self.placements else x
-        for k, x in batch.items()
-        })
+      return batch.__class__(
+        {
+          k: x.to(**self.placements[n]) if n in self.placements else x
+          for k, x in batch.items()
+        },
+      )
     elif self.placements is None and hasattr(batch, 'to'):
       return batch.to(**self.kwargs)
     else:
       # TODO: support dataclasses
       raise ValueError('Batch must be a collection or mappable type')
-

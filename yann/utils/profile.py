@@ -1,28 +1,35 @@
-from torch.autograd.profiler import profile
-from typing import Union, Tuple, Callable
+from typing import Callable, Tuple, Union
+
 import torch
+from torch.autograd.profiler import profile
+
 from .timer import Timer
 
 # TODO:
 # - https://github.com/pytorch/pytorch/issues/3749#issuecomment-374006211
 # - https://pytorch.org/docs/stable/bottleneck.html
 
+
 def param_count(model):
-  return sum(p.numel() for p in (model.parameters() if isinstance(model, torch.nn.Module) else model))
+  return sum(
+    p.numel()
+    for p in (model.parameters() if isinstance(model, torch.nn.Module) else model)
+  )
 
 
 def profile_module(
-    module,
-    input,
-    warmup=10,
-    iterations=20,
-    sync=True,
-    timer=None,
-    task_name='iteration',
-    jit=False
+  module,
+  input,
+  warmup=10,
+  iterations=20,
+  sync=True,
+  timer=None,
+  task_name='iteration',
+  jit=False,
 ):
   if jit:
     import torch.jit
+
     module = torch.jit.trace(module, input)
 
   for n in range(warmup):

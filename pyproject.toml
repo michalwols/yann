@@ -9,18 +9,20 @@ authors = [
 ]
 requires-python = ">=3.7"
 dependencies = [
-    "datasets>=2.13.2",
     "pyyaml>=6.0.1",
     "rich>=13.8.1",
-    "tokenizers>=0.13.3",
     "torch",
     "torchvision",
-    "transformers>=4.30.2",
 ]
 
 [project.optional-dependencies]
 cli = ["click>=6.7"]
 pretrainedmodels = ["pretrainedmodels"]
+transformers = [
+    "datasets>=2.13.2",
+    "tokenizers>=0.13.3", 
+    "transformers>=4.30.2",
+]
 
 [project.scripts]
 yann = "yann.cli:main"

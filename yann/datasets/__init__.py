@@ -1,19 +1,24 @@
 import os
 from glob import iglob
-from typing import Union, Iterable, Any
+from typing import Any, Iterable, Union
 
 import torch
 from torch.utils import data
 
-from .wrappers import LookupCache, DatasetWrapper, TransformDataset, IncludeIndex, IndexedView, Subset
 from ..data.classes import Classes
+from .wrappers import (
+  DatasetWrapper,
+  IncludeIndex,
+  IndexedView,
+  LookupCache,
+  Subset,
+  TransformDataset,
+)
 
 
 class Dataset(data.Dataset):
   def state_dict(self):
-    return {
-      'name': self.__class__.__name__
-    }
+    return {'name': self.__class__.__name__}
 
 
 class SupervisedDataset(Dataset):
@@ -77,16 +82,20 @@ class TinyDigits(data.TensorDataset):
   """
 
   def __init__(self, num_classes=10):
-    from sklearn.datasets import load_digits
+    try:
+      from sklearn.datasets import load_digits
+    except ImportError:
+      raise ImportError(
+        "TinyDigits requires scikit-learn. Install it with: pip install scikit-learn"
+      )
+
     digits = load_digits(num_classes)
     super().__init__(
       torch.from_numpy(digits.images).unsqueeze(1).float(),
-      torch.Tensor(digits.target).long()
+      torch.Tensor(digits.target).long(),
     )
-
 
 
 # from .voc import VOCMultilabel
 # from .coco import CocoMultilabel
 # from .imagenette import Imagenette, Imagewoof
-

@@ -1,7 +1,6 @@
 import torch
 
 
-
 class SelectiveBackprop(torch.nn.Module):
   def __init__(self, model, loss, k=None, percent=None, min=None):
     super(SelectiveBackprop, self).__init__()
@@ -25,13 +24,9 @@ class SelectiveBackprop(torch.nn.Module):
           indices = losses >= min
         # elif self.percent:
 
-
       inputs, targets = inputs[indices], targets[indices]
       outputs = self.model(inputs)
       loss = self.loss(outputs, targets)
       return loss
     else:
       return self.model(inputs)
-
-
-

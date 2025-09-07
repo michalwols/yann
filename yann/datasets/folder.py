@@ -1,4 +1,5 @@
-from torchvision.datasets.folder import ImageFolder as IF, default_loader
+from torchvision.datasets.folder import ImageFolder as IF
+from torchvision.datasets.folder import default_loader
 
 from yann.data import Classes
 
@@ -10,14 +11,14 @@ class ImageFolder(IF):
     transform=None,
     target_transform=None,
     loader=default_loader,
-    is_valid_file=None
+    is_valid_file=None,
   ):
     super(ImageFolder, self).__init__(
       root=root,
       transform=transform,
       target_transform=target_transform,
       loader=loader,
-      is_valid_file=is_valid_file
+      is_valid_file=is_valid_file,
     )
 
     self.classes = Classes(self.classes)

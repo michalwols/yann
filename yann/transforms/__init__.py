@@ -1,16 +1,23 @@
 import base64
-import os
-from typing import Protocol, Any
 import io
-import numpy as np
+import os
 import pathlib
-import torch
 import random
+from typing import Any, Protocol
+
+import numpy as np
+import torch
 from PIL import Image
-from timm.data.mixup import rand_bbox
+from torchvision import transforms
 from torchvision import transforms as tvt
 from torchvision.transforms.functional import to_pil_image
-from torchvision import transforms
+
+try:
+  from timm.data.mixup import rand_bbox
+except ImportError:
+  HAS_TIMM = False
+else:
+  HAS_TIMM = True
 
 from ..utils import truthy
 
@@ -21,17 +28,11 @@ class Transform(Protocol):
 
 
 class FittableTransform(Transform):
-  def fit(self, x: Any):
-    ...
+  def fit(self, x: Any): ...
 
-  def transform(self, x: Any) -> Any:
-    ...
+  def transform(self, x: Any) -> Any: ...
 
-  def fit_transform(self, x: Any) -> Any:
-    ...
-
-
-
+  def fit_transform(self, x: Any) -> Any: ...
 
 
 class Transforms:
@@ -58,40 +59,38 @@ class Transforms:
 
   def __repr__(self):
     return (
-      f"{self.__class__.__name__}(\n"
-      f"  load={str(self.load)}\n"
-      f"  transform={str(self.transform)}\n"
-      f"  to_tensor={str(self.to_tensor)}\n"
-      ")")
+      f'{self.__class__.__name__}(\n'
+      f'  load={str(self.load)}\n'
+      f'  transform={str(self.transform)}\n'
+      f'  to_tensor={str(self.to_tensor)}\n'
+      ')'
+    )
 
 
-
-
-
- # for backwards compatibility after rename, to avoid confusion with "Transformers"
+# for backwards compatibility after rename, to avoid confusion with "Transformers"
 Transformer = Transforms
 
 
 class ImageTransforms(Transforms):
   def __init__(
-      self,
-      load=None,
-      resize=None,
-      rotate=None,
-      crop=None,
-      warp=None,
-      mirror=None,
-      mean=None,
-      std=None,
-      color_jitter=None,
-      interpolation=None,
-      color_space=None,
-      transform=None,
-      to_tensor=None,
-      autoaugment=None,
-      randaugment=None,
-      trivialaugment=None,
-      erase=None
+    self,
+    load=None,
+    resize=None,
+    rotate=None,
+    crop=None,
+    warp=None,
+    mirror=None,
+    mean=None,
+    std=None,
+    color_jitter=None,
+    interpolation=None,
+    color_space=None,
+    transform=None,
+    to_tensor=None,
+    autoaugment=None,
+    randaugment=None,
+    trivialaugment=None,
+    erase=None,
   ):
     interpolation = interpolation or Image.ANTIALIAS
     self.resize = resize and tvt.Resize(resize, interpolation=interpolation)
@@ -102,10 +101,11 @@ class ImageTransforms(Transforms):
       else tvt.CenterCrop(crop)
     )
     self.mirror = mirror and tvt.RandomHorizontalFlip(
-      .5 if mirror is True else mirror)
+      0.5 if mirror is True else mirror,
+    )
 
     if color_jitter is True:
-      color_jitter = (.4, .2, .1, .05)
+      color_jitter = (0.4, 0.2, 0.1, 0.05)
     self.color_jitter = color_jitter and tvt.ColorJitter(*color_jitter)
 
     self.normalize = (mean or std) and tvt.Normalize(mean=mean, std=std)
@@ -120,25 +120,25 @@ class ImageTransforms(Transforms):
     self.randaugment = randaugment and tvt.RandAugment()
     self.trivialaugment = trivialaugment and tvt.TrivialAugmentWide()
 
-
     super().__init__(
       load=load or GetImage(color_space),
-      transform=tvt.Compose(truthy([
-        self.resize,
-        transform,
-        self.autoagument,
-        self.randaugment,
-        self.trivialaugment,
-        self.rotate,
-        self.crop,
-        self.mirror,
-        self.color_jitter,
-      ])),
-      to_tensor=to_tensor or tvt.Compose(truthy([
-        tvt.ToTensor(),
-        self.normalize,
-        self.erase
-      ]))
+      transform=tvt.Compose(
+        truthy(
+          [
+            self.resize,
+            transform,
+            self.autoagument,
+            self.randaugment,
+            self.trivialaugment,
+            self.rotate,
+            self.crop,
+            self.mirror,
+            self.color_jitter,
+          ],
+        ),
+      ),
+      to_tensor=to_tensor
+      or tvt.Compose(truthy([tvt.ToTensor(), self.normalize, self.erase])),
     )
 
   def state_dict(self):
@@ -148,7 +148,7 @@ class ImageTransforms(Transforms):
     pass
 
 
- # for backwards compatibility after rename, to avoid confusion with "Transformers"
+# for backwards compatibility after rename, to avoid confusion with "Transformers"
 ImageTransformer = ImageTransforms
 
 
@@ -158,8 +158,7 @@ class DictTransforms:
 
   def __call__(self, data: dict):
     return {
-      k: (self.transforms[k](v) if k in self.transforms else v)
-      for k, v in data.items()
+      k: (self.transforms[k](v) if k in self.transforms else v) for k, v in data.items()
     }
 
 
@@ -169,7 +168,6 @@ class BatchTransforms:
 
   def __call__(self, items):
     return [self.transform(x) for x in items]
-
 
 
 class GetImage:
@@ -199,6 +197,7 @@ def get_image(x, space=None) -> Image.Image:
   if isinstance(x, str):
     if x.startswith('http') or x.startswith('www.'):
       import requests
+
       x = requests.get(x).content
     elif x.startswith('data') and 'base64,' in x:
       # data header for base64 encoded
@@ -233,7 +232,7 @@ def mixup(inputs, targets, alpha=1):
   fraction = np.random.beta(alpha, alpha)
   return (
     fraction * inputs + (1 - fraction) * inputs[shuffled_indices],
-    fraction * targets + (1 - fraction) * targets[shuffled_indices]
+    fraction * targets + (1 - fraction) * targets[shuffled_indices],
   )
 
 
@@ -245,7 +244,7 @@ class Mixup:
     return mixup(inputs=inputs, targets=targets, alpha=self.alpha)
 
 
-def cutout(img, percent=.3, value=0):
+def cutout(img, percent=0.3, value=0):
   pil_img = False
   if isinstance(img, Image.Image):
     img = np.array(img)
@@ -258,33 +257,38 @@ def cutout(img, percent=.3, value=0):
   start_h = random.randint(0, (height - mask_height))
   start_w = random.randint(0, (width - mask_width))
 
-  img[start_h:start_h + mask_height, start_w:start_w + mask_width] = value
+  img[start_h : start_h + mask_height, start_w : start_w + mask_width] = value
   return Image.fromarray(img) if pil_img else img
 
 
-def cutmix(inputs, targets, beta):
-  lam = np.random.beta(beta, beta)
-  rand_index = torch.randperm(inputs.size()[0]).cuda()
-  target_a = targets
-  target_b = targets[rand_index]
-  bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
-  inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
-  # adjust lambda to exactly match pixel ratio
-  lam = 1 - (
-        (bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+if HAS_TIMM:
 
+  def cutmix(inputs, targets, beta):
+    lam = np.random.beta(beta, beta)
+    rand_index = torch.randperm(inputs.size()[0]).cuda()
+    target_a = targets
+    target_b = targets[rand_index]
+    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+    inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[
+      rand_index,
+      :,
+      bbx1:bbx2,
+      bby1:bby2,
+    ]
+    # adjust lambda to exactly match pixel ratio
+    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
 
 
 def get_imagenet_transforms(
-    size=224,
-    crop_scale=(.5, 1.2),
-    val_size=None,
-    resize=256,
-    fixres=False,
-    trivial=False,
-
+  size=224,
+  crop_scale=(0.5, 1.2),
+  val_size=None,
+  resize=256,
+  fixres=False,
+  trivial=False,
 ):
-  augment = transforms.Compose([
+  augment = transforms.Compose(
+    [
       transforms.RandomResizedCrop(
         size,
         scale=crop_scale,
@@ -294,32 +298,41 @@ def get_imagenet_transforms(
       #     .3, .3, .3
       # ),
       transforms.RandomHorizontalFlip(),
-    ])
+    ],
+  )
 
   train_transform = Transforms(
     load=GetImage('RGB'),
     transform=augment,
-    to_tensor=transforms.Compose([
-      transforms.ToTensor(),
-      # transforms.RandomErasing(),
-      transforms.Normalize(
+    to_tensor=transforms.Compose(
+      [
+        transforms.ToTensor(),
+        # transforms.RandomErasing(),
+        transforms.Normalize(
           mean=[0.485, 0.456, 0.406],
-          std=[0.229, 0.224, 0.225])
-    ])
+          std=[0.229, 0.224, 0.225],
+        ),
+      ],
+    ),
   )
 
   test_transform = Transforms(
     load=train_transform.load,
-    transform=transforms.Compose([
-      transforms.Resize(val_size or size, interpolation=Image.ANTIALIAS),
-      transforms.CenterCrop(val_size or size)
-    ]),
-    to_tensor=transforms.Compose([
-      transforms.ToTensor(),
-      transforms.Normalize(
+    transform=transforms.Compose(
+      [
+        transforms.Resize(val_size or size, interpolation=Image.ANTIALIAS),
+        transforms.CenterCrop(val_size or size),
+      ],
+    ),
+    to_tensor=transforms.Compose(
+      [
+        transforms.ToTensor(),
+        transforms.Normalize(
           mean=[0.485, 0.456, 0.406],
-          std=[0.229, 0.224, 0.225])
-    ])
+          std=[0.229, 0.224, 0.225],
+        ),
+      ],
+    ),
   )
 
   return train_transform, test_transform

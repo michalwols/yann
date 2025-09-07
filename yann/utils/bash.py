@@ -1,4 +1,6 @@
+import shutil
 import subprocess
+
 
 def run(command):
   out = subprocess.check_output(command, shell=True)
@@ -7,7 +9,7 @@ def run(command):
 
 
 def git_hash():
-  return run('git rev-parse HEAD')
+  return run('git rev-parse --short HEAD')
 
 
 def git_commit(files='.', message='automated commit', branch=None):
@@ -36,9 +38,23 @@ def nvidia_smi():
 
 
 def pip_freeze():
-  return run('pip freeze')
+  try:
+    # Try standard pip first
+    return run('pip freeze')
+  except subprocess.CalledProcessError as e:
+    if e.returncode == 127:
+      # If pip is not found, try uv pip freeze
+      try:
+        return run('uv pip freeze')
+      except subprocess.CalledProcessError as uv_e:
+        print(
+          f"Warning: 'pip freeze' and 'uv pip freeze' failed. Requirements will not be saved. Error: {uv_e}",
+        )
+        return 'Could not determine requirements.'
+    else:
+      # Re-raise other pip errors
+      raise e
 
 
 def conda_list(explicit=False):
   return run(f'conda list {"--explicit" if explicit else ""}')
-

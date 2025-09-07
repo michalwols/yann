@@ -1,6 +1,6 @@
 import pathlib
-from yann.utils import print_tree
 
+from yann.utils import print_tree
 
 
 class Paths:
@@ -51,7 +51,7 @@ class Paths:
 
   @property
   def profile(self):
-      return self.root / 'profile'
+    return self.root / 'profile'
 
   @property
   def git_diff(self):

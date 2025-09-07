@@ -1,8 +1,7 @@
 import sys
-from sklearn.metrics import classification_report, accuracy_score
-from .base import Callback
 
 from ..metrics import get_preds
+from .base import Callback
 
 
 class MulticlassEval(Callback):
@@ -19,13 +18,23 @@ class MulticlassEval(Callback):
 
     preds, targets = preds.to('cpu').numpy(), targets.to('cpu').numpy()
 
-    print(classification_report(targets, preds, target_names=classes),
-          file=self.dest)
+    from sklearn.metrics import accuracy_score, classification_report
+
+    print(
+      classification_report(targets, preds, target_names=classes),
+      file=self.dest,
+    )
 
     print('Accuracy: ', accuracy_score(targets, preds))
 
-  def on_validation_end(self, targets=None, outputs=None, loss=None,
-                        trainer=None, **kwargs):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+    **kwargs,
+  ):
     self(targets=targets, outputs=outputs, trainer=trainer)
 
 

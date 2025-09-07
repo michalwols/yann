@@ -1,8 +1,7 @@
-import torch
 import pytest
+import torch
 
 from yann.data.place import Place
-
 
 devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 
@@ -10,7 +9,8 @@ devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 @pytest.mark.parametrize('device', devices)
 def test_place(device):
   import torch
-  tuple_batch = (torch.rand(3,3), torch.rand(3,1), 'foo')
+
+  tuple_batch = (torch.rand(3, 3), torch.rand(3, 1), 'foo')
 
   place = Place(('cpu', device))
   b = place(tuple_batch)

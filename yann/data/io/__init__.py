@@ -1,10 +1,10 @@
+import csv
+import gzip
 import json
 import os
 import pickle as pkl
 import tarfile
 from collections import namedtuple
-import csv
-import gzip
 from pathlib import Path
 from typing import Union
 
@@ -13,11 +13,18 @@ import torch
 
 class Loader:
   """
-    gs://bucket/file.th
-    ./foo/**/*.jpg
+  gs://bucket/file.th
+  ./foo/**/*.jpg
   """
 
-  def __call__(self, path, format=None, deserialize=None, filesystem=None, **kwargs):
+  def __call__(
+    self,
+    path,
+    format=None,
+    deserialize=None,
+    filesystem=None,
+    **kwargs,
+  ):
     path = Path(path)
     format = format or path.suffix[1:]
     if hasattr(self, format):
@@ -35,23 +42,28 @@ class Loader:
 
   def parquet(self, path, **kwargs):
     import pandas as pd
+
     return pd.read_parquet(path, **kwargs)
 
   def csv(self, path, **kwargs):
     import pandas as pd
+
     return pd.read_csv(path, **kwargs)
 
   def tsv(self, path, **kwargs):
     import pandas as pd
+
     return pd.read_csv(path, **kwargs)
 
   def yaml(self, path, **kwargs):
     import yaml
+
     with open(path, 'r') as f:
       return yaml.load(f, yaml.SafeLoader)
 
   def image(self, path, **kwargs):
     import PIL.Image
+
     return PIL.Image.open(path)
 
   png = image
@@ -68,8 +80,10 @@ load = Loader()
 
 def to_pyarrow_table(x):
   import pyarrow as pa
+
   try:
     import pandas as pd
+
     if isinstance(x, pd.DataFrame):
       x = pa.Table.from_pandas(x)
   except ImportError:
@@ -80,9 +94,16 @@ def to_pyarrow_table(x):
 
   return x
 
+
 class Saver:
   def __call__(
-    self, x, path, format=None, serialize=None, filesystem=None, **kwargs
+    self,
+    x,
+    path,
+    format=None,
+    serialize=None,
+    filesystem=None,
+    **kwargs,
   ):
     path = Path(path)
     format = format or path.suffix[1:]
@@ -102,28 +123,33 @@ class Saver:
 
   def yaml(self, x, path, **kwargs):
     import yaml
+
     with open(path, 'w') as f:
       yaml.dump(x, f, sort_keys=False)
 
   def csv(self, x, path, **kwargs):
     import pyarrow.csv as csv
+
     x = to_pyarrow_table(x)
     csv.write_csv(x, path, **kwargs)
 
   def parquet(
-      self, x: Union['pandas.Dataframe', 'pyarrow.Table'],
-      path,
-      **kwargs
+    self,
+    x: Union['pandas.Dataframe', 'pyarrow.Table'],
+    path,
+    **kwargs,
   ):
-    import pyarrow.parquet as pq
     import pyarrow as pa
+    import pyarrow.parquet as pq
 
     x = to_pyarrow_table(x)
 
     if isinstance(x, pa.Table):
       pq.write_table(x, path, **kwargs)
     else:
-      raise ValueError(f'Unsupported type {type(x)} expected pandas.Dataframe or pyarrow.Table')
+      raise ValueError(
+        f'Unsupported type {type(x)} expected pandas.Dataframe or pyarrow.Table',
+      )
 
   def pickle(self, x, path, **kwargs):
     return save_pickle(x, path, **kwargs)
@@ -132,6 +158,7 @@ class Saver:
   yml = yaml
   pt = th
   pth = th
+
 
 save = Saver()
 
@@ -187,8 +214,9 @@ def untar(path):
 
 def unzip(zip, dest):
   import zipfile
+
   with zipfile.ZipFile(zip, 'r') as f:
-      f.extractall(dest)
+    f.extractall(dest)
 
 
 def iter_csv(path, header=True, tuples=True, sep=',', quote='"', **kwargs):

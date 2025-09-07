@@ -23,11 +23,3 @@ class BaseTrainer:
   @classmethod
   def from_checkpoint(cls, path):
     pass
-
-
-
-
-
-
-
-

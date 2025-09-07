@@ -1,18 +1,28 @@
 from collections import OrderedDict, defaultdict
-from contextlib import contextmanager, ContextDecorator
-
+from contextlib import ContextDecorator, contextmanager
 from datetime import datetime
+
 import torch.cuda
 
 from ..viz.plot import plot_timeline
 
+
 def time(name=None, sync=False):
   return Task(name=name, sync=sync, log=True)
+
 
 class Task(ContextDecorator):
   __slots__ = ('name', 'start_time', 'end_time', 'meta', 'sync', 'log')
 
-  def __init__(self, name=None, start=None, end=None, meta=None, sync=False, log=False):
+  def __init__(
+    self,
+    name=None,
+    start=None,
+    end=None,
+    meta=None,
+    sync=False,
+    log=False,
+  ):
     self.name = name
     self.start_time = start
     self.end_time = end
@@ -63,7 +73,10 @@ class Task(ContextDecorator):
     self.end()
 
   def __repr__(self):
-    return f"Task({self.name or id(self)}, seconds={self.seconds:.9g}, sync={self.sync})"
+    return (
+      f'Task({self.name or id(self)}, seconds={self.seconds:.9g}, sync={self.sync})'
+    )
+
 
 class Timer:
   def __init__(self, name=None, log=False):
@@ -75,10 +88,13 @@ class Timer:
 
   def start(self, name, sync=True, **meta):
     task = self.task(name, sync=sync, **meta)
-    if self.log: print('Started', name)
+    if self.log:
+      print('Started', name)
 
     if task in self.active_tasks:
-      raise ValueError(f'Nesting tasks is not allowed, "{name}" was already started and not finished')
+      raise ValueError(
+        f'Nesting tasks is not allowed, "{name}" was already started and not finished',
+      )
     self.active_tasks[name] = task
 
   def end(self, name, sync=True, **meta):
@@ -104,4 +120,3 @@ class Timer:
 
   def plot(self):
     plot_timeline(self.tasks)
-

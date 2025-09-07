@@ -1,8 +1,15 @@
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
-from typing import Union, Iterable, Optional, Callable
+from typing import Callable, Iterable, Optional, Union
+
+from torch.utils.data import (
+  DataLoader,
+  Dataset,
+  RandomSampler,
+  SequentialSampler,
+)
+
+import yann
 
 from ..datasets import TransformDataset
-import yann
 
 
 class LoopedDataLoader(DataLoader):
@@ -14,6 +21,7 @@ class LoopedDataLoader(DataLoader):
 
   # might be fixed here https://github.com/pytorch/pytorch/pull/35795
   """
+
   def __init__(self, *args, **kwargs):
     super(DataLoader, self).__init__(*args, **kwargs)
     self.__initialized = False
@@ -40,14 +48,16 @@ class LoopSampler:
 
 class TransformLoader(DataLoader):
   def __init__(self, dataset, transform, **kwargs):
-    super(TransformLoader, self
-         ).__init__(TransformDataset(dataset, transform), **kwargs)
+    super(TransformLoader, self).__init__(
+      TransformDataset(dataset, transform),
+      **kwargs,
+    )
 
 
 def loader(
   data: Union[str, Iterable, Dataset, DataLoader],
   transform: Optional[Callable] = None,
-  **kwargs
+  **kwargs,
 ):
   """instantiate a loader from a dataset name, dataset or loader"""
   if isinstance(data, DataLoader):

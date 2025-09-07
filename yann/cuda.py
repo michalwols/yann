@@ -1,7 +1,6 @@
 import torch
 
 
-
 def device_info(d=None):
   d = d or torch.cuda.current_device()
   return {

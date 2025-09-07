@@ -1,8 +1,8 @@
-from torch import nn
 import torch
-from yann.typedefs import Logits, MultiLabelOneHot
+from torch import nn
 
 from yann.modules.loss import _reduce
+from yann.typedefs import Logits, MultiLabelOneHot
 
 
 class AsymmetricLoss(nn.Module):
@@ -25,7 +25,14 @@ class AsymmetricLoss(nn.Module):
     https://github.com/Alibaba-MIIL/ASL
   """
 
-  def __init__(self, neg_decay=4, pos_decay=1, prob_shift=0.05, eps=1e-8, reduction='mean'):
+  def __init__(
+    self,
+    neg_decay=4,
+    pos_decay=1,
+    prob_shift=0.05,
+    eps=1e-8,
+    reduction='mean',
+  ):
     super(AsymmetricLoss, self).__init__()
     self.pos_decay = pos_decay
     self.neg_decay = neg_decay
@@ -35,7 +42,6 @@ class AsymmetricLoss(nn.Module):
 
     self.reduction = reduction
     self.calculate_focal_loss_gradients = True
-
 
   def forward(self, inputs: Logits, targets: MultiLabelOneHot, reduction=None):
     pos_probs = torch.sigmoid(inputs)
@@ -47,7 +53,7 @@ class AsymmetricLoss(nn.Module):
       # paper claims this also helps handling mislabeled negative examples
       neg_probs = (neg_probs + self.prob_shift).clamp(max=1)
 
-    neg_targets = (1 - targets)
+    neg_targets = 1 - targets
 
     pos_losses = targets * torch.log(pos_probs.clamp(min=self.eps))
     neg_losses = neg_targets * torch.log(neg_probs.clamp(min=self.eps))
@@ -66,7 +72,7 @@ class AsymmetricLoss(nn.Module):
 class AsymmetricLossOptimized(AsymmetricLoss):
   def forward(self, inputs: Logits, targets: MultiLabelOneHot, reduction=None):
     self.targets = targets
-    self.neg_targets = (1 - self.targets)
+    self.neg_targets = 1 - self.targets
 
     self.pos_probs = torch.sigmoid(inputs)
     self.neg_probs = 1 - self.pos_probs
@@ -83,7 +89,7 @@ class AsymmetricLossOptimized(AsymmetricLoss):
         self.neg_probs.mul_(self.neg_targets)
         weights = torch.pow(
           1 - self.pos_probs - self.neg_probs,
-          self.pos_decay * self.targets + self.neg_decay * self.neg_targets
+          self.pos_decay * self.targets + self.neg_decay * self.neg_targets,
         )
       self.losses *= weights
 

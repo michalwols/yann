@@ -1,20 +1,32 @@
-from torch import distributed as dist
-import torch
 import os
 from typing import NamedTuple, Union
+
+import torch
+from torch import distributed as dist
 
 
 class Dist:
   """
   torch.distributed wrapper that also supports non distributed mode
   """
-  def __init__(self, backend='nccl', init_method='env://', world_size=None, rank=None):
+
+  def __init__(
+    self,
+    backend='nccl',
+    init_method='env://',
+    world_size=None,
+    rank=None,
+  ):
     self.backend = backend
     self.init_method = init_method
 
     self.world_size = int(
-        world_size if world_size is not None else
-        os.environ.get('WORLD_SIZE', torch.cuda.device_count() if torch.cuda.is_available() else 1)
+      world_size
+      if world_size is not None
+      else os.environ.get(
+        'WORLD_SIZE',
+        torch.cuda.device_count() if torch.cuda.is_available() else 1,
+      ),
     )
     self.rank = rank if rank is not None else int(os.environ.get('RANK', 0))
     self.local_rank = int(os.environ.get('LOCAL_RANK', 0))
@@ -27,7 +39,7 @@ class Dist:
       backend=self.backend,
       init_method=self.init_method,
       world_size=self.world_size,
-      rank=self.rank
+      rank=self.rank,
     )
 
     if self.backend == 'nccl':
@@ -44,11 +56,11 @@ class Dist:
 
   @property
   def is_enabled(self):
-    return "RANK" in os.environ and "WORLD_SIZE" in os.environ
+    return 'RANK' in os.environ and 'WORLD_SIZE' in os.environ
 
   @property
   def device(self):
-    return f"cuda:{self.local_rank}"
+    return f'cuda:{self.local_rank}'
 
   @property
   def is_main(self):
@@ -74,12 +86,9 @@ class Dist:
     )"""
 
 
-
-
 class DistPlacement(NamedTuple):
   rank: Union[int, None] = None
   local_rank: Union[int, None] = None
-
 
 
 def matches(placement: Union[int, DistPlacement, None], dist: Dist):

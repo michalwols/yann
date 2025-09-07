@@ -1,7 +1,5 @@
-
 from functools import update_wrapper
 from typing import Any
-
 
 
 class Scheduler:
@@ -60,10 +58,8 @@ def scheduled(*, get_step=None, **params):
   Returns:
 
   """
+
   def decorator(func):
     return Scheduled(func, **params, get_step=get_step)
 
   return decorator
-
-
-

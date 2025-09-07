@@ -1,10 +1,11 @@
-import lmdb
-import pickle
 import json
+import pickle
 from contextlib import contextmanager
 
-from ..serialize import serialize_arrow, deserialize_arrow, to_bytes, to_unicode
-from ..images import image_to_bytes, image_from_bytes
+import lmdb
+
+from ..images import image_from_bytes, image_to_bytes
+from ..serialize import deserialize_arrow, serialize_arrow, to_bytes, to_unicode
 
 
 class LMDB:
@@ -35,14 +36,19 @@ class LMDB:
   def __getitem__(self, key):
     # TODO: support indexing multiple values
     if self._current_transaction:
-      return self.deserialize(self._current_transaction.get(self.serialize_key(key)))
+      return self.deserialize(
+        self._current_transaction.get(self.serialize_key(key)),
+      )
     else:
       with self.db.begin(write=False) as t:
         return self.deserialize(t.get(self.serialize_key(key)))
 
   def __setitem__(self, key, value):
     if self._current_transaction:
-      return self._current_transaction.put(self.serialize_key(key), self.serialize(value))
+      return self._current_transaction.put(
+        self.serialize_key(key),
+        self.serialize(value),
+      )
     else:
       with self.db.begin(write=True) as t:
         return t.put(self.serialize_key(key), self.serialize(value))
@@ -106,19 +112,19 @@ class ArrowLMDB(LMDB):
   """
 
   @staticmethod
-  def serialize_key(x): 
+  def serialize_key(x):
     return to_bytes(x)
 
   @staticmethod
-  def deserialize_key(x): 
+  def deserialize_key(x):
     return to_unicode(x)
 
   @staticmethod
-  def serialize(x): 
+  def serialize(x):
     return serialize_arrow(x)
 
   @staticmethod
-  def deserialize(x): 
+  def deserialize(x):
     return deserialize_arrow(x)
 
 

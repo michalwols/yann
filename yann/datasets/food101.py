@@ -20,18 +20,9 @@ class Food101(Dataset):
   url = 'http://data.vision.ee.ethz.ch/cvl/food-101.tar.gz'
   filename = 'food-101.tar.gz'
 
-  splits = {
-    'train',
-    'test'
-  }
+  splits = {'train', 'test'}
 
-  def __init__(
-      self,
-      root=None,
-      split='train',
-      download=False,
-      shuffle=True
-  ):
+  def __init__(self, root=None, split='train', download=False, shuffle=True):
     assert split in self.splits
     self.root = Path(root) if root else yann.default.dataset_root(Food101)
     self.root = self.root.expanduser()
@@ -42,8 +33,7 @@ class Food101(Dataset):
 
     with open(self.meta_path, 'r') as f:
       self.samples = [
-        (self.get_image_path(name.strip()), name.split('/')[0])
-        for name in f
+        (self.get_image_path(name.strip()), name.split('/')[0]) for name in f
       ]
 
     if shuffle:
@@ -70,11 +60,11 @@ class Food101(Dataset):
     extract(self.root / self.filename, self.root)
 
 
-
 class Food101N(Food101):
   """
   https://kuanghuei.github.io/Food-101N/
   """
+
   url = 'https://iudata.blob.core.windows.net/food101/Food-101N_release.zip'
   filename = 'Food-101N_release.zip'
   pass

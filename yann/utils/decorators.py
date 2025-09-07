@@ -1,5 +1,6 @@
 from functools import wraps
 
+
 class lazy:
   __slots__ = 'method', 'name'
 
@@ -34,6 +35,7 @@ def robust(x=None, exceptions=Exception, default=None):
   if callable(x):
     return RobustFunction(func=x, exceptions=exceptions, default=default)
   else:
+
     def decorator(x):
       return RobustFunction(func=x, exceptions=exceptions, default=default)
 
@@ -58,6 +60,7 @@ def track(x=None, sanitize=None):
   if callable(x):
     return FunctionTracker(func=x)
   else:
+
     def decorator(x):
       return FunctionTracker(func=x, sanitize=sanitize)
 

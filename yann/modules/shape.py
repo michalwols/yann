@@ -1,5 +1,7 @@
 from torch.nn import Module
+
 from ..exceptions import ShapeInferenceError
+
 
 class Reshape(Module):
   method = None
@@ -12,9 +14,7 @@ class Reshape(Module):
     return getattr(input, self.method)(*self.dims)
 
   def state_dict(self, destination=None, prefix='', keep_vars=False):
-    return {
-      'dims': self.dims
-    }
+    return {'dims': self.dims}
 
   def load_state_dict(self, state_dict, strict=True):
     self.dims = state_dict['dims']
@@ -72,9 +72,15 @@ class Infer(Module):
   def forward(self, x):
     if self.module is None:
       try:
-        self.module = self.cls(x.shape[self.shape_dim], *self.args, **self.kwargs)
+        self.module = self.cls(
+          x.shape[self.shape_dim],
+          *self.args,
+          **self.kwargs,
+        )
       except IndexError as e:
-        raise ShapeInferenceError(f"Improper shape dim ({self.shape_dim}) selected for {self.cls} with input of shape {x.shape}")
+        raise ShapeInferenceError(
+          f'Improper shape dim ({self.shape_dim}) selected for {self.cls} with input of shape {x.shape}',
+        )
     return self.module(x)
 
   @classmethod

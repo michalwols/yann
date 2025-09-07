@@ -1,3 +1,5 @@
+import math
+
 from torch import nn
 from torch.nn import init
 
@@ -20,3 +22,8 @@ def kaiming(model: nn.Module):
 
 
 msr = kaiming
+
+
+def linear_zero_bias(linear: nn.Module, num_classes):
+  init.zeros_(linear.weight)
+  init.constant_(linear.bias, -math.log(num_classes))

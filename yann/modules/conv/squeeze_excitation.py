@@ -1,10 +1,10 @@
 from torch import nn
-from ..stack import Stack
+
 from ..residual import Residual
+from ..stack import Stack
 
 
 class SqueezeExcitation(Residual):
-
   def __init__(self, channels: int, reduction: int):
     """
     Args:
@@ -18,8 +18,8 @@ class SqueezeExcitation(Residual):
         nn.Conv2d(channels, inner_channels, kernel_size=1, padding=0),
         nn.ReLU(inplace=True),
         nn.Conv2d(inner_channels, channels, kernel_size=1, padding=0),
-        nn.Sigmoid()
-      )
+        nn.Sigmoid(),
+      ),
     )
 
 

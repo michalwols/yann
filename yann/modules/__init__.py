@@ -4,15 +4,24 @@ from .conv import (
   ConvBlock,
   ConvBlock1x1,
   ConvBlock3x3,
+  DepthwiseConv2d,
+  DepthwiseSeparableConv2d,
+  EfficientChannelAttention,
   MixConv,
   SqueezeExcitation,
-  EfficientChannelAttention,
-  DepthwiseSeparableConv2d,
-  DepthwiseConv2d
 )
-from .shape import View, Flatten, Infer, Squeeze, Reshape, Permute, Transpose, FlattenSequences
-from .stack import Stack
 from .residual import Residual
+from .shape import (
+  Flatten,
+  FlattenSequences,
+  Infer,
+  Permute,
+  Reshape,
+  Squeeze,
+  Transpose,
+  View,
+)
+from .stack import Stack
 
 
 class Init:
@@ -23,7 +32,6 @@ class Init:
 
   def __call__(self, *args, **kwargs):
     return self.cls(*self.args, *args, **{**self.kwargs, **kwargs})
-
 
 
 class TrainEvalSwitch(nn.Module):

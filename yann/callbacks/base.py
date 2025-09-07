@@ -21,8 +21,15 @@ class Callback:
   def on_step_start(self, index=None, inputs=None, targets=None, trainer=None):
     pass
 
-  def on_step_end(self, index=None, inputs=None, targets=None, outputs=None, loss=None,
-                   trainer=None):
+  def on_step_end(
+    self,
+    index=None,
+    inputs=None,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     pass
 
   def on_epoch_end(self, epoch=None, loss=None, metrics=None, trainer=None):
@@ -31,11 +38,22 @@ class Callback:
   def on_validation_start(self, trainer=None):
     pass
 
-  def on_validation_batch(self, inputs=None, targets=None, outputs=None, trainer=None):
+  def on_validation_batch(
+    self,
+    inputs=None,
+    targets=None,
+    outputs=None,
+    trainer=None,
+  ):
     pass
 
-  def on_validation_end(self, targets=None, outputs=None, loss=None,
-                        trainer=None):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     pass
 
   def on_train_end(self, trainer=None):
@@ -69,8 +87,8 @@ class FunctionCallback(Callback):
   def on(self, event, callback):
     if event not in self._valid_names:
       raise ValueError(
-        f'{event} is not a valid option, '
-        f'must be one of {self._valid_names}')
+        f'{event} is not a valid option, must be one of {self._valid_names}',
+      )
     callbacks = self.callbacks[event]
     if callback not in callbacks:
       callbacks.append(callback)
@@ -78,6 +96,7 @@ class FunctionCallback(Callback):
   def on_init(self, *args, **kwargs):
     for f in self.callbacks['init']:
       f(*args, **kwargs)
+
   def on_train_start(self, *args, **kwargs):
     for f in self.callbacks['train_start']:
       f(*args, **kwargs)

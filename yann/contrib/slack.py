@@ -1,28 +1,42 @@
+import json
 import urllib
 import urllib.request
-import json
 
 from ..callbacks.base import Callback
+
 
 def post(url, data):
   data = json.dumps(data).encode('utf8')
   req = urllib.request.Request(
-    url, data=data, headers={'content-type': 'application/json'})
+    url,
+    data=data,
+    headers={'content-type': 'application/json'},
+  )
   return urllib.request.urlopen(req)
 
 
 DEFAULT_CHANNEL = '#training'
 
-def send(text, attachments=None, channel=None, username=None, icon=None,
-         url=None):
+
+def send(
+  text,
+  attachments=None,
+  channel=None,
+  username=None,
+  icon=None,
+  url=None,
+):
   """https://api.slack.com/docs/message-attachments"""
-  return post(url, {
-    'text': text,
-    'channel': channel or DEFAULT_CHANNEL,
-    'username': username,
-    'icon_emoji': icon and (icon if icon.startswith(':') else f':{icon}:'),
-    'attachments': attachments,
-  })
+  return post(
+    url,
+    {
+      'text': text,
+      'channel': channel or DEFAULT_CHANNEL,
+      'username': username,
+      'icon_emoji': icon and (icon if icon.startswith(':') else f':{icon}:'),
+      'attachments': attachments,
+    },
+  )
 
 
 def atch(title=None, text=None, fields=None, color=None, **kwargs):
@@ -31,10 +45,10 @@ def atch(title=None, text=None, fields=None, color=None, **kwargs):
     text=text,
     fields=[
       *(fields or {}),
-      *({'title': k, 'value': v} for k, v in kwargs.items())],
-    color=color)
-
-
+      *({'title': k, 'value': v} for k, v in kwargs.items()),
+    ],
+    color=color,
+  )
 
 
 class Slack(Callback):
@@ -52,7 +66,7 @@ class Slack(Callback):
       channel=self.channel,
       username=self.username,
       url=self.url,
-      **kwargs
+      **kwargs,
     )
 
   def on_train_start(self, trainer=None):
@@ -60,15 +74,20 @@ class Slack(Callback):
       text='Starting train run',
       attachments=[
         atch(experiment=trainer.name, text=trainer.description),
-        atch('Configuration', f"```{trainer}```", color='good'),
-      ]
+        atch('Configuration', f'```{trainer}```', color='good'),
+      ],
     )
 
-  def on_validation_end(self, targets=None, outputs=None, loss=None,
-                        trainer=None):
+  def on_validation_end(
+    self,
+    targets=None,
+    outputs=None,
+    loss=None,
+    trainer=None,
+  ):
     if self.validation:
       self.send(
-        text=f'Completed epoch {trainer.num_epochs} with loss: {loss.item()}'
+        text=f'Completed epoch {trainer.num_epochs} with loss: {loss.item()}',
       )
 
   def on_error(self, error, trainer=None):
@@ -77,8 +96,8 @@ class Slack(Callback):
       attachments=[
         atch(experiment=trainer.name),
         atch(epoch=trainer.num_epochs + 1),
-        atch('Exception', f"```{str(error)}```", color='danger'),
-      ]
+        atch('Exception', f'```{str(error)}```', color='danger'),
+      ],
     )
 
   def on_train_end(self, trainer=None):
