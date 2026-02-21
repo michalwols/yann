@@ -373,7 +373,7 @@ def train_mode(*modules):
 @contextmanager
 def optim_step(optimizer, zero_grad=True):
   if zero_grad:
-    optimizer.zero_grad()
+    optimizer.zero_grad(set_to_none=True)
 
   yield
 

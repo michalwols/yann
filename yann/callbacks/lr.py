@@ -3,6 +3,7 @@ import os
 from math import cos, pi
 
 import numpy as np
+import torch
 
 from .. import set_param
 from ..callbacks.base import Callback
@@ -143,7 +144,7 @@ class LRRangeTest(Callback):
       print(self)
 
   def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
-    self.losses.append(loss.item())
+    self.losses.append(loss.item() if torch.is_tensor(loss) else loss)
     self.avg_loss = exp_moving_avg(
       self.losses[-1],
       self.avg_loss,

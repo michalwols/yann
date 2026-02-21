@@ -62,7 +62,7 @@ class PagedMetricStore:
     """
     current_step = step if step is not None else len(self.steps)
     self.steps.append(
-      torch.tensor(current_step, dtype=torch.int64),
+      torch.as_tensor(current_step, dtype=torch.int64),
     )  # Steps always on CPU
 
     for name, value in metrics.items():
@@ -71,14 +71,12 @@ class PagedMetricStore:
         # Try to infer dtype, fallback to default
         dtype_to_use = getattr(value, 'dtype', self.default_dtype)
         try:
-          # Ensure value is compatible with tensor creation
-          value_tensor = torch.tensor(value, dtype=dtype_to_use)
+          value_tensor = torch.as_tensor(value, dtype=dtype_to_use)
         except TypeError:
-          # Fallback for non-numeric types if necessary, or raise error
-          value_tensor = torch.tensor(
+          value_tensor = torch.as_tensor(
             value,
             dtype=self.default_dtype,
-          )  # Re-attempt with default
+          )
       else:
         value_tensor = value
 

@@ -19,8 +19,8 @@ def inference_stream(
   transform=None,
   batch_size=64,
   parallel=False,
-  num_workers=1,
-  pin_memory=False,
+  num_workers=4,
+  pin_memory=True,
   shuffle=False,
   progress=10,
   eval=True,
@@ -57,9 +57,9 @@ def inference_stream(
 
   start = begin = time.time()
 
-  with torch.no_grad():
+  with torch.inference_mode():
     for idx, (inputs, *rest) in enumerate(data):
-      inputs = inputs.to(device)
+      inputs = inputs.to(device, non_blocking=True)
       outputs = model(inputs)
 
       yield (inputs, *rest, outputs)
