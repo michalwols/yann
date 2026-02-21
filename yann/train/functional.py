@@ -7,7 +7,7 @@ def step(
   callback: 'yann.callbacks.callback.Callback' = None,
 ):
   model.train()
-  optimizer.zero_grad()
+  optimizer.zero_grad(set_to_none=True)
 
   pred = model(inputs)
   loss = loss(pred, targets)
@@ -34,5 +34,5 @@ def train(
       inputs, targets = batch  # Traditional tuple unpacking
 
     if device:
-      inputs, targets = inputs.to(device), targets.to(device)
+      inputs, targets = inputs.to(device, non_blocking=True), targets.to(device, non_blocking=True)
     yield step(model, inputs, targets, optimizer, loss)

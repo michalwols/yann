@@ -593,6 +593,10 @@ class Trainer(TrainState, BaseTrainer):
     self.device = kwargs.pop('device', None) or self.device
     self.memory_format = kwargs.pop('memory_format', None) or self.memory_format
 
+    # Use non_blocking transfers to overlap data transfer with computation
+    # when pin_memory=True in the DataLoader
+    kwargs.setdefault('non_blocking', True)
+
     # FIXME: find better way to handle channels last for specific entries in batch
     # possibly let memory_format take a dict or list to match batch
     if self.memory_format == torch.channels_last:
@@ -741,7 +745,9 @@ class Trainer(TrainState, BaseTrainer):
     if self.callbacks:
       self.callbacks.on_validation_start(trainer=self)
 
-    ts, os, loss = [], [], None
+    ts, os = [], []
+    total_loss = 0.0
+    total_samples = 0
     if loader is not None:
       with torch.inference_mode():
         for inputs, targets, outputs in yann.evaluate(
@@ -756,13 +762,20 @@ class Trainer(TrainState, BaseTrainer):
               outputs=outputs,
               trainer=self,
             )
+          # Compute loss per batch to avoid accumulating all
+          # outputs in GPU memory before computing loss
+          if self.loss:
+            batch_loss = self.loss(outputs, targets)
+            batch_size = targets.shape[0]
+            total_loss += batch_loss.item() * batch_size
+            total_samples += batch_size
           ts.append(targets)
           os.append(outputs)
 
         ts = torch.cat(ts)
         os = torch.cat(os)
 
-        loss = self.loss(os, ts)
+    loss = total_loss / total_samples if total_samples > 0 else None
 
     if self.callbacks:
       self.callbacks.on_validation_end(
@@ -802,6 +815,10 @@ class Trainer(TrainState, BaseTrainer):
             )
             try:
               outputs, loss = self.step(inputs=inputs, targets=targets)
+              # Convert loss to Python scalar once to avoid multiple
+              # GPU-CPU sync points when callbacks each call .item()
+              if torch.is_tensor(loss):
+                loss = loss.detach().item()
             except KeyboardInterrupt as e:
               self.stop()
               break

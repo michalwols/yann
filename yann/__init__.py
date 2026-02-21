@@ -147,7 +147,7 @@ def evaluate(model, batches, device=None, transform=None):
         x, y = batch
 
       if device:
-        x, y = to(x, device=device), to(y, device=device)
+        x, y = to(x, device=device, non_blocking=True), to(y, device=device, non_blocking=True)
 
       pred = model(x)
 
