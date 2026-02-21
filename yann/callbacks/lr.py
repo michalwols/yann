@@ -202,7 +202,7 @@ class CyclicalLR(Callback):
     set_param(trainer.optimizer, 'lr', self.cur_lr)
 
   def on_step_end(self, index, inputs, targets, outputs, loss, trainer=None):
-    if self.cur_step % self.cycle_len // self.steps:
+    if (self.cur_step % self.cycle_len) // self.steps:
       self.cur_lr -= self.step
     else:
       self.cur_lr += self.step

@@ -148,10 +148,10 @@ class HyperParamsBase:
 
     try:
       data = yann.load(uri)
-    except:
+    except Exception:
       try:
         data = yann.utils.dynamic_import(uri)
-      except:
+      except Exception:
         raise ValueError('uri must be a file or fully qualified python path')
     return cls(**data)
 
@@ -167,7 +167,7 @@ class HyperParamsBase:
     if k in self.__fields__:
       for c in self._change_callbacks:
         c(k, v)
-    super.__setattr__(self, k, v)
+    super().__setattr__(k, v)
 
   def __iter__(self):
     return iter(self.keys())

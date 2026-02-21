@@ -80,6 +80,6 @@ class Keys(Tracker):
     for k in self.keys:
       try:
         values[k] = yann.nested_lookup(trainer, k)
-      except:
+      except (KeyError, AttributeError, IndexError):
         pass
     return values

@@ -39,11 +39,10 @@ class Tensorboard(Callback):
     ipython = get_ipython()
     ipython.magic('load_ext tensorboard')
 
-    if isinstance(self, (str, Path)):
-      # static method (Tensorboard.show())
-      ipython.magic(f'tensorboard --logdir {self}')
+    if isinstance(root, (str, Path)):
+      ipython.magic(f'tensorboard --logdir {root}')
     else:
-      ipython.magic(f'tensorboard --logdir {root or self.root or "./"}')
+      ipython.magic(f'tensorboard --logdir {self.root or "./"}')
 
   def close(self):
     if self.writer:

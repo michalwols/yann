@@ -9,7 +9,7 @@ def weighted_sum(tensors, weights):
     raise ValueError('must pass at least 2 tensors')
   s = tensors[0] * weights[0]
   for t, w in zip(tensors[1:], weights[1:]):
-    s.add_(w, t)
+    s.add_(t, alpha=w)
   return s
 
 

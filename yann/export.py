@@ -40,8 +40,17 @@ def export(
 
   path = Path(path)
 
+  export_format = kwargs.pop('export_format', None)
+
   if model:
-    if trace is not False and trace is not None:
+    if export_format == 'torch_export':
+      example_input = trace if trace is not False and trace is not None else None
+      if example_input is not None:
+        exported = torch.export.export(model, (example_input,))
+        torch.export.save(exported, os.path.join(path, 'model.pt2'))
+      else:
+        raise ValueError('torch_export format requires example input via trace=')
+    elif trace is not False and trace is not None:
       from torch import jit
 
       traced = jit.trace(model, trace)
@@ -77,6 +86,7 @@ def export(
 
   # Export environment information
   from .utils import get_env_info
+
   get_env_info(save_to_path=path)
 
   if tar:
@@ -111,7 +121,9 @@ def load(path, eval=True):
     path = Path(str(path).rstrip('.tar.gz'))
 
   p.model = None
-  if (path / 'model.th').exists():
+  if (path / 'model.pt2').exists():
+    p.model = torch.export.load(str(path / 'model.pt2')).module()
+  elif (path / 'model.th').exists():
     # weights_only=False needed for loading complete models (not just state dicts)
     p.model = torch.load(str(path / 'model.th'), weights_only=False)
   elif (path / 'model.traced.th').exists():

@@ -20,7 +20,7 @@ class ProgressBar(Callback):
     if self.notebook:
       try:
         from tqdm.notebook import tqdm
-      except:
+      except ImportError:
         from tqdm import tqdm
     else:
       from tqdm import tqdm

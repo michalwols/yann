@@ -54,10 +54,11 @@ class TestTrainerInitialization:
 
   def test_initialization_with_params_class(self):
     """Test initialization with Params class."""
+
     class TestParams(Trainer.Params):
       lr = 0.01
       batch_size = 32
-    
+
     params = TestParams()
     trainer = Trainer(params=params)
     assert trainer.params.lr == 0.01
@@ -156,7 +157,7 @@ class TestTrainerSetup:
     trainer = Trainer(device='cpu')
     assert trainer.params.device == 'cpu'
 
-  @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+  @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
   def test_device_cuda(self):
     """Test device setup for CUDA."""
     trainer = Trainer(device='cuda')
@@ -250,9 +251,10 @@ class TestTrainingLifecycle:
       loss=nn.CrossEntropyLoss(),
     )
     trainer(epochs=0)  # Initialize
-    
+
     batch = next(iter(trainer.loader))
-    loss = trainer.step(batch)
+    inputs, targets = batch
+    outputs, loss = trainer.step(inputs=inputs, targets=targets)
     assert loss is not None
     assert isinstance(loss.item(), float)
 
@@ -264,9 +266,10 @@ class TestTrainingLifecycle:
       loss=nn.CrossEntropyLoss(),
     )
     trainer(epochs=0)  # Initialize
-    
+
     batch = next(iter(trainer.loader))
-    output = trainer.forward(batch)
+    inputs, targets = batch
+    output = trainer.forward(inputs=inputs, targets=targets)
     assert output is not None
 
   def test_backward_pass(self, simple_model, simple_dataset):
@@ -278,11 +281,12 @@ class TestTrainingLifecycle:
       loss=nn.CrossEntropyLoss(),
     )
     trainer(epochs=0)  # Initialize
-    
+
     batch = next(iter(trainer.loader))
-    loss = trainer.forward(batch)
-    trainer.backward(loss)
-    
+    inputs, targets = batch
+    outputs, loss = trainer.forward(inputs=inputs, targets=targets)
+    loss.backward()
+
     # Check that gradients were computed
     for param in trainer.model.parameters():
       if param.requires_grad:
@@ -315,7 +319,7 @@ class TestCallbacksIntegration:
       callbacks=[Checkpoint(freq=1)],
     )
     trainer(epochs=2)
-    
+
     # Check that checkpoint files were created
     # The trainer creates a subdirectory structure
     checkpoint_dir = trainer.paths.checkpoints
@@ -324,18 +328,28 @@ class TestCallbacksIntegration:
 
   def test_custom_callback(self, simple_model, simple_dataset):
     """Test custom callback integration."""
+
     class TestCallback(Callback):
       def __init__(self):
         super().__init__()
         self.on_epoch_end_called = False
-        self.on_batch_end_called = False
-      
-      def on_epoch_end(self, trainer, **kwargs):
+        self.on_step_end_called = False
+
+      def on_epoch_end(self, epoch=None, trainer=None, **kwargs):
         self.on_epoch_end_called = True
-      
-      def on_batch_end(self, trainer, **kwargs):
-        self.on_batch_end_called = True
-    
+
+      def on_step_end(
+        self,
+        index=None,
+        inputs=None,
+        targets=None,
+        outputs=None,
+        loss=None,
+        trainer=None,
+        **kwargs,
+      ):
+        self.on_step_end_called = True
+
     callback = TestCallback()
     trainer = Trainer(
       model=simple_model,
@@ -345,9 +359,9 @@ class TestCallbacksIntegration:
       callbacks=[callback],
     )
     trainer(epochs=1)
-    
+
     assert callback.on_epoch_end_called
-    assert callback.on_batch_end_called
+    assert callback.on_step_end_called
 
   def test_multiple_callbacks(self, simple_model, simple_dataset):
     """Test multiple callbacks working together."""
@@ -376,7 +390,7 @@ class TestStateManagement:
       callbacks=[Checkpoint(freq=1)],
     )
     trainer(epochs=1)
-    
+
     # Check that checkpoint was created
     checkpoint_dir = trainer.paths.checkpoints
     assert checkpoint_dir.exists()
@@ -395,12 +409,12 @@ class TestStateManagement:
       callbacks=[Checkpoint(freq=1)],
     )
     trainer1(epochs=2)
-    
+
     # Get checkpoint file
     checkpoint_files = list(trainer1.paths.checkpoints.glob('*.th'))
     assert len(checkpoint_files) > 0
     checkpoint_path = checkpoint_files[0]
-    
+
     # Load into new trainer
     trainer2 = Trainer(
       model=simple_model,
@@ -424,12 +438,12 @@ class TestStateManagement:
       callbacks=[Checkpoint(freq=1)],
     )
     trainer1(epochs=2)
-    
+
     # Get checkpoint file
     checkpoint_files = list(trainer1.paths.checkpoints.glob('*.th'))
     assert len(checkpoint_files) > 0
     checkpoint_path = checkpoint_files[-1]  # Get last checkpoint
-    
+
     # Resume and train for 2 more epochs
     trainer2 = Trainer(
       root=temp_dir,
@@ -454,10 +468,12 @@ class TestStateManagement:
       classes=Classes.ordered(2),
     )
     trainer(epochs=1)
-    
+
     export_path = trainer.export()
     assert export_path.exists()
-    assert (export_path / 'model.th').exists() or (export_path / 'model.state_dict.th').exists()
+    assert (export_path / 'model.th').exists() or (
+      export_path / 'model.state_dict.th'
+    ).exists()
 
 
 # Test Advanced Features
@@ -474,7 +490,7 @@ class TestAdvancedFeatures:
     trainer(epochs=1)
     assert trainer.num_epochs == 1
 
-  @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+  @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
   def test_mixed_precision_training(self, simple_model, simple_dataset):
     """Test automatic mixed precision training."""
     trainer = Trainer(
@@ -499,7 +515,7 @@ class TestAdvancedFeatures:
       lr_scheduler='StepLR',
       lr_scheduler_params={'step_size': 1, 'gamma': 0.1},
     )
-    
+
     initial_lr = trainer.optimizer.param_groups[0]['lr']
     trainer(epochs=2)
     final_lr = trainer.optimizer.param_groups[0]['lr']
@@ -507,10 +523,11 @@ class TestAdvancedFeatures:
 
   def test_metrics_tracking(self, simple_model, simple_dataset):
     """Test custom metrics tracking."""
+
     def accuracy(output, target):
       pred = output.argmax(dim=1)
       return (pred == target).float().mean()
-    
+
     trainer = Trainer(
       model=simple_model,
       dataset=simple_dataset,
@@ -524,9 +541,10 @@ class TestAdvancedFeatures:
 
   def test_data_transforms(self, simple_model):
     """Test data transforms."""
+
     def transform(x):
       return x * 2
-    
+
     dataset = TensorDataset(torch.randn(100, 10), torch.randint(0, 2, (100,)))
     trainer = Trainer(
       model=simple_model,
@@ -621,7 +639,7 @@ class TestPerformanceFeatures:
       trainer(epochs=1)
       assert trainer.num_epochs == 1
     else:
-      pytest.skip("Multiple GPUs not available")
+      pytest.skip('Multiple GPUs not available')
 
   def test_compile_mode(self, simple_model, simple_dataset):
     """Test torch.compile mode."""
@@ -636,12 +654,12 @@ class TestPerformanceFeatures:
       trainer(epochs=1)
       assert trainer.num_epochs == 1
     else:
-      pytest.skip("torch.compile not available")
+      pytest.skip('torch.compile not available')
 
 
 # Test Registry Integration
 class TestRegistryIntegration:
-  @pytest.mark.skip(reason="Registry resolution needs proper setup")
+  @pytest.mark.skip(reason='Registry resolution needs proper setup')
   def test_resolve_model_by_name(self):
     """Test resolving model by name from registry."""
     trainer = Trainer(
@@ -677,12 +695,15 @@ class TestRegistryIntegration:
 
 # Test Distributed Training
 class TestDistributedTraining:
-  @pytest.mark.skipif(not torch.distributed.is_available(), reason="Distributed not available")
+  @pytest.mark.skipif(
+    not torch.distributed.is_available(),
+    reason='Distributed not available',
+  )
   def test_distributed_setup(self, simple_model, simple_dataset):
     """Test distributed training setup."""
     # This is a basic test - full distributed testing requires special setup
     from yann.distributed import Dist
-    
+
     dist = Dist(backend='gloo', init=False)  # Don't actually initialize
     trainer = Trainer(
       model=simple_model,
@@ -698,13 +719,14 @@ class TestDistributedTraining:
 class TestCustomStepFunctions:
   def test_custom_step_function(self, simple_model, simple_dataset):
     """Test using a custom step function."""
+
     def custom_step(trainer, batch):
       # Custom training step
       x, y = batch
       output = trainer.model(x)
       loss = trainer.loss(output, y)
       return loss
-    
+
     trainer = Trainer(
       model=simple_model,
       dataset=simple_dataset,
@@ -717,6 +739,7 @@ class TestCustomStepFunctions:
 
   def test_custom_forward_function(self, simple_model, simple_dataset):
     """Test using a custom forward function."""
+
     class CustomTrainer(Trainer):
       def forward(self, batch):
         # Custom forward logic
@@ -724,7 +747,7 @@ class TestCustomStepFunctions:
         output = self.model(x)
         loss = self.loss(output, y)
         return loss * 2  # Scale loss by 2
-    
+
     trainer = CustomTrainer(
       model=simple_model,
       dataset=simple_dataset,

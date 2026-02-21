@@ -6,8 +6,8 @@ from ..data import Classes
 class Classifier(nn.Module):
   classes: Classes
 
-  def __del__(self, cls):
-    raise NotImplementedError()
+  def __del__(self):
+    pass
 
   def add_class(self, name, weight=None, bias=None):
     # TODO: copy other class, average multiple classes
@@ -26,7 +26,7 @@ class LinearClassifier(Classifier):
     activation=None,
     test_activation=None,
   ):
-    super(Classifier, self).__init__()
+    super().__init__()
 
     self.linear = nn.Linear(in_features, len(classes), bias=bias)
     self.classes = classes

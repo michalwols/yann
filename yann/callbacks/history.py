@@ -113,7 +113,7 @@ class HistoryPlotter(Callback):
         from IPython.display import clear_output
 
         clear_output(wait=True)
-      except:
+      except ImportError:
         pass
 
     if validation:
@@ -246,7 +246,7 @@ class HistoryWriter(Callback):
         'step',
         *trainer.history.val_metrics.keys(),
       ]
-      self.val_file.write('\t'.join(self.header) + '\n')
+      self.val_file.write('\t'.join(self.val_header) + '\n')
 
     self.val_file.write(
       f'{trainer.history.val_metrics.times[-1]}\t'
@@ -268,8 +268,10 @@ class HistoryWriter(Callback):
     self.val_file = None
 
   def on_error(self, error, trainer=None):
-    self.train_file.close()
-    self.val_file.close()
+    if self.train_file:
+      self.train_file.close()
+    if self.val_file:
+      self.val_file.close()
 
     self.train_file = None
     self.val_file = None

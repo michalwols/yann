@@ -119,43 +119,39 @@ def plot_pred_scores(
       ax.set(yscale='log')
 
     if len(targets.shape) == 1:
-      sns.distplot(
+      sns.histplot(
         preds[targets != idx, idx],
         bins=50,
         kde=False,
-        rug=False,
-        hist_kws={'range': [0, 1]},
+        binrange=(0, 1),
         ax=ax,
         color='red',
         label='Negative',
       )
-      sns.distplot(
+      sns.histplot(
         preds[targets == idx, idx],
         bins=50,
         kde=False,
-        rug=False,
-        hist_kws={'range': [0, 1]},
+        binrange=(0, 1),
         ax=ax,
         color='blue',
         label='Positive',
       )
     else:
-      sns.distplot(
+      sns.histplot(
         preds[targets[:, idx] == 0, idx],
         bins=50,
         kde=False,
-        rug=False,
-        hist_kws={'range': [0, 1]},
+        binrange=(0, 1),
         ax=ax,
         color='red',
         label='Negative',
       )
-      sns.distplot(
+      sns.histplot(
         preds[targets[:, idx] == 1, idx],
         bins=50,
         kde=False,
-        rug=False,
-        hist_kws={'range': [0, 1]},
+        binrange=(0, 1),
         ax=ax,
         color='blue',
         label='Positive',

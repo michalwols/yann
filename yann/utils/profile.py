@@ -1,7 +1,7 @@
 from typing import Callable, Tuple, Union
 
 import torch
-from torch.autograd.profiler import profile
+from torch.profiler import profile
 
 from .timer import Timer
 

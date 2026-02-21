@@ -2,8 +2,8 @@ from typing import Optional
 
 try:
   import wandb
-except:
-  pass
+except ImportError:
+  wandb = None
 
 from yann.callbacks import Callback
 

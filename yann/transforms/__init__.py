@@ -92,7 +92,7 @@ class ImageTransforms(Transforms):
     trivialaugment=None,
     erase=None,
   ):
-    interpolation = interpolation or Image.ANTIALIAS
+    interpolation = interpolation or Image.LANCZOS
     self.resize = resize and tvt.Resize(resize, interpolation=interpolation)
     self.rotate = rotate and tvt.RandomRotation(rotate)
     self.crop = crop and (
@@ -207,7 +207,7 @@ def get_image(x, space=None) -> Image.Image:
       # assume no header base 64 image
       try:
         x = base64.b64decode(x)
-      except:
+      except Exception:
         pass
 
   if hasattr(x, 'read'):
@@ -265,7 +265,7 @@ if HAS_TIMM:
 
   def cutmix(inputs, targets, beta):
     lam = np.random.beta(beta, beta)
-    rand_index = torch.randperm(inputs.size()[0]).cuda()
+    rand_index = torch.randperm(inputs.size()[0], device=inputs.device)
     target_a = targets
     target_b = targets[rand_index]
     bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
@@ -321,7 +321,7 @@ def get_imagenet_transforms(
     load=train_transform.load,
     transform=transforms.Compose(
       [
-        transforms.Resize(val_size or size, interpolation=Image.ANTIALIAS),
+        transforms.Resize(val_size or size, interpolation=Image.LANCZOS),
         transforms.CenterCrop(val_size or size),
       ],
     ),

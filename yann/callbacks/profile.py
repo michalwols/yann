@@ -15,7 +15,7 @@ class Profile(Callback):
     if index == self.start_step:
       from torch.profiler import profile
 
-      self.profiler = profile(**kwargs)
+      self.profiler = profile(**self.profiler_args)
       self.profiler.start()
 
   def on_step_end(self, index=None, trainer=None, **kwargs):
@@ -31,7 +31,7 @@ class Profile(Callback):
 
     try:
       self.profiler.tensorboard_trace_handler(str(root / 'tensorboard'))
-    except:
+    except Exception:
       pass
 
     try:
@@ -39,7 +39,7 @@ class Profile(Callback):
         str(root / 'cpu.stacks'),
         metric='self_cpu_time_total',
       )
-    except:
+    except Exception:
       pass
 
     try:
@@ -47,5 +47,5 @@ class Profile(Callback):
         str(root / 'cuda.stacks'),
         metric='self_cuda_time_total',
       )
-    except:
+    except Exception:
       pass

@@ -37,9 +37,8 @@ def soft_target_cross_entropy(
 
 
 class SoftTargetCrossEntropyLoss(_Loss):
-  def __init__(self, smooth=None, reduce=True, dim=1, reduction='mean'):
-    super().__init__(reduce=reduce, reduction=reduction)
-    self.reduce = reduce
+  def __init__(self, smooth=None, dim=1, reduction='mean'):
+    super().__init__(reduction=reduction)
     self.reduction = reduction
     self.smooth = smooth
     self.dim = dim
@@ -49,7 +48,6 @@ class SoftTargetCrossEntropyLoss(_Loss):
       inputs,
       targets,
       smooth=self.smooth,
-      reduce=self.reduce,
       dim=self.dim,
       reduction=self.reduction,
     )

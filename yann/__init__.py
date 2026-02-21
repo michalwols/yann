@@ -106,17 +106,15 @@ def seed(val=1, deterministic=False):
     torch.cuda.manual_seed(val)
 
     if deterministic:
-      torch.cuda.deterministic = True
+      torch.use_deterministic_algorithms(True)
       # torch.cuda.benchmark = False
-  except:
+  except Exception:
     pass
   return val
 
 
 def get_item(x: Union[torch.Tensor, np.ndarray]):
   if torch.is_tensor(x):
-    if x.is_cuda:
-      x = x.cpu()
     return x.item()
   elif isinstance(x, np.ndarray):
     return x.item()
@@ -145,7 +143,7 @@ def evaluate(model, batches, device=None, transform=None):
       x, y = batch, batch  # Pass dict as both inputs and targets
     else:
       x, y = batch  # Traditional tuple unpacking
-    
+
     if device:
       x, y = to(x, device=device), to(y, device=device)
 
@@ -344,7 +342,7 @@ def eval_mode(*modules, grad=False):
         if train:
           m.train()
   else:
-    with torch.no_grad():
+    with torch.inference_mode():
       training = (m.training for m in modules)
       try:
         for m in modules:
@@ -456,18 +454,16 @@ def grad_norm(parameters, norm_type: float = 2.0):
   if len(parameters) == 0:
     return torch.tensor(0.0)
   device = parameters[0].grad.device
-  try:
-    from torch import inf
-  except ImportError:
-    from torch._six import inf
-
-  if norm_type == inf:
+  if norm_type == torch.inf:
     norms = [p.grad.detach().abs().max().to(device) for p in parameters]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
-    norm = torch.norm(
+    norm = torch.linalg.vector_norm(
       torch.stack(
-        [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters],
+        [
+          torch.linalg.vector_norm(p.grad.detach(), norm_type).to(device)
+          for p in parameters
+        ],
       ),
       norm_type,
     )
@@ -485,17 +481,15 @@ def param_norm(parameters, norm_type: float = 2.0):
   if len(parameters) == 0:
     return torch.tensor(0.0)
   device = parameters[0].device
-  try:
-    from torch import inf
-  except ImportError:
-    from torch._six import inf
-  if norm_type == inf:
+  if norm_type == torch.inf:
     norms = [p.detach().abs().max().to(device) for p in parameters]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
-    norm = torch.norm(
+    norm = torch.linalg.vector_norm(
       torch.stack(
-        [torch.norm(p.detach(), norm_type).to(device) for p in parameters],
+        [
+          torch.linalg.vector_norm(p.detach(), norm_type).to(device) for p in parameters
+        ],
       ),
       norm_type,
     )

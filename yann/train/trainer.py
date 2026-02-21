@@ -126,8 +126,10 @@ class Params(yann.params.HyperParams):
     None,
   ] = None
 
+  accumulation_steps: int = 1
+
   dist: Optional[Dist] = None
-  parallel: Union[None, Literal['dp', 'ddp']] = None
+  parallel: Union[None, Literal['dp', 'ddp', 'fsdp']] = None
 
   amp: bool = False
   grad_scaler: Optional[torch.amp.GradScaler] = None
@@ -138,7 +140,7 @@ class Params(yann.params.HyperParams):
   aot_autograd: bool = False
   cuda_graph: bool = False
 
-  compile: bool = False
+  compile: Union[bool, dict] = False
   tf32: bool = False
 
   step: Optional[Callable] = None
@@ -214,7 +216,9 @@ class Trainer(TrainState, BaseTrainer):
     self.params = (
       params
       if isinstance(params, self.Params)
-      else self.Params(params) if params else self.Params()
+      else self.Params(params)
+      if params
+      else self.Params()
     )
     self.params.update(kwargs)
 
@@ -245,32 +249,35 @@ class Trainer(TrainState, BaseTrainer):
     device = yann.default.device if device is None else device
     self.device = torch.device(device) if isinstance(device, str) else device
 
-    self.memory_format = yann.memory_formats.get(self.params.memory_format, self.params.memory_format)
+    self.memory_format = yann.memory_formats.get(
+      self.params.memory_format,
+      self.params.memory_format,
+    )
     self.dtype = self.params.dtype
 
     self.lr_batch_step = self.params.lr_batch_step
     self.none_grad = self.params.none_grad
 
-    self.model = yann.resolve.model(self.params.model, required=False, validate=callable)
+    self.model = yann.resolve.model(
+      self.params.model,
+      required=False,
+      validate=callable,
+    )
 
     if self.params.tf32:
       torch.backends.cuda.matmul.allow_tf32 = True
 
     compile_arg = self.params.compile
     if compile_arg:
-      if isinstance(compile_arg, dict):
-        self.model = torch.compile(self.model, **compile_arg)
-      else:
-        self.model = torch.compile(self.model)
+      compile_kwargs = compile_arg if isinstance(compile_arg, dict) else {}
+      compile_kwargs.setdefault('backend', 'inductor')
+      self.model = torch.compile(self.model, **compile_kwargs)
 
     if self.params.jit:
       self.model = torch.jit.script(self.model)
     if self.params.aot_autograd:
-      try:
-        from functorch.compile import memory_efficient_fusion
-      except ImportError:
-        raise ValueError('functorch must be installed for aot_autograd support')
-      self.model = memory_efficient_fusion(self.model)
+      if not compile_arg:
+        self.model = torch.compile(self.model, mode='max-autotune')
 
     self.loss = yann.resolve.loss(self.params.loss, required=False, validate=callable)
 
@@ -288,6 +295,7 @@ class Trainer(TrainState, BaseTrainer):
         self.place = self.params.place
       else:
         from yann.data.place import Place
+
         self.place = Place(self.params.place)
 
     self.to(device=self.device, memory_format=self.memory_format)
@@ -308,7 +316,7 @@ class Trainer(TrainState, BaseTrainer):
     if self.dist.is_main:
       try:
         yann.save.txt(git_diff(), self.paths.git_diff)
-      except:
+      except Exception:
         pass  # not in git repo
       yann.save.txt(pip_freeze(), self.paths.requirements)
 
@@ -322,7 +330,9 @@ class Trainer(TrainState, BaseTrainer):
     from yann.callbacks import get_callbacks
     from yann.callbacks.callbacks import Callbacks
 
-    callbacks = get_callbacks() if self.params.callbacks is True else self.params.callbacks
+    callbacks = (
+      get_callbacks() if self.params.callbacks is True else self.params.callbacks
+    )
     callbacks = callbacks or []
     callbacks = [
       c for c in callbacks if yann.distributed.matches(c.dist_placement, self.dist)
@@ -347,7 +357,14 @@ class Trainer(TrainState, BaseTrainer):
       if self.params.parallel == 'dp':
         if not isinstance(self.model, torch.nn.parallel.DataParallel):
           self.model = torch.nn.DataParallel(self.model)
-      elif self.params.parallel == 'ddp' or (self.params.parallel is None and self.dist.is_enabled):
+      elif self.params.parallel == 'fsdp':
+        from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+        self.model.to(self.device)
+        self.model = FSDP(self.model, device_id=self.dist.local_rank)
+      elif self.params.parallel == 'ddp' or (
+        self.params.parallel is None and self.dist.is_enabled
+      ):
         self.parallel = 'ddp'  # Store the effective parallel type
         if not isinstance(
           self.model,
@@ -367,14 +384,20 @@ class Trainer(TrainState, BaseTrainer):
     if self.dataset and self.params.subset is not None:
       self.dataset = yann.datasets.Subset(
         self.dataset,
-        *self.params.subset if isinstance(self.params.subset, tuple) else (self.params.subset,),
+        *self.params.subset
+        if isinstance(self.params.subset, tuple)
+        else (self.params.subset,),
       )
 
-    val_dataset = self.params.val_dataset # Temporary for split logic
+    val_dataset = self.params.val_dataset  # Temporary for split logic
     if isinstance(val_dataset, float):
       split = 1 - val_dataset
-      self.val_dataset_resolved = Subset(self.dataset, split, 1.0) # Resolved val dataset
-      self.dataset = Subset(self.dataset, 0, split) # Updated train dataset
+      self.val_dataset_resolved = Subset(
+        self.dataset,
+        split,
+        1.0,
+      )  # Resolved val dataset
+      self.dataset = Subset(self.dataset, 0, split)  # Updated train dataset
     else:
       self.val_dataset_resolved = yann.resolve.dataset(val_dataset, required=False)
 
@@ -414,7 +437,8 @@ class Trainer(TrainState, BaseTrainer):
           batch_sampler=self.params.batch_sampler,
           pin_memory=self.params.pin_memory,
           num_workers=self.params.num_workers,
-          persistent_workers=self.params.persistent_workers and self.params.num_workers > 0,
+          persistent_workers=self.params.persistent_workers
+          and self.params.num_workers > 0,
           prefetch_factor=self.params.prefetch_factor,
           **({'collate_fn': self.params.collate} if self.params.collate else {}),
         )
@@ -426,7 +450,8 @@ class Trainer(TrainState, BaseTrainer):
           shuffle=False if self.sampler else True,
           sampler=self.sampler,
           num_workers=self.params.num_workers,
-          persistent_workers=self.params.persistent_workers and self.params.num_workers > 0,
+          persistent_workers=self.params.persistent_workers
+          and self.params.num_workers > 0,
           prefetch_factor=self.params.prefetch_factor,
           **({'collate_fn': self.params.collate} if self.params.collate else {}),
         )
@@ -434,12 +459,17 @@ class Trainer(TrainState, BaseTrainer):
     if self.val_dataset_resolved and self.params.val_subset is not None:
       self.val_dataset_resolved = yann.datasets.Subset(
         self.val_dataset_resolved,
-        *self.params.val_subset if isinstance(self.params.val_subset, tuple) else (self.params.val_subset,),
+        *self.params.val_subset
+        if isinstance(self.params.val_subset, tuple)
+        else (self.params.val_subset,),
       )
 
     resolved_val_transform = self.params.val_transform or self.params.transform
     if resolved_val_transform and self.val_dataset_resolved:
-        self.val_dataset_resolved = TransformDataset(self.val_dataset_resolved, resolved_val_transform)
+      self.val_dataset_resolved = TransformDataset(
+        self.val_dataset_resolved,
+        resolved_val_transform,
+      )
 
     self.val_loader = self.params.val_loader or (
       self.val_dataset_resolved
@@ -493,7 +523,9 @@ class Trainer(TrainState, BaseTrainer):
     if self.params.grad_scaler is False:
       self.grad_scaler = None
     else:
-      self.grad_scaler = self.params.grad_scaler or (GradScaler() if self.params.amp else None)
+      self.grad_scaler = self.params.grad_scaler or (
+        GradScaler() if self.params.amp else None
+      )
 
   @property
   def root(self):
@@ -511,7 +543,7 @@ class Trainer(TrainState, BaseTrainer):
       if hasattr(self, 'dataset') and hasattr(value, 'dataset'):
         super(Trainer, self).__setattr__('dataset', value.dataset)
       if hasattr(value, 'batch_size'):
-        pass # batch_size is now only on params
+        pass  # batch_size is now only on params
     if key == 'batch_size':
       if self.params.batch_size != value:
         if hasattr(self, 'loader') and self.loader:
@@ -662,28 +694,33 @@ class Trainer(TrainState, BaseTrainer):
 
   def update(self, loss=None, inputs=None, targets=None, outputs=None):
     """
-    Handles resetting gradients, running backward pass and optimizer step
+    Handles resetting gradients, running backward pass and optimizer step.
+    Supports gradient accumulation via accumulation_steps param.
     """
+    accumulation_steps = self.params.accumulation_steps
+    should_step = (self.num_steps + 1) % accumulation_steps == 0
 
-    # TODO: add gradient accumulation
-
-    self.optimizer.zero_grad(set_to_none=self.none_grad)
+    if accumulation_steps > 1:
+      loss = loss / accumulation_steps
 
     if self.grad_scaler:
       self.grad_scaler.scale(loss).backward()
-      self.grad_scaler.step(self.optimizer)
 
-      if self.clip_grad:
-        self.grad_scaler.unscale_(self.optimizer)
-        self.clip_grad(self.model.parameters())
-      self.grad_scaler.update()
+      if should_step:
+        if self.clip_grad:
+          self.grad_scaler.unscale_(self.optimizer)
+          self.clip_grad(self.model.parameters())
+        self.grad_scaler.step(self.optimizer)
+        self.grad_scaler.update()
+        self.optimizer.zero_grad(set_to_none=self.none_grad)
     else:
       loss.backward()
 
-      if self.clip_grad:
-        self.clip_grad(self.model.parameters())
-
-      self.optimizer.step()
+      if should_step:
+        if self.clip_grad:
+          self.clip_grad(self.model.parameters())
+        self.optimizer.step()
+        self.optimizer.zero_grad(set_to_none=self.none_grad)
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
@@ -729,9 +766,11 @@ class Trainer(TrainState, BaseTrainer):
     return loss
 
   def run(self, epochs=None):
-    epochs = epochs or self._epochs
+    epochs = self._epochs if epochs is None else epochs
 
     self._stop = False
+    if self.optimizer:
+      self.optimizer.zero_grad(set_to_none=self.none_grad)
 
     if self.callbacks:
       try:
@@ -748,7 +787,7 @@ class Trainer(TrainState, BaseTrainer):
               inputs, targets = batch, batch  # Pass dict as both inputs and targets
             else:
               inputs, targets = batch  # Traditional tuple unpacking
-            
+
             self.callbacks.on_step_start(
               index=self.num_steps,
               inputs=inputs,
@@ -820,14 +859,18 @@ class Trainer(TrainState, BaseTrainer):
             inputs, targets = batch, batch  # Pass dict as both inputs and targets
           else:
             inputs, targets = batch  # Traditional tuple unpacking
-          
+
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
           if self.lr_scheduler and self.lr_batch_step:
             self.lr_scheduler.step(epoch=self.num_steps)
 
           self.num_steps += 1
-          self.num_samples += len(inputs) if not isinstance(inputs, dict) else len(next(iter(inputs.values())))
+          self.num_samples += (
+            len(inputs)
+            if not isinstance(inputs, dict)
+            else len(next(iter(inputs.values())))
+          )
 
         val_loss = self.validate() if self.val_loader else None
         self._lr_scheduler_step(
@@ -875,7 +918,7 @@ class Trainer(TrainState, BaseTrainer):
   ):
     # TODO: add 'latest', 'best' support
     log.info(f'Attempting to load checkpoint {path}')
-    data = torch.load(path, map_location=map_location)
+    data = torch.load(path, map_location=map_location, weights_only=False)
     self.load_state_dict(data, metadata=metadata, strict=strict, keys=keys)
 
   def export(self, path=None, trace=False, meta=None, postprocess=None):
