@@ -22,8 +22,8 @@ devices = ['cpu', 'cuda'] if torch.cuda.is_available() else ['cpu']
 @pytest.mark.parametrize('device', devices)
 def test_train(tmpdir, device):
   """Sanity check train run"""
-  
-  pytest.importorskip("sklearn", reason="scikit-learn not installed")
+
+  pytest.importorskip('sklearn', reason='scikit-learn not installed')
 
   model = nn.Sequential(
     nn.Conv2d(1, 20, 3),

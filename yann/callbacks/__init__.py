@@ -40,6 +40,7 @@ def get_callbacks(
   if tensorboard:
     try:
       from .tensorboard import Tensorboard
+
       tb = _maybe_init(tensorboard, Tensorboard)
     except ImportError:
       tb = None

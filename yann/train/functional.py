@@ -32,7 +32,7 @@ def train(
       inputs, targets = batch, batch  # Pass dict as both inputs and targets
     else:
       inputs, targets = batch  # Traditional tuple unpacking
-    
+
     if device:
       inputs, targets = inputs.to(device), targets.to(device)
     yield step(model, inputs, targets, optimizer, loss)

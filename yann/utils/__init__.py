@@ -19,18 +19,18 @@ from .ids import memorable_id
 
 def get_env_info(save_to_path=None):
   """Get environment dependencies and optionally save to files.
-  
+
   Args:
     save_to_path: Optional directory path to save environment files
                   (env.yml for conda, requirements.txt for pip)
-  
+
   Returns:
     dict: Environment information including packages and versions
   """
   import os
-  
+
   env_data = {}
-  
+
   # Try to get conda environment info
   try:
     result = subprocess.run(
@@ -45,10 +45,10 @@ def get_env_info(save_to_path=None):
         f.write(result.stdout)
   except (FileNotFoundError, subprocess.CalledProcessError):
     pass  # Conda not available
-  
+
   # Try to get pip requirements
   requirements = None
-  
+
   # Try uv pip freeze first
   try:
     result = subprocess.run(
@@ -74,12 +74,12 @@ def get_env_info(save_to_path=None):
       env_data['pip_tool'] = 'pip'
     except (FileNotFoundError, subprocess.CalledProcessError):
       pass  # Neither uv nor pip available
-  
+
   # Save requirements.txt if we got pip info
   if save_to_path and requirements:
     with open(os.path.join(save_to_path, 'requirements.txt'), 'w') as f:
       f.write(requirements)
-  
+
   return env_data
 
 

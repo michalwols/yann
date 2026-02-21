@@ -1,7 +1,13 @@
 import torch
 
 from .defaults import default
-from .registry import Registry, DatasetRegistry, ModelRegistry, is_public_callable, pass_args
+from .registry import (
+  Registry,
+  DatasetRegistry,
+  ModelRegistry,
+  is_public_callable,
+  pass_args,
+)
 
 ## Configure Registry
 
@@ -30,9 +36,11 @@ registry.dataset.index(
 registry.loss.index(
   torch.nn.modules.loss,
   types=(torch.nn.modules.loss._Loss,),
-  get_names=lambda x: (x.__name__, x.__name__[: -len('Loss')])
-  if x.__name__.endswith('Loss')
-  else (x.__name__,),
+  get_names=lambda x: (
+    (x.__name__, x.__name__[: -len('Loss')])
+    if x.__name__.endswith('Loss')
+    else (x.__name__,)
+  ),
 )
 
 import torch.nn.functional as F
@@ -40,9 +48,11 @@ import torch.nn.functional as F
 registry.loss.index(
   F,
   include=lambda x: hasattr(x, '__name__') and 'loss' in x.__name__.lower(),
-  get_names=lambda x: (x.__name__, x.__name__[: -len('_loss')])
-  if x.__name__.endswith('_loss')
-  else (x.__name__,),
+  get_names=lambda x: (
+    (x.__name__, x.__name__[: -len('_loss')])
+    if x.__name__.endswith('_loss')
+    else (x.__name__,)
+  ),
 )
 
 from ..modules import loss

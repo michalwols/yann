@@ -86,7 +86,7 @@ class TinyDigits(data.TensorDataset):
       from sklearn.datasets import load_digits
     except ImportError:
       raise ImportError(
-        "TinyDigits requires scikit-learn. Install it with: pip install scikit-learn"
+        'TinyDigits requires scikit-learn. Install it with: pip install scikit-learn',
       )
 
     digits = load_digits(num_classes)

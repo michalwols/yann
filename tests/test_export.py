@@ -62,7 +62,7 @@ def test_export_traced(tmpdir):
 
   for name in expected_files:
     assert (path / name).exists()
-  
+
   # These files may or may not exist depending on available tools
   optional_files = ['requirements.txt', 'env.yml']
 
