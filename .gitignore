@@ -3,6 +3,7 @@
 
 
 experiments/*/runs/
+runs/
 train-runs/
 /datasets/
 
