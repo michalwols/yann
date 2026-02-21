@@ -49,15 +49,17 @@ class MetricStore:
       values = {k: self.cast_value(v) for (k, v) in values.items()}
 
     self.times[step] = time
+    target_len = len(self.times)
     for metric, v in values.items():
       if metric not in self.values:
         self._init_metric(metric)
       self.values[metric][step] = v
 
-    # need to make sure all metrics have the same length
-    for metric, vs in self.values.items():
-      if len(vs) < len(self.times):
-        vs[len(self.times) - 1] = self.null_val
+    # Only pad metrics that weren't updated and are shorter than times
+    if len(values) < len(self.values):
+      for metric, vs in self.values.items():
+        if metric not in values and len(vs) < target_len:
+          vs[target_len - 1] = self.null_val
 
   def _init_metric(self, name):
     self.values[name] = PaddedList(null_val=self.null_val)
@@ -91,7 +93,7 @@ class MetricStore:
         from IPython.display import clear_output
 
         clear_output(wait=True)
-      except:
+      except ImportError:
         pass
 
   def summary(self):
@@ -100,7 +102,7 @@ class MetricStore:
       try:
         s[f'{metric}_min'] = min(values)
         s[f'{metric}_max'] = max(values)
-      except:
+      except (ValueError, TypeError):
         pass
     return s
 

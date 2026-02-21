@@ -69,21 +69,37 @@ class Infer(Module):
   def was_inferred(self):
     return self.module is not None
 
+  def _infer_and_forward(self, x):
+    try:
+      self.module = self.cls(
+        x.shape[self.shape_dim],
+        *self.args,
+        **self.kwargs,
+      )
+    except IndexError as e:
+      raise ShapeInferenceError(
+        f'Improper shape dim ({self.shape_dim}) selected for {self.cls} with input of shape {x.shape}',
+      )
+    # After inference, replace forward to skip the check on subsequent calls
+    self.forward = self.module.forward
+    return self.module(x)
+
   def forward(self, x):
     if self.module is None:
-      try:
-        self.module = self.cls(
-          x.shape[self.shape_dim],
-          *self.args,
-          **self.kwargs,
-        )
-      except IndexError as e:
-        raise ShapeInferenceError(
-          f'Improper shape dim ({self.shape_dim}) selected for {self.cls} with input of shape {x.shape}',
-        )
+      return self._infer_and_forward(x)
     return self.module(x)
 
   @classmethod
   def shed(cls, module):
-    # TODO: modify the model to drop the Infer nodes and replace them with the initialized module
-    raise NotImplementedError()
+    """Replace all Infer nodes in a module with their initialized inner modules."""
+    for name, child in list(module.named_children()):
+      if isinstance(child, cls):
+        if child.module is not None:
+          setattr(module, name, child.module)
+        else:
+          raise RuntimeError(
+            f'Cannot shed Infer node {name!r}: module has not been inferred yet. '
+            'Run a forward pass first.',
+          )
+      else:
+        cls.shed(child)

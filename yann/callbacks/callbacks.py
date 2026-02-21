@@ -18,15 +18,19 @@ class Events:
 
 
 def callback(method):
+  name = method.__name__
+
   def wrapped_method(self, *args, **kwargs):
     ret = method(self, *args, **kwargs)
     for callback_ in self:
       if hasattr(callback_, 'enabled') and not callback_.enabled:
         continue
-      if hasattr(callback_, method.__name__):
-        getattr(callback_, method.__name__)(*args, **kwargs)
+      fn = getattr(callback_, name, None)
+      if fn is not None:
+        fn(*args, **kwargs)
     return ret
 
+  wrapped_method.__name__ = name
   return wrapped_method
 
 

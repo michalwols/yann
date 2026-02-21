@@ -138,20 +138,20 @@ def evaluate(model, batches, device=None, transform=None):
   if isinstance(batches, str):
     batches = yann.loader(batches, transform=transform)
 
-  for batch in batches:
-    if isinstance(batch, dict):
-      x, y = batch, batch  # Pass dict as both inputs and targets
-    else:
-      x, y = batch  # Traditional tuple unpacking
+  model.eval()
+  with torch.inference_mode():
+    for batch in batches:
+      if isinstance(batch, dict):
+        x, y = batch, batch
+      else:
+        x, y = batch
 
-    if device:
-      x, y = to(x, device=device), to(y, device=device)
+      if device:
+        x, y = to(x, device=device), to(y, device=device)
 
-    model.eval()
-    with torch.inference_mode():
       pred = model(x)
 
-    yield x, y, pred
+      yield x, y, pred
 
 
 def predict_multicrop(model, inputs, reduce='mean'):
@@ -331,41 +331,40 @@ def none_grad(model: nn.Module):
 
 @contextmanager
 def eval_mode(*modules, grad=False):
+  # Capture training states as a list (not generator) so they survive to finally
+  training = [m.training for m in modules]
   if grad:
-    training = (m.training for m in modules)
     try:
       for m in modules:
         m.eval()
       yield
     finally:
-      for m, train in zip(modules, training):
-        if train:
+      for m, was_training in zip(modules, training):
+        if was_training:
           m.train()
   else:
-    with torch.inference_mode():
-      training = (m.training for m in modules)
-      try:
-        for m in modules:
-          m.eval()
+    try:
+      for m in modules:
+        m.eval()
+      with torch.inference_mode():
         yield
-      finally:
-        for m, train in zip(modules, training):
-          if train:
-            m.train()
+    finally:
+      for m, was_training in zip(modules, training):
+        if was_training:
+          m.train()
 
 
 @contextmanager
 def train_mode(*modules):
-  initial_training_states = (m.training for m in modules)
+  # Capture training states as a list (not generator) so they survive to finally
+  training = [m.training for m in modules]
   try:
     for m in modules:
       m.train()
-
     yield
-
   finally:
-    for m, train in zip(modules, initial_training_states):
-      if train:
+    for m, was_training in zip(modules, training):
+      if was_training:
         m.train()
       else:
         m.eval()
@@ -434,37 +433,25 @@ def load_state_dict(
 
 def grad_norm(parameters, norm_type: float = 2.0):
   """
+  Compute the norm of gradients for a set of parameters.
 
   Adapted from https://pytorch.org/docs/stable/_modules/torch/nn/utils/clip_grad.html
-  Args:
-    parameters:
-    norm_type:
-
-  Returns:
-
   """
   if isinstance(parameters, nn.Module):
     parameters = parameters.parameters()
   if isinstance(parameters, torch.Tensor):
     parameters = [parameters]
-  parameters = [p for p in parameters if p.grad is not None]
-  parameters = list(parameters)
+  grads = [p.grad.detach() for p in parameters if p.grad is not None]
 
   norm_type = float(norm_type)
-  if len(parameters) == 0:
+  if len(grads) == 0:
     return torch.tensor(0.0)
-  device = parameters[0].grad.device
   if norm_type == torch.inf:
-    norms = [p.grad.detach().abs().max().to(device) for p in parameters]
+    norms = [g.abs().max() for g in grads]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
     norm = torch.linalg.vector_norm(
-      torch.stack(
-        [
-          torch.linalg.vector_norm(p.grad.detach(), norm_type).to(device)
-          for p in parameters
-        ],
-      ),
+      torch.stack([torch.linalg.vector_norm(g, norm_type) for g in grads]),
       norm_type,
     )
   return norm
@@ -480,16 +467,13 @@ def param_norm(parameters, norm_type: float = 2.0):
   norm_type = float(norm_type)
   if len(parameters) == 0:
     return torch.tensor(0.0)
-  device = parameters[0].device
   if norm_type == torch.inf:
-    norms = [p.detach().abs().max().to(device) for p in parameters]
+    norms = [p.detach().abs().max() for p in parameters]
     norm = norms[0] if len(norms) == 1 else torch.max(torch.stack(norms))
   else:
     norm = torch.linalg.vector_norm(
       torch.stack(
-        [
-          torch.linalg.vector_norm(p.detach(), norm_type).to(device) for p in parameters
-        ],
+        [torch.linalg.vector_norm(p.detach(), norm_type) for p in parameters],
       ),
       norm_type,
     )

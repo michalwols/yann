@@ -8,9 +8,9 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 
 def unitwise_norm(x: torch.Tensor, p=2.0):
   if x.ndim <= 1:
-    return x.norm(p)
+    return torch.linalg.vector_norm(x, p)
   else:
-    return x.norm(p, dim=tuple(range(1, x.ndim)), keepdim=True)
+    return torch.linalg.vector_norm(x, p, dim=tuple(range(1, x.ndim)), keepdim=True)
 
 
 def clip_grad_adaptive_(parameters, value=0.01, norm_type=2.0, eps=1e-3):

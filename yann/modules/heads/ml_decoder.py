@@ -43,8 +43,9 @@ class MLTransformerDecoderLayer(Stack):
     return self.norm3(x)
 
 
-@torch.jit.script
-class GroupFC(object):
+class GroupFC:
+  """Batched group fully-connected via bmm (replaces jit-scripted per-group loop)."""
+
   def __init__(self, embed_len_decoder: int):
     self.embed_len_decoder = embed_len_decoder
 
@@ -54,10 +55,13 @@ class GroupFC(object):
     duplicate_pooling: torch.Tensor,
     out_extrap: torch.Tensor,
   ):
-    for i in range(self.embed_len_decoder):
-      h_i = h[:, i, :]
-      w_i = duplicate_pooling[i, :, :]
-      out_extrap[:, i, :] = torch.matmul(h_i, w_i)
+    # h: [batch, groups, embed], duplicate_pooling: [groups, embed, dup_factor]
+    # Use bmm: [groups, batch, embed] @ [groups, embed, dup_factor] -> [groups, batch, dup_factor]
+    result = torch.bmm(
+      h.permute(1, 0, 2),
+      duplicate_pooling,
+    )
+    out_extrap[:] = result.permute(1, 0, 2)
 
 
 class GroupFullyConnectedPooling(nn.Module):

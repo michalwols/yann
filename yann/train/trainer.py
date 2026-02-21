@@ -479,6 +479,9 @@ class Trainer(TrainState, BaseTrainer):
         shuffle=False,
         pin_memory=self.params.pin_memory,
         num_workers=self.params.num_workers,
+        persistent_workers=self.params.persistent_workers
+        and self.params.num_workers > 0,
+        prefetch_factor=self.params.prefetch_factor,
       )
     )
 
@@ -636,6 +639,12 @@ class Trainer(TrainState, BaseTrainer):
       yield e
       self.num_epochs += 1
 
+  def _unpack_batch(self, batch):
+    """Unpack batch into (inputs, targets). Determined once per run."""
+    if isinstance(batch, dict):
+      return batch, batch
+    return batch
+
   def batches(self, device=None):
     for batch in self.loader:
       if self.params.transform_batch:
@@ -783,10 +792,7 @@ class Trainer(TrainState, BaseTrainer):
             self.sampler.set_epoch(epoch_idx)
 
           for batch in self.batches():
-            if isinstance(batch, dict):
-              inputs, targets = batch, batch  # Pass dict as both inputs and targets
-            else:
-              inputs, targets = batch  # Traditional tuple unpacking
+            inputs, targets = self._unpack_batch(batch)
 
             self.callbacks.on_step_start(
               index=self.num_steps,
@@ -855,10 +861,7 @@ class Trainer(TrainState, BaseTrainer):
           self.sampler.set_epoch(epoch_idx)
 
         for batch in self.batches():
-          if isinstance(batch, dict):
-            inputs, targets = batch, batch  # Pass dict as both inputs and targets
-          else:
-            inputs, targets = batch  # Traditional tuple unpacking
+          inputs, targets = self._unpack_batch(batch)
 
           outputs, loss = self.step(inputs=inputs, targets=targets)
 

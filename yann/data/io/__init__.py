@@ -1,4 +1,5 @@
 import csv
+import datetime
 import gzip
 import json
 import os
@@ -7,6 +8,16 @@ import tarfile
 from collections import namedtuple
 from pathlib import Path
 from typing import Union
+
+
+class _ExtendedEncoder(json.JSONEncoder):
+  def default(self, o):
+    if isinstance(o, (datetime.datetime, datetime.date)):
+      return o.isoformat()
+    if isinstance(o, Path):
+      return str(o)
+    return super().default(o)
+
 
 import torch
 
@@ -175,7 +186,7 @@ def load_pickle(path, mode='rb'):
 
 def save_json(obj, path, mode='w'):
   with open(str(path), mode) as f:
-    json.dump(obj, f)
+    json.dump(obj, f, cls=_ExtendedEncoder)
   return path
 
 
