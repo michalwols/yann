@@ -746,7 +746,7 @@ class Trainer(TrainState, BaseTrainer):
       self.callbacks.on_validation_start(trainer=self)
 
     ts, os = [], []
-    total_loss = 0.0
+    total_loss = None
     total_samples = 0
     if loader is not None:
       with torch.inference_mode():
@@ -767,7 +767,12 @@ class Trainer(TrainState, BaseTrainer):
           if self.loss:
             batch_loss = self.loss(outputs, targets)
             batch_size = targets.shape[0]
-            total_loss += batch_loss.item() * batch_size
+            # Accumulate on-device to avoid per-batch GPU-CPU sync
+            weighted = batch_loss.detach() * batch_size
+            if total_loss is None:
+              total_loss = weighted
+            else:
+              total_loss = total_loss + weighted
             total_samples += batch_size
           ts.append(targets)
           os.append(outputs)
@@ -775,7 +780,8 @@ class Trainer(TrainState, BaseTrainer):
         ts = torch.cat(ts)
         os = torch.cat(os)
 
-    loss = total_loss / total_samples if total_samples > 0 else None
+    # Single .item() call at end instead of one per batch
+    loss = total_loss.item() / total_samples if total_loss is not None else None
 
     if self.callbacks:
       self.callbacks.on_validation_end(
