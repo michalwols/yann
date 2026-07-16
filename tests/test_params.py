@@ -42,3 +42,11 @@ def test_serialization(tmpdir):
   assert (tmpdir / 'params.yaml').exists()
   assert p == p2
 
+
+def test_standalone_hp_compatibility():
+  class Params(params.HyperParams):
+    method: str = params.Choice(('sft', 'grpo'), default='sft')
+
+  p = Params(method='grpo')
+  assert p.method == 'grpo'
+  assert p.to_dict() == {'method': 'grpo'}

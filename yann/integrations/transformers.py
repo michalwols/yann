@@ -34,7 +34,9 @@ def load(
       AutoTokenizer,
     )
   except ImportError as error:
-    raise ImportError('install yann[transformers] to load Hugging Face models') from error
+    raise ImportError(
+      'install yann[transformers] to load Hugging Face models'
+    ) from error
 
   model_cls = {
     'model': AutoModel,
