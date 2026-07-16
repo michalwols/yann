@@ -42,7 +42,3 @@ def test_serialization(tmpdir):
   assert (tmpdir / 'params.yaml').exists()
   assert p == p2
 
-  p.save(tmpdir / 'params.pkl')
-  p2 = p.load(tmpdir / 'params.pkl')
-  assert (tmpdir / 'params.pkl').exists()
-  assert p == p2

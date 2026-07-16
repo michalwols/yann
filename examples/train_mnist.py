@@ -15,9 +15,9 @@ class Params(HyperParams):
   dataset = 'MNIST'
   batch_size = 32
   epochs = 10
-  optimizer: Choice(('SGD', 'Adam')) = 'SGD'
-  learning_rate: Range(0.01, 0.0001) = 0.01
-  momentum = 0
+  optimizer: str = Choice(('SGD', 'Adam'))
+  learning_rate: float = Range(0.0001, 0.01, default=0.01)
+  momentum: float = 0
 
   seed = 1
 

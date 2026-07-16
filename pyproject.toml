@@ -7,8 +7,9 @@ license = { text = "MIT" }
 authors = [
     { name = "Michal Wolski", email = "michal@bite.ai" }
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 dependencies = [
+    "hp>=0.1.0",
     "pyyaml>=6.0.1",
     "rich>=13.8.1",
     "torch",
@@ -43,6 +44,10 @@ where = ["."]  # Specifies to look for packages in the current directory
 include = ["yann*"]  # Include the main 'yann' package and any potential 'yann_extras' etc.
 exclude = ["tests*"]  # Example: Exclude tests directory if you have one
 
+
+[tool.uv.sources]
+# local checkout until hp 0.1.0 is published to PyPI
+hp = { path = "../hp", editable = true }
 
 [tool.ruff]
 line-length = 88
