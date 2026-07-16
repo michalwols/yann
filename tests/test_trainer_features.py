@@ -15,6 +15,7 @@ def make_dataset(samples=20, features=10):
 
 
 def make_trainer(tmp_path, **kwargs):
+  kwargs.setdefault('callbacks', False)
   return Trainer(
     dataset=make_dataset(),
     batch_size=4,
@@ -23,7 +24,6 @@ def make_trainer(tmp_path, **kwargs):
     num_workers=0,
     prefetch_factor=None,
     persistent_workers=False,
-    callbacks=False,
     root=tmp_path,
     **kwargs,
   )
@@ -99,3 +99,30 @@ def test_legacy_step_signature(tmp_path):
   )
   trainer.run(epochs=1)
   assert trainer.num_steps == 5
+
+
+class RecordingLog:
+  def __init__(self):
+    self.calls = []
+
+  def metric(self, name, value, **attrs):
+    self.calls.append((name, value, attrs))
+
+
+def test_multilog_callback(tmp_path):
+  from yann.integrations.multilog import Multilog
+
+  log = RecordingLog()
+  trainer = make_trainer(
+    tmp_path,
+    model=nn.Linear(10, 2),
+    loss=nn.CrossEntropyLoss(),
+    callbacks=[Multilog(log)],
+  )
+  trainer.run(epochs=1)
+
+  assert log.calls, 'multilog should record loss metrics'
+  name, value, attrs = log.calls[0]
+  assert name == 'train.loss'
+  assert isinstance(value, float)
+  assert 'step' in attrs and 'optim_step' in attrs
