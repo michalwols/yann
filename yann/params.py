@@ -7,8 +7,6 @@ directly; ``HyperParams`` here adds yann's legacy ``from_command`` entry
 point on top of ``hp.HP``.
 """
 
-import sys
-
 from hp import (
   HP,
   Choice,
@@ -24,28 +22,10 @@ from hp import (
 )
 
 
-def _cli_args(cmd=None):
-  if isinstance(cmd, str):
-    args = cmd.split()
-  elif cmd is None:
-    args = list(sys.argv[1:])
-  else:
-    args = list(cmd)
-
-  # legacy argparse flags used dashes, hp paths use underscores
-  normalized = []
-  for arg in args:
-    if arg.startswith('--'):
-      key, eq, value = arg[2:].partition('=')
-      arg = f'--{key.replace("-", "_")}{eq}{value}'
-    normalized.append(arg)
-  return normalized
-
-
 class HyperParams(HP):
   @classmethod
   def from_command(cls, cmd=None, validate=False, **kwargs):
-    params = cls.from_cli(_cli_args(cmd))
+    params = super().from_command(cmd)
     if validate:
       params.validate()
     return params
