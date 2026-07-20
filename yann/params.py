@@ -36,7 +36,7 @@ from abc import ABCMeta
 from collections import OrderedDict
 from copy import deepcopy
 from functools import wraps
-from typing import Dict
+from typing import Any, Dict, Mapping, Sequence
 
 from .utils import get_arg_parser
 
@@ -153,12 +153,12 @@ class HyperParamsBase:
         data = yann.utils.dynamic_import(uri)
       except:
         raise ValueError('uri must be a file or fully qualified python path')
-    return cls(**data)
+    return cls.from_dict(data)
 
   def save(self, path):
     import yann
 
-    yann.save(dict(self), path)
+    yann.save(self.to_dict(), path)
 
   def on_change(self, callback):
     self._change_callbacks.append(callback)
@@ -167,7 +167,7 @@ class HyperParamsBase:
     if k in self.__fields__:
       for c in self._change_callbacks:
         c(k, v)
-    super.__setattr__(self, k, v)
+    super().__setattr__(k, v)
 
   def __iter__(self):
     return iter(self.keys())
@@ -191,7 +191,16 @@ class HyperParamsBase:
     )
 
   def fork(self, **args):
-    return HyperParams(**{**self.items(), **args})
+    data = dict(self.items())
+    data.update(args)
+    return self.__class__(**data)
+
+  def to_dict(self) -> Dict[str, Any]:
+    return {k: getattr(self, k) for k in self.keys()}
+
+  @classmethod
+  def from_dict(cls, data: Mapping[str, Any]):
+    return cls(**dict(data))
 
   def __repr__(self):
     return (
@@ -366,6 +375,44 @@ def from_signature(function, params: HyperParams = None):
     )
     params[k] = default
   return params
+
+
+def to_dict(params: HyperParamsBase) -> Dict[str, Any]:
+  if hasattr(params, 'to_dict'):
+    return params.to_dict()
+  return {k: getattr(params, k) for k in params.keys()}
+
+
+def save_params(params: HyperParamsBase, path):
+  params.save(path)
+
+
+_PRIMITIVE_TYPES = (str, int, float, bool, type(None))
+
+
+def _serialize_param_value(value, *, _depth=0):
+  if isinstance(value, _PRIMITIVE_TYPES):
+    return value
+
+  if isinstance(value, Mapping):
+    return {str(k): _serialize_param_value(v, _depth=_depth + 1) for k, v in value.items()}
+
+  if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+    return [_serialize_param_value(v, _depth=_depth + 1) for v in value]
+
+  if isinstance(value, set):
+    return [_serialize_param_value(v, _depth=_depth + 1) for v in sorted(value, key=repr)]
+
+  try:
+    from yann.utils import fully_qualified_name
+
+    return fully_qualified_name(value)
+  except Exception:
+    return repr(value)
+
+
+def to_serializable_dict(params: HyperParamsBase) -> Dict[str, Any]:
+  return {k: _serialize_param_value(getattr(params, k)) for k in params.keys()}
 
 
 def register():

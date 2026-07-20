@@ -1,6 +1,7 @@
 import logging
 import math
 import typing
+from collections.abc import Sequence
 from itertools import zip_longest
 from typing import Union
 
@@ -92,7 +93,7 @@ class Subset(DatasetWrapper):
         self.end = (
           args[0] if not (0 < args[0] < 1) else math.floor(len(dataset) * args[0])
         )
-      elif isinstance(args[0], Union[np.ndarray, torch.Tensor]):
+      elif isinstance(args[0], (np.ndarray, torch.Tensor)):
         self.indices = args[0]
     elif len(args) == 2:
       if 0 < args[1] <= 1:
@@ -103,7 +104,7 @@ class Subset(DatasetWrapper):
 
   def __len__(self):
     if self.indices is not None:
-      return self.indices
+      return len(self.indices)
     else:
       return self.end - self.start
 
@@ -189,7 +190,10 @@ class LookupCache(DatasetWrapper):
 class TransformDataset(DatasetWrapper):
   def __init__(self, dataset, transform):
     super().__init__(dataset)
-    self.transforms = transform if isinstance(transform, tuple) else (transform,)
+    if isinstance(transform, Sequence) and not isinstance(transform, (str, bytes)):
+      self.transforms = tuple(transform)
+    else:
+      self.transforms = (transform,)
 
   def __getitem__(self, idx):
     return tuple(
