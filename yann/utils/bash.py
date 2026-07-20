@@ -1,9 +1,17 @@
 import shutil
 import subprocess
+from collections.abc import Sequence
 
 
 def run(command):
-  out = subprocess.check_output(command, shell=True)
+  shell = isinstance(command, str)
+
+  if not shell and not isinstance(command, Sequence):
+    raise TypeError('command must be a string or a sequence of arguments')
+
+  cmd = command if shell else [str(arg) for arg in command]
+
+  out = subprocess.check_output(cmd, shell=shell)
   if out:
     return out.decode('utf-8').strip()
 

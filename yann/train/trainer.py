@@ -468,17 +468,23 @@ class Trainer(TrainState, BaseTrainer):
           raise ValueError(
             'batch_sampler provided but DataLoader does not support it, might need to upgrade pytorch to newer version',
           )
-        self.loader = self.DataLoader(
+        # Build kwargs for DataLoader, handling prefetch_factor properly
+        loader_kwargs = dict(
           dataset=self.dataset,
           batch_sampler=self.params.batch_sampler,
           pin_memory=self.params.pin_memory,
           num_workers=self.params.num_workers,
           persistent_workers=self.params.persistent_workers and self.params.num_workers > 0,
-          prefetch_factor=self.params.prefetch_factor,
-          **({'collate_fn': self.params.collate} if self.params.collate else {}),
         )
+        # Only add prefetch_factor if using multiprocessing
+        if self.params.num_workers > 0 and self.params.prefetch_factor is not None:
+          loader_kwargs['prefetch_factor'] = self.params.prefetch_factor
+        if self.params.collate:
+          loader_kwargs['collate_fn'] = self.params.collate
+        self.loader = self.DataLoader(**loader_kwargs)
       else:
-        self.loader = self.DataLoader(
+        # Build kwargs for DataLoader, handling prefetch_factor properly
+        loader_kwargs = dict(
           dataset=self.dataset,
           batch_size=self.params.batch_size or yann.default.batch_size,
           pin_memory=self.params.pin_memory,
@@ -486,9 +492,13 @@ class Trainer(TrainState, BaseTrainer):
           sampler=self.sampler,
           num_workers=self.params.num_workers,
           persistent_workers=self.params.persistent_workers and self.params.num_workers > 0,
-          prefetch_factor=self.params.prefetch_factor,
-          **({'collate_fn': self.params.collate} if self.params.collate else {}),
         )
+        # Only add prefetch_factor if using multiprocessing
+        if self.params.num_workers > 0 and self.params.prefetch_factor is not None:
+          loader_kwargs['prefetch_factor'] = self.params.prefetch_factor
+        if self.params.collate:
+          loader_kwargs['collate_fn'] = self.params.collate
+        self.loader = self.DataLoader(**loader_kwargs)
 
     if self.val_dataset_resolved and self.params.val_subset is not None:
       self.val_dataset_resolved = yann.datasets.Subset(
@@ -659,6 +669,8 @@ class Trainer(TrainState, BaseTrainer):
     """
     Yields current epoch count and keeps internal epoch count
     """
+    if num is None or num == 0:
+      return
     for e in counter(start=self.num_epochs, end=self.num_epochs + num):
       yield e
       self.num_epochs += 1
@@ -710,13 +722,21 @@ class Trainer(TrainState, BaseTrainer):
     return outputs, loss
 
   def forward(self, inputs=None, targets=None):
+    # Handle the case when forward is called with a batch directly
+    if inputs is not None and not isinstance(inputs, torch.Tensor) and hasattr(inputs, '__iter__'):
+      # If inputs is a batch (tuple/list), unpack it
+      if len(inputs) >= 2:
+        inputs, targets = inputs[0], inputs[1]
+      elif len(inputs) == 1:
+        inputs = inputs[0]
+
     with autocast(
       device_type=self.device.type,
       dtype=self.dtype,
       enabled=self.params.amp,
     ):
       outputs = self.model(inputs)
-      if self.loss:
+      if self.loss and targets is not None:
         loss = self.loss(outputs, targets)
         return outputs, loss
       else:
@@ -727,6 +747,9 @@ class Trainer(TrainState, BaseTrainer):
     Handles resetting gradients, running backward pass and optimizer step,
     accumulating gradients over `grad_accum` batches before each step
     """
+    if self.optimizer is None:
+      return
+
     if self._accum_step % self.grad_accum == 0:
       self.optimizer.zero_grad(set_to_none=self.none_grad)
     self._accum_step += 1
@@ -799,8 +822,21 @@ class Trainer(TrainState, BaseTrainer):
           ts.append(targets)
           os.append(outputs)
 
-        ts = torch.cat(ts)
-        os = torch.cat(os)
+        try:
+          ts = torch.cat(ts)
+        except (TypeError, RuntimeError):
+          if len(ts) == 1:
+            ts = ts[0]
+          else:
+            ts = tuple(ts)
+
+        try:
+          os = torch.cat(os)
+        except (TypeError, RuntimeError):
+          if len(os) == 1:
+            os = os[0]
+          else:
+            os = tuple(os)
 
         loss = self.loss(os, ts)
 
@@ -832,6 +868,8 @@ class Trainer(TrainState, BaseTrainer):
           for batch in self.batches():
             if isinstance(batch, (tuple, list)) and len(batch) == 2:
               inputs, targets = batch  # Traditional tuple unpacking
+            elif isinstance(batch, (tuple, list)) and len(batch) == 1:
+              inputs, targets = batch[0], None
             else:
               # dicts and other structures are passed whole as both
               inputs, targets = batch, batch
@@ -909,6 +947,8 @@ class Trainer(TrainState, BaseTrainer):
         for batch in self.batches():
           if isinstance(batch, (tuple, list)) and len(batch) == 2:
             inputs, targets = batch  # Traditional tuple unpacking
+          elif isinstance(batch, (tuple, list)) and len(batch) == 1:
+            inputs, targets = batch[0], None
           else:
             # dicts and other structures are passed whole as both
             inputs, targets = batch, batch
@@ -916,7 +956,7 @@ class Trainer(TrainState, BaseTrainer):
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
           if self.lr_scheduler and self.lr_batch_step:
-            self.lr_scheduler.step(epoch=self.num_steps)
+            self._lr_scheduler_step(step=self.num_steps)
 
           self.num_steps += 1
           self.num_samples += batch_size(inputs)
@@ -971,7 +1011,8 @@ class Trainer(TrainState, BaseTrainer):
   ):
     # TODO: add 'latest', 'best' support
     log.info(f'Attempting to load checkpoint {path}')
-    data = torch.load(path, map_location=map_location)
+    # Use weights_only=False for backward compatibility with older checkpoints
+    data = torch.load(path, map_location=map_location, weights_only=False)
     self.load_state_dict(data, metadata=metadata, strict=strict, keys=keys)
 
   def export(self, path=None, trace=False, meta=None, postprocess=None):
@@ -991,7 +1032,7 @@ class Trainer(TrainState, BaseTrainer):
         num_samples=self.num_samples,
         num_epochs=self.num_epochs,
         batch_size=self.params.batch_size,
-        time_created=self.time_created,
+        time_created=self.time_created.isoformat() if isinstance(self.time_created, datetime.datetime) else self.time_created,
         param_hash=hash_params(self.model),
       ),
     )
@@ -1009,7 +1050,7 @@ class Trainer(TrainState, BaseTrainer):
         'num_tokens': self.num_tokens,
         'num_optim_steps': self.num_optim_steps,
         'batch_size': self.params.batch_size,
-        'time_created': self.time_created,
+        'time_created': self.time_created.isoformat() if isinstance(self.time_created, datetime.datetime) else self.time_created,
         'param_hash': hash_params(self.model),
       },
     }
@@ -1076,10 +1117,14 @@ class Trainer(TrainState, BaseTrainer):
         num_epochs=self.num_epochs,
         batch_size=self.params.batch_size,
         device=str(self.device),
-        time_created=self.time_created,
-        # params={k: str(v) for k, v in self.params.items()},
+        time_created=self.time_created.isoformat() if isinstance(self.time_created, datetime.datetime) else self.time_created,
       ),
     )
+
+    try:
+      self.summary['params'] = yann.params.to_serializable_dict(self.params)
+    except Exception as exc:
+      log.debug(f'Failed to serialize params into summary: {exc}')
 
     if 'env' not in self.summary:
       self.summary['env'] = self._get_env()

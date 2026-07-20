@@ -77,6 +77,10 @@ from torch.optim import lr_scheduler
 registry.lr_scheduler.index(lr_scheduler, types=(lr_scheduler._LRScheduler,))
 # ReduceLROnPlateau subclasses object
 registry.lr_scheduler.register(lr_scheduler.ReduceLROnPlateau)
+# Manually register commonly used schedulers to ensure they're available
+registry.lr_scheduler.register(lr_scheduler.StepLR)
+registry.lr_scheduler.register(lr_scheduler.ExponentialLR)
+registry.lr_scheduler.register(lr_scheduler.CosineAnnealingLR)
 
 # Models - Use the new ModelRegistry that handles HuggingFace models
 registry.model = ModelRegistry(name='model')
