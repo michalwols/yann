@@ -129,6 +129,7 @@ class Params(yann.params.HyperParams):
   weight_decay: Optional[float] = None
   momentum: Optional[float] = None
   lr_scheduler: Union[torch.optim.lr_scheduler._LRScheduler, None] = None
+  lr_scheduler_params: Optional[Dict] = None
   lr_batch_step: bool = False
   none_grad: bool = True
   grad_accum: int = 1
@@ -544,7 +545,10 @@ class Trainer(TrainState, BaseTrainer):
 
     self.lr_scheduler = yann.resolve.lr_scheduler(
       self.params.lr_scheduler,
-      kwargs=dict(optimizer=self.optimizer),
+      kwargs=dict(
+        optimizer=self.optimizer,
+        **(self.params.lr_scheduler_params or {}),
+      ),
     )
 
     self.clip_grad = None

@@ -196,6 +196,7 @@ class TestTrainerSetup:
     )
     trainer(epochs=1)  # Need at least 1 epoch
     assert trainer.lr_scheduler is not None
+    assert trainer.lr_scheduler.patience == 10
 
 
 # Test Training Lifecycle
