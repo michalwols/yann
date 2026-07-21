@@ -1,3 +1,4 @@
+import hp
 import torch
 from torch import nn
 from torchvision import transforms
@@ -61,7 +62,7 @@ class BoundedLeakyReLU(nn.Module):
 if __name__ == '__main__':
   # parse command line arguments
   params = Params.from_command()
-  params.validate()
+  hp.validate(params)
 
   print(params)
 

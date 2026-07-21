@@ -1,3 +1,4 @@
+import hp
 import os
 import tempfile
 from pathlib import Path
@@ -114,7 +115,7 @@ class TestTrainerInitialization:
   def test_params_update(self):
     """Test that params.update works correctly."""
     trainer = Trainer()
-    trainer.params.update({'lr': 0.1, 'batch_size': 128})
+    hp.update(trainer.params, {'lr': 0.1, 'batch_size': 128})
     assert trainer.params.lr == 0.1
     assert trainer.params.batch_size == 128
 

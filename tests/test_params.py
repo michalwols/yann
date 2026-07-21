@@ -1,3 +1,4 @@
+import hp
 from yann import params
 
 
@@ -32,13 +33,13 @@ def test_serialization(tmpdir):
 
   p = Params()
 
-  p.save(tmpdir / 'params.json')
-  p2 = p.load(tmpdir / 'params.json')
+  params.save_params(p, tmpdir / 'params.json')
+  p2 = hp.load(Params, tmpdir / 'params.json')
   assert (tmpdir / 'params.json').exists()
   assert p == p2
 
-  p.save(tmpdir / 'params.yaml')
-  p2 = p.load(tmpdir / 'params.yaml')
+  params.save_params(p, tmpdir / 'params.yaml')
+  p2 = hp.load(Params, tmpdir / 'params.yaml')
   assert (tmpdir / 'params.yaml').exists()
   assert p == p2
 
@@ -49,7 +50,7 @@ def test_standalone_hp_compatibility():
 
   p = Params(method='grpo')
   assert p.method == 'grpo'
-  assert p.to_dict() == {'method': 'grpo'}
+  assert hp.to_dict(p) == {'method': 'grpo'}
 
 
 def test_hyperparams_allows_attribute_assignment():
@@ -70,7 +71,7 @@ def test_hyperparams_fork_returns_same_type_with_updates():
 
   params_instance = Params()
 
-  forked = params_instance.fork(value=5)
+  forked = hp.fork(params_instance, value=5)
 
   assert isinstance(forked, Params)
   assert forked.value == 5
@@ -85,7 +86,7 @@ def test_hyperparams_to_dict_and_from_dict(tmp_path):
 
   instance = Params(value=7)
 
-  data = instance.to_dict()
+  data = hp.to_dict(instance)
   assert data == {'value': 7, 'other': 'x'}
 
   restored = Params.from_dict(data)

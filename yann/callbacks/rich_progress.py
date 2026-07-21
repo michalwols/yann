@@ -1,3 +1,4 @@
+import hp
 import subprocess  # For git hash
 import sys
 import time
@@ -221,7 +222,7 @@ class RichProgress(Callback):
     param_table.add_column('Parameter', style='dim', width=30)
     param_table.add_column('Value')
     if hasattr(trainer, 'params') and trainer.params:
-      for key, value in trainer.params.items():
+      for key, value in hp.items(trainer.params):
         param_table.add_row(str(key), str(value))
     print_func(param_table)
 

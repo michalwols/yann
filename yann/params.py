@@ -1,10 +1,13 @@
 """
 Hyperparameter configuration, provided by the standalone ``hp`` package.
 
-``yann.params`` is now a thin compatibility layer over ``hp``
+``yann.params`` is a thin compatibility layer over ``hp``
 (https://github.com/michalwols/hp). New code should import from ``hp``
-directly; ``HyperParams`` here adds yann's legacy entry points on top of
-``hp.Params``.
+directly.
+
+``hp.Params`` deliberately has no public methods, so that every attribute name
+stays available for user fields. Operations are module-level functions taking
+the params first: ``hp.to_dict(params)``, ``hp.fork(params)`` and so on.
 """
 
 from collections.abc import Mapping, Sequence
@@ -13,6 +16,7 @@ from typing import Any, Dict
 from hp import (
   Choice,
   Dynamic,
+  Evolve,
   Field,
   IntRange,
   LogIntRange,
@@ -21,17 +25,28 @@ from hp import (
   Range,
   ValidationError,
   fields_from_callable,
+  items,
+  parametrize,
   schema,
-  wrap,
+  to_dict,
+  update,
+  validate,
 )
+from hp import from_command as _from_command
 
 
 class HyperParams(Params):
+  """``hp.Params`` plus yann's legacy entry points.
+
+  Only classmethods and dunders are added, so the instance namespace stays
+  empty for user fields.
+  """
+
   @classmethod
-  def from_command(cls, cmd=None, validate=False, **kwargs):
-    params = super().from_command(cmd)
-    if validate:
-      params.validate()
+  def from_command(cls, cmd=None, validate_params=False, **kwargs):
+    params = _from_command(cls, cmd)
+    if validate_params:
+      validate(params)
     return params
 
   @classmethod
@@ -44,38 +59,39 @@ class HyperParams(Params):
       return tuple(self[k] for k in key)
     return super().__getitem__(key)
 
-  def inject(self, scope=None, uppercase=True):
-    scope = globals() if scope is None else scope
-    for k, v in self.items():
-      scope[k.upper() if uppercase else k] = v
 
-  @classmethod
-  def collect(
-    cls,
-    scope=None,
-    types=(int, str, float, bool),
-    upper_only=True,
-    lowercase=True,
-  ):
-    scope = globals() if scope is None else scope
-
-    values = {}
-    for k, v in scope.items():
-      if types and not isinstance(v, types):
-        continue
-      if upper_only and not k.isupper():
-        continue
-      values[k.lower() if lowercase else k] = v
-
-    return cls(**values)
+def inject(params: Params, scope=None, uppercase=True):
+  """Copy params into a namespace, uppercased by default."""
+  scope = globals() if scope is None else scope
+  for key, value in items(params):
+    scope[key.upper() if uppercase else key] = value
 
 
-def to_dict(params: Params) -> Dict[str, Any]:
-  return params.to_dict()
+def collect(
+  cls,
+  scope=None,
+  types=(int, str, float, bool),
+  upper_only=True,
+  lowercase=True,
+):
+  """Build params from the constants in a namespace."""
+  scope = globals() if scope is None else scope
+
+  values = {}
+  for key, value in scope.items():
+    if types and not isinstance(value, types):
+      continue
+    if upper_only and not key.isupper():
+      continue
+    values[key.lower() if lowercase else key] = value
+
+  return cls(**values)
 
 
 def save_params(params: Params, path):
-  params.save(path)
+  from hp import save
+
+  save(params, path)
 
 
 _PRIMITIVE_TYPES = (str, int, float, bool, type(None))
@@ -84,6 +100,9 @@ _PRIMITIVE_TYPES = (str, int, float, bool, type(None))
 def _serialize_param_value(value, *, _depth=0):
   if isinstance(value, _PRIMITIVE_TYPES):
     return value
+
+  if isinstance(value, Params):
+    return to_serializable_dict(value)
 
   if isinstance(value, Mapping):
     return {
@@ -106,24 +125,30 @@ def _serialize_param_value(value, *, _depth=0):
 
 def to_serializable_dict(params: Params) -> Dict[str, Any]:
   """Params as a dict safe to serialize, stringifying unsupported objects."""
-  return {k: _serialize_param_value(v) for k, v in params.items()}
+  return {k: _serialize_param_value(v) for k, v in items(params)}
 
 
 __all__ = [
   'Params',
-  'Dynamic',
   'HyperParams',
+  'Dynamic',
   'Field',
   'Choice',
   'Range',
   'LogRange',
   'IntRange',
   'LogIntRange',
+  'Evolve',
   'ValidationError',
   'schema',
-  'wrap',
+  'parametrize',
   'fields_from_callable',
   'to_dict',
+  'items',
+  'update',
+  'validate',
+  'inject',
+  'collect',
   'save_params',
   'to_serializable_dict',
 ]

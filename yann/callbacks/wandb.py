@@ -1,3 +1,4 @@
+import hp
 from typing import Optional
 
 try:
@@ -46,7 +47,7 @@ class Wandb(Callback):
         project=self.project,
         entity=self.entity,
         name=self.name or trainer.name,
-        config=dict(trainer.params) if trainer.params else {},
+        config=hp.to_dict(trainer.params) if trainer.params else {},
       )
 
       if self.log_code is True:

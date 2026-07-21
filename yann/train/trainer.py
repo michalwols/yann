@@ -1,3 +1,4 @@
+import hp
 import datetime
 import inspect
 import logging
@@ -258,7 +259,7 @@ class Trainer(TrainState, BaseTrainer):
 
   @classmethod
   def from_params(cls, params: Params, **kwargs: Unpack[Params]):
-    return cls(**{**params, **kwargs}, params=params)
+    return cls(**{**hp.to_dict(params), **kwargs}, params=params)
 
   @time('Initialize Trainer')
   def __init__(
@@ -274,7 +275,7 @@ class Trainer(TrainState, BaseTrainer):
       if isinstance(params, self.Params)
       else self.Params(params) if params else self.Params()
     )
-    self.params.update(kwargs)
+    hp.update(self.params, kwargs)
 
     if self.params.seed is not None:
       yann.seed(self.params.seed)
