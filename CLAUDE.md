@@ -28,10 +28,11 @@ Yann (Yet Another Neural Network Library) is an extended version of torch.nn tha
    - Training tracking in `train/track.py`
 
 2. **Parameter System** (`yann/params.py`)
-   - `HyperParams` base class for configuration
-   - Automatically generates CLI arguments from class attributes
-   - Use `Choice` and `Range` for constrained parameters
-   - Call `Params.from_command()` to parse CLI args
+   - Thin shim over the standalone `hp` package (github.com/michalwols/hp)
+   - `HyperParams` (= `hp.HP`) base class for configuration
+   - Constraints go in value position: `lr: float = Range(1e-5, 1e-1, default=0.01)`, `optimizer: str = Choice(('SGD', 'Adam'))`
+   - Call `Params.from_command()` to parse CLI args (`--lr 0.1`, `--optim.lr=0.1`, dashes normalized)
+   - hp also provides search spaces (`sample()`/`grid()`), `freeze()`, `diff()`, `stable_hash()`, env/file loading
 
 3. **Module System** (`yann/modules/`)
    - `Stack`: Sequential container for layers (like nn.Sequential but more powerful)

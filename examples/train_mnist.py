@@ -1,3 +1,4 @@
+import hp
 import torch
 from torch import nn
 from torchvision import transforms
@@ -15,9 +16,9 @@ class Params(HyperParams):
   dataset = 'MNIST'
   batch_size = 32
   epochs = 10
-  optimizer: Choice(('SGD', 'Adam')) = 'SGD'
-  learning_rate: Range(0.01, 0.0001) = 0.01
-  momentum = 0
+  optimizer: str = Choice(('SGD', 'Adam'))
+  learning_rate: float = Range(0.0001, 0.01, default=0.01)
+  momentum: float = 0
 
   seed = 1
 
@@ -61,7 +62,7 @@ class BoundedLeakyReLU(nn.Module):
 if __name__ == '__main__':
   # parse command line arguments
   params = Params.from_command()
-  params.validate()
+  hp.validate(params)
 
   print(params)
 

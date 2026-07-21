@@ -1,3 +1,4 @@
+import hp
 import logging
 from pathlib import Path
 
@@ -62,7 +63,7 @@ class Tensorboard(Callback):
       self._init_writer()
 
     try:
-      self.writer.add_hparams(dict(self.trainer.params), {})
+      self.writer.add_hparams(hp.to_dict(self.trainer.params), {})
     except Exception as e:
       print(f'failed to write tensorboard hparams: {e}')
 
@@ -70,7 +71,7 @@ class Tensorboard(Callback):
     if self.trainer and self.trainer.params and self.trainer.history.val_metrics:
       try:
         self.writer.add_hparams(
-          dict(self.trainer.params),
+          hp.to_dict(self.trainer.params),
           self.trainer.history.val_metrics.summary(),
         )
       except ValueError as e:

@@ -136,7 +136,7 @@ class BertParams(Trainer.Params):
     """Configuration parameters for BERT text classification."""
     
     # Dataset configuration
-    dataset: Choice(['imdb', 'ag_news', 'sst2']) = 'imdb'
+    dataset: str = Choice(['imdb', 'ag_news', 'sst2'], default='imdb')
     max_length: int = 512
     
     # Model configuration  
@@ -156,7 +156,7 @@ class BertParams(Trainer.Params):
     clip_grad_max_norm: float = 1.0
     
     # Device and performance
-    device: Choice(['auto', 'cpu', 'cuda']) = 'auto'
+    device: str = Choice(['auto', 'cpu', 'cuda'], default='auto')
     amp: bool = True
     
     # Output configuration

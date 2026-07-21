@@ -1,390 +1,98 @@
 """
+Hyperparameter configuration, provided by the standalone ``hp`` package.
 
+``yann.params`` is a thin compatibility layer over ``hp``
+(https://github.com/michalwols/hp). New code should import from ``hp``
+directly.
 
-# TODO:
-- add a way to bind params to a function
-  # inspired by https://github.com/google/gin-config
-  p = Params()
-
-  @p.bind(('batch_size'), prefix=True)
-  def train(batch_size: int = 32):
-    pass
-
-  @p.bind({'batch_size': 'bs'}, prefix='train')
-  def train(batch_size):
-    pass
-
-  @p.bind('smooth')
-  def loss(x, y, smooth=.2):
-    pass
-
-  p.from_command()
-  train()
-
-- add __instance_fields__, __fields__ is a class attribute
-
-
-- Params.sample()
-- Params.sampler() # sample without replacement
-- Params.grid()
-
+``hp.Params`` deliberately has no public methods, so that every attribute name
+stays available for user fields. Operations are module-level functions taking
+the params first: ``hp.to_dict(params)``, ``hp.fork(params)`` and so on.
 """
 
-import logging
-import typing
-from abc import ABCMeta
-from collections import OrderedDict
-from copy import deepcopy
-from functools import wraps
-from typing import Any, Dict, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Dict
 
-from .utils import get_arg_parser
-
-log = logging.getLogger(__name__)
-
-
-class ValidationError(ValueError):
-  pass
-
-
-class Field:
-  def __init__(
-    self,
-    *,
-    name=None,
-    help=None,
-    type=None,
-    required=False,
-    default=None,
-    choices=None,
-  ):
-    self.name = name
-    self.help = help
-    self.type = type
-    self.required = required
-    self.default = default
-    self.choices = choices
-
-  def validate(self, val):
-    try:
-      if self.type and not isinstance(val, self.type):
-        raise ValidationError(
-          f'Failed to validate {self.name}, the type ({type(val)} does is not a subclass of {self.type}',
-        )
-    except TypeError as e:
-      log.debug(
-        f'skipping type validation due to unresolved forwardref for {self.name} and expected type {self.type}',
-      )
-    if self.choices:
-      assert val in self.choices
-
-  def __repr__(self):
-    return f'{self.__class__.__name__}(type={self.type}, default={self.default})'
-
-  def __str__(self):
-    return f'{self.__class__.__name__}(type={self.type}, default={self.default})'
+from hp import (
+  Choice,
+  Dynamic,
+  Evolve,
+  Field,
+  IntRange,
+  LogIntRange,
+  LogRange,
+  Params,
+  Range,
+  ValidationError,
+  fields_from_callable,
+  items,
+  load,
+  params,
+  schema,
+  to_dict,
+  update,
+  validate,
+)
+from hp import cli as _cli
 
 
-class Choice(Field):
-  def __init__(self, choices=None, **kwargs):
-    super().__init__(choices=choices, **kwargs)
+class HyperParams(Params):
+  """``hp.Params`` plus yann's legacy entry points.
 
-
-class Range(Field):
-  def __init__(self, start, end):
-    super(Range, self).__init__()
-    self.min = min(start, end)
-    self.max = max(start, end)
-
-  def validate(self, val):
-    super().validate(val)
-    assert self.min <= val <= self.max
-
-
-class HyperParamsBase:
-  __fields__: Dict[str, Field]
-
-  def __init__(self, **args):
-    self._change_callbacks = []
-
-    for k, v in args.items():
-      if k in self.__fields__:
-        setattr(self, k, v)
-      else:
-        raise ValueError(
-          f'Unknown parameter: {k}, should be one of {", ".join(self.__fields__)}',
-        )
-
-  def validate(self):
-    for k, f in self.__fields__.items():
-      try:
-        f.validate(getattr(self, k))
-      except Exception as e:
-        raise Exception(f'{k} failed validation. {e}')
+  Only classmethods and dunders are added, so the instance namespace stays
+  empty for user fields.
+  """
 
   @classmethod
-  def from_command(cls, cmd=None, validate=False, **kwargs):
-    parser = get_arg_parser(cls.__fields__, **kwargs)
-    parsed = parser.parse_args(cmd.split() if isinstance(cmd, str) else cmd)
-    params = cls(**vars(parsed))
-
-    if validate:
-      params.validate()
-
+  def from_command(cls, cmd=None, validate_params=False, **kwargs):
+    params = load(cls, _cli(cmd) if cmd is not None else _cli)
+    if validate_params:
+      validate(params)
     return params
-
-  #
-  # @classmethod
-  # def from_env(cls, prefix=''):
-  #   raise NotImplementedError()
-  #
-  # @classmethod
-  # def from_constants(cls):
-  #   pass
-
-  @classmethod
-  def load(cls, uri):
-    import yann
-
-    try:
-      data = yann.load(uri)
-    except:
-      try:
-        data = yann.utils.dynamic_import(uri)
-      except:
-        raise ValueError('uri must be a file or fully qualified python path')
-    return cls.from_dict(data)
-
-  def save(self, path):
-    import yann
-
-    yann.save(self.to_dict(), path)
-
-  def on_change(self, callback):
-    self._change_callbacks.append(callback)
-
-  def __setattr__(self, k, v):
-    if k in self.__fields__:
-      for c in self._change_callbacks:
-        c(k, v)
-    super().__setattr__(k, v)
-
-  def __iter__(self):
-    return iter(self.keys())
-
-  def __getitem__(self, item):
-    if isinstance(item, (tuple, list)):
-      return tuple(getattr(self, k) for k in item)
-    return getattr(self, item)
-
-  def __setitem__(self, k, v):
-    setattr(self, k, v)
-
-  def __len__(self):
-    return len(self.__fields__)
-
-  def __eq__(self, other):
-    return (
-      len(self) == len(other)
-      and self.keys() == other.keys()
-      and all(self[k] == other[k] for k in self.keys())
-    )
-
-  def fork(self, **args):
-    data = dict(self.items())
-    data.update(args)
-    return self.__class__(**data)
-
-  def to_dict(self) -> Dict[str, Any]:
-    return {k: getattr(self, k) for k in self.keys()}
 
   @classmethod
   def from_dict(cls, data: Mapping[str, Any]):
     return cls(**dict(data))
 
-  def __repr__(self):
-    return (
-      f'{self.__class__.__name__}({", ".join(f"{k}={v}" for k, v in self.items())})'
-    )
-
-  def __str__(self):
-    return (
-      f'{self.__class__.__name__}(\n'
-      + ',\n'.join('  {}={}'.format(k, v) for k, v in self.items())
-      + '\n)'
-    )
-
-  def __contains__(self, key):
-    return key in self.__fields__
-
-  def __hash__(self):
-    return hash(tuple(sorted(self.items())))
-
-  def keys(self):
-    return self.__fields__.keys()
-
-  def values(self):
-    return {getattr(self, k) for k in self.keys()}
-
-  def items(self):
-    return ((k, getattr(self, k)) for k in self.keys())
-
-  def update(self, other=None, **kwargs):
-    """Update parameters from dict or kwargs."""
-    if other is not None:
-      if hasattr(other, 'items'):
-        for k, v in other.items():
-          if k in self.__fields__:
-            setattr(self, k, v)
-      else:
-        for k in other:
-          if k in self.__fields__:
-            setattr(self, k, other[k])
-    for k, v in kwargs.items():
-      if k in self.__fields__:
-        setattr(self, k, v)
-
-  def inject(self, scope=None, uppercase=True):
-    scope = globals() if scope is None else scope
-    for k, v in self.items():
-      scope[k.upper() if uppercase else k] = v
-
-  @classmethod
-  def collect(
-    cls,
-    scope=None,
-    types=(int, str, float, bool),
-    upper_only=True,
-    lowercase=True,
-  ):
-    scope = globals() if scope is None else scope
-
-    d = {}
-    for k, v in scope.items():
-      if types and not isinstance(v, types):
-        continue
-      if upper_only and not k.isupper():
-        continue
-
-      d[k.lower() if lowercase else k] = v
-
-    return cls(**d)
+  def __getitem__(self, key):
+    # legacy multi-key access: params['a', 'b'] == (params.a, params.b)
+    if isinstance(key, (tuple, list)):
+      return tuple(self[k] for k in key)
+    return super().__getitem__(key)
 
 
-class MetaHyperParams(ABCMeta):
-  def __new__(metaclass, class_name, bases, namespace):
-    fields = OrderedDict()
-
-    for base in reversed(bases):
-      if issubclass(base, HyperParamsBase) and base != HyperParamsBase:
-        fields.update(
-          # deepcopy(
-          base.__fields__,
-          # )
-        )
-
-    # existing_attributes = set(dir(HyperParamsBase)) | set(fields)
-
-    new_attributes = {
-      k: v for (k, v) in namespace.items() if not k.startswith('_') and not callable(v)
-    }
-
-    for name, annotation in namespace.get('__annotations__', {}).items():
-      if name not in new_attributes:
-        continue
-      if isinstance(annotation, Field):
-        fields[name] = annotation
-      else:
-        fields[name] = Field(type=annotation)
-
-    for name, value in new_attributes.items():
-      if name in fields:
-        # already defined annotation, need to set default
-        fields[name].default = value
-      else:
-        # new attribute without type annotation
-        fields[name] = Field(name=name, default=value, type=type(value))
-
-    return super().__new__(
-      metaclass,
-      class_name,
-      bases,
-      {
-        '__fields__': fields,
-        **namespace,
-      },
-    )
+def inject(params: Params, scope=None, uppercase=True):
+  """Copy params into a namespace, uppercased by default."""
+  scope = globals() if scope is None else scope
+  for key, value in items(params):
+    scope[key.upper() if uppercase else key] = value
 
 
-class HyperParams(HyperParamsBase, metaclass=MetaHyperParams):
-  def __getstate__(self):
-    return self.__dict__
+def collect(
+  cls,
+  scope=None,
+  types=(int, str, float, bool),
+  upper_only=True,
+  lowercase=True,
+):
+  """Build params from the constants in a namespace."""
+  scope = globals() if scope is None else scope
 
-  def __setstate__(self, state):
-    self.__dict__.update(state)
+  values = {}
+  for key, value in scope.items():
+    if types and not isinstance(value, types):
+      continue
+    if upper_only and not key.isupper():
+      continue
+    values[key.lower() if lowercase else key] = value
 
-  def __reduce__(self):
-    return (self.__class__,)
-
-
-def to_argparse(params: HyperParams, **kwargs):
-  return get_arg_parser(params.__fields__, **kwargs)
-
-
-def bind(params, mapping=None):
-  def decorator(function):
-    import inspect
-
-    sig = inspect.signature(function)
-
-    _mapping = mapping or {}
-    for p in sig.parameters:
-      if p not in _mapping and p in params:
-        _mapping[p] = p
-
-    @wraps(function)
-    def bound(*args, **kwargs):
-      for k, p in _mapping.items():
-        if k in kwargs:
-          params[p] = kwargs[k]
-        else:
-          kwargs[k] = params[p]
-
-      return function(*args, **kwargs)
-
-    return bound
-
-  return decorator
+  return cls(**values)
 
 
-def from_signature(function, params: HyperParams = None):
-  import inspect
+def save_params(params: Params, path):
+  from hp import save
 
-  sig = inspect.signature(function)
-
-  params = params or HyperParams()
-  for k, p in sig.parameters.items():
-    default = p.default if p.default is not p.empty else None
-
-    params.__fields__[k] = Field(
-      name=p.name,
-      default=default,
-      type=p.annotation
-      if p.annotation is not p.empty
-      else (type(p.default) if p.default is not p.empty else None),
-    )
-    params[k] = default
-  return params
-
-
-def to_dict(params: HyperParamsBase) -> Dict[str, Any]:
-  if hasattr(params, 'to_dict'):
-    return params.to_dict()
-  return {k: getattr(params, k) for k in params.keys()}
-
-
-def save_params(params: HyperParamsBase, path):
-  params.save(path)
+  save(params, path)
 
 
 _PRIMITIVE_TYPES = (str, int, float, bool, type(None))
@@ -394,8 +102,13 @@ def _serialize_param_value(value, *, _depth=0):
   if isinstance(value, _PRIMITIVE_TYPES):
     return value
 
+  if isinstance(value, Params):
+    return to_serializable_dict(value)
+
   if isinstance(value, Mapping):
-    return {str(k): _serialize_param_value(v, _depth=_depth + 1) for k, v in value.items()}
+    return {
+      str(k): _serialize_param_value(v, _depth=_depth + 1) for k, v in value.items()
+    }
 
   if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
     return [_serialize_param_value(v, _depth=_depth + 1) for v in value]
@@ -411,9 +124,33 @@ def _serialize_param_value(value, *, _depth=0):
     return repr(value)
 
 
-def to_serializable_dict(params: HyperParamsBase) -> Dict[str, Any]:
-  return {k: _serialize_param_value(getattr(params, k)) for k in params.keys()}
+def to_serializable_dict(params: Params) -> Dict[str, Any]:
+  """Params as a dict safe to serialize, stringifying unsupported objects."""
+  return {k: _serialize_param_value(v) for k, v in items(params)}
 
 
-def register():
-  pass
+__all__ = [
+  'Params',
+  'HyperParams',
+  'Dynamic',
+  'Field',
+  'Choice',
+  'Range',
+  'LogRange',
+  'IntRange',
+  'LogIntRange',
+  'Evolve',
+  'ValidationError',
+  'schema',
+  'params',
+  'load',
+  'fields_from_callable',
+  'to_dict',
+  'items',
+  'update',
+  'validate',
+  'inject',
+  'collect',
+  'save_params',
+  'to_serializable_dict',
+]

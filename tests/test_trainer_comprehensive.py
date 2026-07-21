@@ -1,3 +1,4 @@
+import hp
 import os
 import tempfile
 from pathlib import Path
@@ -114,7 +115,7 @@ class TestTrainerInitialization:
   def test_params_update(self):
     """Test that params.update works correctly."""
     trainer = Trainer()
-    trainer.params.update({'lr': 0.1, 'batch_size': 128})
+    hp.update(trainer.params, {'lr': 0.1, 'batch_size': 128})
     assert trainer.params.lr == 0.1
     assert trainer.params.batch_size == 128
 
@@ -196,6 +197,7 @@ class TestTrainerSetup:
     )
     trainer(epochs=1)  # Need at least 1 epoch
     assert trainer.lr_scheduler is not None
+    assert trainer.lr_scheduler.patience == 10
 
 
 # Test Training Lifecycle
@@ -430,7 +432,8 @@ class TestStateManagement:
     trainer1(epochs=2)
     
     # Get checkpoint file
-    checkpoint_files = list(trainer1.paths.checkpoints.glob('*.th'))
+    # glob order is not guaranteed, sort so the newest checkpoint wins
+    checkpoint_files = sorted(trainer1.paths.checkpoints.glob('*.th'))
     assert len(checkpoint_files) > 0
     checkpoint_path = checkpoint_files[-1]  # Get last checkpoint
     

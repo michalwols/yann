@@ -1,0 +1,99 @@
+id: coral-clear-math
+name: TensorDataset-Sequential
+path: runs/TensorDataset-Sequential/26-07-21T14:27:36
+num_steps: 4
+num_samples: 40
+num_epochs: 2
+batch_size: 10
+device: mps
+time_created: '2026-07-21T14:27:36.868746'
+params:
+  id: null
+  name: null
+  description: null
+  project: null
+  meta: null
+  root: ./runs/
+  model: torch.nn.modules.container.Sequential
+  dataset: torch.utils.data.dataset.TensorDataset
+  subset: null
+  batch_size: 10
+  classes: null
+  optimizer: Adam
+  parameters: trainable
+  lr: null
+  weight_decay: null
+  momentum: null
+  lr_scheduler: null
+  lr_scheduler_params: null
+  lr_batch_step: false
+  none_grad: true
+  grad_accum: 1
+  epochs: null
+  loss: torch.nn.modules.loss.CrossEntropyLoss
+  loader: null
+  num_workers: 8
+  collate: null
+  pin_memory: true
+  sampler: null
+  batch_sampler: null
+  prefetch_factor: 2
+  persistent_workers: true
+  transform: null
+  transform_batch: null
+  callbacks: []
+  device: null
+  dtype: null
+  val_dataset: null
+  val_subset: null
+  val_loader: null
+  val_transform: null
+  metrics: null
+  dist: null
+  parallel: null
+  amp: false
+  grad_scaler: null
+  benchmark: true
+  jit: false
+  memory_format: preserve_format
+  aot_autograd: false
+  cuda_graph: false
+  compile: false
+  tf32: false
+  step: null
+  place: null
+  clip_grad: null
+  seed: null
+  from_checkpoint: null
+env:
+  cwd: /Users/michalwolski/projects/yann-integration
+  arguments:
+  - /Users/michalwolski/projects/yann-integration/.venv/lib/python3.12/site-packages/pytest/__main__.py
+  - tests
+  - -q
+  - -p
+  - no:cacheprovider
+  git_hash: 8287c1e
+  python:
+    executable: /Users/michalwolski/projects/yann-integration/.venv/bin/python3
+    version: 3.12.5 (main, Aug 14 2024, 04:32:18) [Clang 18.1.8 ]
+    path:
+    - /Users/michalwolski/projects/yann-integration
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.12.5-macos-aarch64-none/lib/python312.zip
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.12.5-macos-aarch64-none/lib/python3.12
+    - /Users/michalwolski/.local/share/uv/python/cpython-3.12.5-macos-aarch64-none/lib/python3.12/lib-dynload
+    - /Users/michalwolski/projects/yann-integration/.venv/lib/python3.12/site-packages
+    - /Users/michalwolski/projects/hp/src
+    - /var/folders/16/qqcqrk5d2c748c0t_fnps_g00000gn/T/tmpfra_ogjg
+  torch_version: !!python/object/new:torch.torch_version.TorchVersion
+  - 2.6.0
+  yann_version: 0.0.40
+  hostname: Michals-MacBook-Pro.local
+dataset:
+  name: TensorDataset
+  size: 20
+  num_classes: null
+model:
+  name: Sequential
+  param_count: 262
+  trainable_param_count: 262

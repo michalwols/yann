@@ -8,7 +8,6 @@ from .history import History, HistoryPlotter, HistoryWriter
 from .logging import Logger
 
 # from .ema import EMA
-# from .swa import SWA
 from .lr import LRRangeTest
 from .progbar import ProgressBar
 from .stop import StopOnNaN

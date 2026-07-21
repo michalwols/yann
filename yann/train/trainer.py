@@ -1,7 +1,10 @@
+import hp
 import datetime
 import inspect
 import logging
 import types
+from contextlib import nullcontext
+from functools import wraps
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Sequence, Union
 
@@ -34,6 +37,58 @@ from yann.utils.timer import time
 log = logging.getLogger(__name__)
 
 
+def batch_size(inputs):
+  if isinstance(inputs, Mapping):
+    for value in inputs.values():
+      if torch.is_tensor(value) and value.ndim:
+        return len(value)
+  return len(inputs)
+
+
+def batch_token_count(inputs):
+  if isinstance(inputs, Mapping):
+    mask = inputs.get('loss_mask', inputs.get('attention_mask'))
+    if torch.is_tensor(mask):
+      return int(mask.sum().item())
+    ids = inputs.get('input_ids')
+    if torch.is_tensor(ids):
+      return int(ids.numel())
+  return None
+
+
+def adapt_step(function):
+  """
+  Support step functions written as step(trainer, batch) in addition to
+  the legacy step(trainer, inputs, targets) signature.
+  """
+  try:
+    parameters = list(inspect.signature(function).parameters.values())
+  except (TypeError, ValueError):
+    return function
+
+  positional = [
+    p
+    for p in parameters
+    if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+  ]
+  if len(positional) != 2 or any(
+    p.kind == p.VAR_POSITIONAL for p in parameters
+  ):
+    return function
+
+  @wraps(function)
+  def stepper(trainer, inputs=None, targets=None):
+    batch = inputs if targets is inputs else (inputs, targets)
+    result = function(trainer, batch)
+    if isinstance(result, Mapping):
+      return result.get('outputs', result.get('output')), result.get('loss')
+    if isinstance(result, tuple) and len(result) == 2:
+      return result
+    return None, result
+
+  return stepper
+
+
 class Keys:
   """
   keys for data batch
@@ -48,6 +103,8 @@ class TrainState:
   num_steps: int = 0
   num_epochs: int = 0
   num_samples: int = 0
+  num_tokens: int = 0
+  num_optim_steps: int = 0
 
 
 class Params(yann.params.HyperParams):
@@ -73,8 +130,10 @@ class Params(yann.params.HyperParams):
   weight_decay: Optional[float] = None
   momentum: Optional[float] = None
   lr_scheduler: Union[torch.optim.lr_scheduler._LRScheduler, None] = None
+  lr_scheduler_params: Optional[Dict] = None
   lr_batch_step: bool = False
   none_grad: bool = True
+  grad_accum: int = 1
 
   epochs: Optional[int] = None
 
@@ -183,6 +242,7 @@ class Trainer(TrainState, BaseTrainer):
   sampler: Optional[Sampler] = None
 
   paths: Paths = None
+  checkpoint_params: Optional[Dict] = None
   callbacks: Optional['yann.callbacks.Callbacks'] = None
   log: Optional['yann.callbacks.Logger'] = None
 
@@ -200,7 +260,31 @@ class Trainer(TrainState, BaseTrainer):
 
   @classmethod
   def from_params(cls, params: Params, **kwargs: Unpack[Params]):
-    return cls(**{**params, **kwargs}, params=params)
+    return cls(**{**hp.to_dict(params), **kwargs}, params=params)
+
+  @classmethod
+  def from_checkpoint(cls, path, map_location=None, **overrides):
+    """Build a trainer using the config recorded in a checkpoint.
+
+    The checkpoint's params are the base layer and ``overrides`` win, so
+    resuming with a different learning rate is one keyword. Anything the
+    checkpoint could not store -- the model, the dataset -- has to be passed
+    in, since only its type name was recorded.
+    """
+    data = torch.load(path, map_location=map_location, weights_only=False)
+    recorded = data.get('params') or {}
+    literal = set(data.get('params_literal') or ())
+    # a stringified model or loss is a description, not something a
+    # constructor can take back, so only literals are replayed
+    saved = {
+      key: value
+      for key, value in recorded.items()
+      if key in literal and key != 'from_checkpoint' and key not in overrides
+    }
+
+    trainer = cls(**{**saved, **overrides})
+    trainer.load_checkpoint(path, map_location=map_location)
+    return trainer
 
   @time('Initialize Trainer')
   def __init__(
@@ -216,7 +300,7 @@ class Trainer(TrainState, BaseTrainer):
       if isinstance(params, self.Params)
       else self.Params(params) if params else self.Params()
     )
-    self.params.update(kwargs)
+    hp.update(self.params, kwargs)
 
     if self.params.seed is not None:
       yann.seed(self.params.seed)
@@ -250,6 +334,8 @@ class Trainer(TrainState, BaseTrainer):
 
     self.lr_batch_step = self.params.lr_batch_step
     self.none_grad = self.params.none_grad
+    self.grad_accum = max(1, int(self.params.grad_accum or 1))
+    self._accum_step = 0
 
     self.model = yann.resolve.model(self.params.model, required=False, validate=callable)
 
@@ -485,7 +571,10 @@ class Trainer(TrainState, BaseTrainer):
 
     self.lr_scheduler = yann.resolve.lr_scheduler(
       self.params.lr_scheduler,
-      kwargs=dict(optimizer=self.optimizer),
+      kwargs=dict(
+        optimizer=self.optimizer,
+        **(self.params.lr_scheduler_params or {}),
+      ),
     )
 
     self.clip_grad = None
@@ -639,11 +728,14 @@ class Trainer(TrainState, BaseTrainer):
       # assume it's used as a decorator
       # @train.override('step')
       # def custom_step(trainer, inputs, targets):
+      # def custom_step(trainer, batch):
       def decorator(f):
+        f = adapt_step(f) if method == 'step' else f
         setattr(self, method, types.MethodType(f, self))
 
       return decorator
     else:
+      function = adapt_step(function) if method == 'step' else function
       setattr(self, method, types.MethodType(function, self))
 
   def step(self, inputs=None, targets=None):
@@ -682,32 +774,55 @@ class Trainer(TrainState, BaseTrainer):
 
   def update(self, loss=None, inputs=None, targets=None, outputs=None):
     """
-    Handles resetting gradients, running backward pass and optimizer step
+    Handles resetting gradients, running backward pass and optimizer step,
+    accumulating gradients over `grad_accum` batches before each step
     """
-
-    # TODO: add gradient accumulation
-
-    # Skip update if no optimizer is configured
     if self.optimizer is None:
       return
 
-    self.optimizer.zero_grad(set_to_none=self.none_grad)
+    if self._accum_step % self.grad_accum == 0:
+      self.optimizer.zero_grad(set_to_none=self.none_grad)
+    self._accum_step += 1
+    sync = self._accum_step % self.grad_accum == 0
 
+    if self.grad_accum > 1:
+      loss = loss / self.grad_accum
+
+    # skip DDP gradient sync on intermediate accumulation batches
+    context = (
+      self.model.no_sync()
+      if not sync and hasattr(self.model, 'no_sync')
+      else nullcontext()
+    )
+    with context:
+      if self.grad_scaler:
+        self.grad_scaler.scale(loss).backward()
+      else:
+        loss.backward()
+
+    if sync:
+      self._optim_step()
+
+  def _optim_step(self):
     if self.grad_scaler:
-      self.grad_scaler.scale(loss).backward()
-      self.grad_scaler.step(self.optimizer)
-
       if self.clip_grad:
         self.grad_scaler.unscale_(self.optimizer)
         self.clip_grad(self.model.parameters())
+      self.grad_scaler.step(self.optimizer)
       self.grad_scaler.update()
     else:
-      loss.backward()
-
       if self.clip_grad:
         self.clip_grad(self.model.parameters())
-
       self.optimizer.step()
+    self.num_optim_steps += 1
+
+  def _finish_accumulation(self):
+    """Apply a trailing partial gradient accumulation window."""
+    if self.grad_accum <= 1 or self._accum_step % self.grad_accum == 0:
+      return
+    self._optim_step()
+    self.optimizer.zero_grad(set_to_none=self.none_grad)
+    self._accum_step = 0
 
   def validate(self, loader=None, device=None):
     loader = loader or self.val_loader
@@ -781,14 +896,14 @@ class Trainer(TrainState, BaseTrainer):
             self.sampler.set_epoch(epoch_idx)
 
           for batch in self.batches():
-            if isinstance(batch, dict):
-              inputs, targets = batch, batch  # Pass dict as both inputs and targets
-            elif isinstance(batch, (list, tuple)) and len(batch) == 1:
-              # Single element batch - use it for both inputs and targets
+            if isinstance(batch, (tuple, list)) and len(batch) == 2:
+              inputs, targets = batch  # Traditional tuple unpacking
+            elif isinstance(batch, (tuple, list)) and len(batch) == 1:
               inputs, targets = batch[0], None
             else:
-              inputs, targets = batch  # Traditional tuple unpacking
-            
+              # dicts and other structures are passed whole as both
+              inputs, targets = batch, batch
+
             self.callbacks.on_step_start(
               index=self.num_steps,
               inputs=inputs,
@@ -823,11 +938,14 @@ class Trainer(TrainState, BaseTrainer):
               self._lr_scheduler_step(step=self.num_steps)
 
             self.num_steps += 1
-            batch_size = len(inputs) if hasattr(inputs, '__len__') and not isinstance(inputs, dict) else 0
-            self.num_samples += batch_size
+            self.num_samples += batch_size(inputs)
+            tokens = batch_token_count(inputs)
+            if tokens:
+              self.num_tokens += tokens
 
             if self._stop:
               break
+          self._finish_accumulation()
           if self._stop:
             break
 
@@ -857,28 +975,26 @@ class Trainer(TrainState, BaseTrainer):
           self.sampler.set_epoch(epoch_idx)
 
         for batch in self.batches():
-          if isinstance(batch, dict):
-            inputs, targets = batch, batch  # Pass dict as both inputs and targets
-          else:
+          if isinstance(batch, (tuple, list)) and len(batch) == 2:
             inputs, targets = batch  # Traditional tuple unpacking
-          
+          elif isinstance(batch, (tuple, list)) and len(batch) == 1:
+            inputs, targets = batch[0], None
+          else:
+            # dicts and other structures are passed whole as both
+            inputs, targets = batch, batch
+
           outputs, loss = self.step(inputs=inputs, targets=targets)
 
           if self.lr_scheduler and self.lr_batch_step:
-            self.lr_scheduler.step(epoch=self.num_steps)
+            self._lr_scheduler_step(step=self.num_steps)
 
           self.num_steps += 1
-          try:
-            if isinstance(inputs, dict):
-              batch_size = len(next(iter(inputs.values())))
-            elif hasattr(inputs, '__len__'):
-              batch_size = len(inputs)
-            else:
-              batch_size = 0
-          except:
-            batch_size = 0
-          self.num_samples += batch_size
+          self.num_samples += batch_size(inputs)
+          tokens = batch_token_count(inputs)
+          if tokens:
+            self.num_tokens += tokens
 
+        self._finish_accumulation()
         val_loss = self.validate() if self.val_loader else None
         self._lr_scheduler_step(
           step=epoch_idx,
@@ -961,10 +1077,22 @@ class Trainer(TrainState, BaseTrainer):
         'num_steps': self.num_steps,
         'num_samples': self.num_samples,
         'num_epochs': self.num_epochs,
+        'num_tokens': self.num_tokens,
+        'num_optim_steps': self.num_optim_steps,
         'batch_size': self.params.batch_size,
         'time_created': self.time_created.isoformat() if isinstance(self.time_created, datetime.datetime) else self.time_created,
         'param_hash': hash_params(self.model),
       },
+      # the config the run was trained with, so a checkpoint is
+      # self-describing; secrets and unpicklable objects are stripped
+      'params': hp.serializable(self.params),
+      # which of those were literals rather than stringified objects, and so
+      # can be fed back into a constructor
+      'params_literal': sorted(
+        key
+        for key, value in hp.to_dict(self.params).items()
+        if isinstance(value, (str, int, float, bool, type(None)))
+      ),
     }
 
     for k, v in self.__dict__.items():
@@ -990,10 +1118,23 @@ class Trainer(TrainState, BaseTrainer):
 
     from inspect import getfullargspec
 
+    self.checkpoint_params = data.get('params')
+    if self.checkpoint_params:
+      changed = hp.diff(self.params, self.checkpoint_params)
+      # values the checkpoint was trained with that this run disagrees about
+      drift = {k: v for k, v in changed.items() if k in self.checkpoint_params}
+      if drift:
+        log.warning(
+          'checkpoint was trained with different params: '
+          + ', '.join(f'{k}={old!r} -> {new!r}' for k, (new, old) in drift.items()),
+        )
+
     for k, v in data.items():
       if keys and k not in keys:
         continue
-      if 'state_dict' in v and hasattr(self, k):
+      if k == 'params':
+        continue
+      if 'state_dict' in v and getattr(self, k, None) is not None:
         entry = getattr(self, k)
         if 'strict' in getfullargspec(entry.load_state_dict).args:
           entry.load_state_dict(v['state_dict'], strict=strict)
