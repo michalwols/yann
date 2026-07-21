@@ -242,6 +242,7 @@ class Trainer(TrainState, BaseTrainer):
   sampler: Optional[Sampler] = None
 
   paths: Paths = None
+  checkpoint_params: Optional[Dict] = None
   callbacks: Optional['yann.callbacks.Callbacks'] = None
   log: Optional['yann.callbacks.Logger'] = None
 
@@ -260,6 +261,30 @@ class Trainer(TrainState, BaseTrainer):
   @classmethod
   def from_params(cls, params: Params, **kwargs: Unpack[Params]):
     return cls(**{**hp.to_dict(params), **kwargs}, params=params)
+
+  @classmethod
+  def from_checkpoint(cls, path, map_location=None, **overrides):
+    """Build a trainer using the config recorded in a checkpoint.
+
+    The checkpoint's params are the base layer and ``overrides`` win, so
+    resuming with a different learning rate is one keyword. Anything the
+    checkpoint could not store -- the model, the dataset -- has to be passed
+    in, since only its type name was recorded.
+    """
+    data = torch.load(path, map_location=map_location, weights_only=False)
+    recorded = data.get('params') or {}
+    literal = set(data.get('params_literal') or ())
+    # a stringified model or loss is a description, not something a
+    # constructor can take back, so only literals are replayed
+    saved = {
+      key: value
+      for key, value in recorded.items()
+      if key in literal and key != 'from_checkpoint' and key not in overrides
+    }
+
+    trainer = cls(**{**saved, **overrides})
+    trainer.load_checkpoint(path, map_location=map_location)
+    return trainer
 
   @time('Initialize Trainer')
   def __init__(
@@ -1058,6 +1083,16 @@ class Trainer(TrainState, BaseTrainer):
         'time_created': self.time_created.isoformat() if isinstance(self.time_created, datetime.datetime) else self.time_created,
         'param_hash': hash_params(self.model),
       },
+      # the config the run was trained with, so a checkpoint is
+      # self-describing; secrets and unpicklable objects are stripped
+      'params': hp.serializable(self.params),
+      # which of those were literals rather than stringified objects, and so
+      # can be fed back into a constructor
+      'params_literal': sorted(
+        key
+        for key, value in hp.to_dict(self.params).items()
+        if isinstance(value, (str, int, float, bool, type(None)))
+      ),
     }
 
     for k, v in self.__dict__.items():
@@ -1083,10 +1118,23 @@ class Trainer(TrainState, BaseTrainer):
 
     from inspect import getfullargspec
 
+    self.checkpoint_params = data.get('params')
+    if self.checkpoint_params:
+      changed = hp.diff(self.params, self.checkpoint_params)
+      # values the checkpoint was trained with that this run disagrees about
+      drift = {k: v for k, v in changed.items() if k in self.checkpoint_params}
+      if drift:
+        log.warning(
+          'checkpoint was trained with different params: '
+          + ', '.join(f'{k}={old!r} -> {new!r}' for k, (new, old) in drift.items()),
+        )
+
     for k, v in data.items():
       if keys and k not in keys:
         continue
-      if 'state_dict' in v and hasattr(self, k):
+      if k == 'params':
+        continue
+      if 'state_dict' in v and getattr(self, k, None) is not None:
         entry = getattr(self, k)
         if 'strict' in getfullargspec(entry.load_state_dict).args:
           entry.load_state_dict(v['state_dict'], strict=strict)
