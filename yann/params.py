@@ -4,19 +4,20 @@ Hyperparameter configuration, provided by the standalone ``hp`` package.
 ``yann.params`` is now a thin compatibility layer over ``hp``
 (https://github.com/michalwols/hp). New code should import from ``hp``
 directly; ``HyperParams`` here adds yann's legacy entry points on top of
-``hp.HP``.
+``hp.Params``.
 """
 
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict
 
 from hp import (
-  HP,
   Choice,
+  Dynamic,
   Field,
   IntRange,
   LogIntRange,
   LogRange,
+  Params,
   Range,
   ValidationError,
   fields_from_callable,
@@ -25,7 +26,7 @@ from hp import (
 )
 
 
-class HyperParams(HP):
+class HyperParams(Params):
   @classmethod
   def from_command(cls, cmd=None, validate=False, **kwargs):
     params = super().from_command(cmd)
@@ -69,11 +70,11 @@ class HyperParams(HP):
     return cls(**values)
 
 
-def to_dict(params: HP) -> Dict[str, Any]:
+def to_dict(params: Params) -> Dict[str, Any]:
   return params.to_dict()
 
 
-def save_params(params: HP, path):
+def save_params(params: Params, path):
   params.save(path)
 
 
@@ -103,13 +104,14 @@ def _serialize_param_value(value, *, _depth=0):
     return repr(value)
 
 
-def to_serializable_dict(params: HP) -> Dict[str, Any]:
+def to_serializable_dict(params: Params) -> Dict[str, Any]:
   """Params as a dict safe to serialize, stringifying unsupported objects."""
   return {k: _serialize_param_value(v) for k, v in params.items()}
 
 
 __all__ = [
-  'HP',
+  'Params',
+  'Dynamic',
   'HyperParams',
   'Field',
   'Choice',
