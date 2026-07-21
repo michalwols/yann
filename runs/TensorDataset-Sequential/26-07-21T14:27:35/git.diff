@@ -1,0 +1,40 @@
+diff --git a/yann/params.py b/yann/params.py
+index aae4e58..b531bec 100644
+--- a/yann/params.py
++++ b/yann/params.py
+@@ -26,13 +26,14 @@ from hp import (
+   ValidationError,
+   fields_from_callable,
+   items,
+-  parametrize,
++  load,
++  params,
+   schema,
+   to_dict,
+   update,
+   validate,
+ )
+-from hp import from_command as _from_command
++from hp import cli as _cli
+ 
+ 
+ class HyperParams(Params):
+@@ -44,7 +45,7 @@ class HyperParams(Params):
+ 
+   @classmethod
+   def from_command(cls, cmd=None, validate_params=False, **kwargs):
+-    params = _from_command(cls, cmd)
++    params = load(cls, _cli(cmd) if cmd is not None else _cli)
+     if validate_params:
+       validate(params)
+     return params
+@@ -141,7 +142,8 @@ __all__ = [
+   'Evolve',
+   'ValidationError',
+   'schema',
+-  'parametrize',
++  'params',
++  'load',
+   'fields_from_callable',
+   'to_dict',
+   'items',
